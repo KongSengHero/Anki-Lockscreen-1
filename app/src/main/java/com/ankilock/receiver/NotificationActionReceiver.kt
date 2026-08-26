@@ -35,8 +35,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 AnkiNotificationService.update(context)
             }
             ACTION_OPEN_ANKI -> { 
-                val helper = AnkiDroidHelper(context)
-                helper.openAnkiDroidReviewer()
+                val ankiIntent = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                } ?: Intent(Intent.ACTION_MAIN).apply { 
+                    setPackage("com.ichi2.anki")
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                }
+                try { 
+                    context.startActivity(ankiIntent)
+                } catch (e: Exception) { 
+                    val helper = AnkiDroidHelper(context)
+                    helper.openAnkiDroidReviewer()
+                }
             }
         }
     }

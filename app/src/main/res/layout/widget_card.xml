@@ -5,14 +5,23 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="14dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingBottom="6dp">
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/tv_widget_stats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="9 · 6 · 57"
+            android:textColor="#94A3B8"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_widget_deck"
@@ -21,19 +30,11 @@
             android:layout_weight="1"
             android:text="Kaishi 1.5k"
             android:textColor="#E2E8F0"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold"
+            android:gravity="end"
             android:singleLine="true"
             android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/tv_widget_stats"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="10 · 15 · 65"
-            android:textColor="#94A3B8"
-            android:textSize="12sp"
-            android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout
@@ -49,7 +50,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#7EB6FF"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:gravity="center"
             android:visibility="gone" />
@@ -60,7 +61,7 @@
             android:layout_height="wrap_content"
             android:text="戦う"
             android:textColor="#FFFFFF"
-            android:textSize="26sp"
+            android:textSize="32sp"
             android:textStyle="bold"
             android:gravity="center" />
 
@@ -70,10 +71,10 @@
             android:layout_height="wrap_content"
             android:text="to wage war, to fight"
             android:textColor="#F1F5F9"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:paddingTop="2dp"
+            android:paddingTop="3dp"
             android:visibility="gone" />
 
         <TextView
@@ -82,11 +83,24 @@
             android:layout_height="wrap_content"
             android:text="彼は最後まで戦ったよ。"
             android:textColor="#CBD5E1"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:gravity="center"
-            android:singleLine="true"
+            android:maxLines="2"
             android:ellipsize="end"
-            android:paddingTop="4dp" />
+            android:paddingTop="6dp" />
+
+        <TextView
+            android:id="@+id/tv_widget_sentence_meaning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="He fought to the very end."
+            android:textColor="#94A3B8"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:paddingTop="2dp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout
@@ -95,57 +109,57 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="6dp">
+        android:paddingTop="8dp">
 
         <TextView
             android:id="@+id/btn_widget_again"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="6dp"
             android:background="@drawable/btn_again_bg"
             android:gravity="center"
             android:text="Again"
             android:textColor="#EF5350"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btn_widget_reveal"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:layout_weight="1.2"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="6dp"
             android:background="@drawable/btn_reveal_bg"
             android:gravity="center"
             android:text="Reveal"
             android:textColor="#90CAF9"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btn_widget_good"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="6dp"
             android:background="@drawable/btn_good_bg"
             android:gravity="center"
             android:text="Good"
             android:textColor="#66BB6A"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btn_widget_open"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:layout_weight="0.9"
             android:background="@drawable/btn_action_bg"
             android:gravity="center"
             android:text="Anki"
             android:textColor="#E2E8F0"
-            android:textSize="11sp" />
+            android:textSize="13sp" />
     </LinearLayout>
 
 </LinearLayout>

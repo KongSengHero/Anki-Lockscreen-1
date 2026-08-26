@@ -26,6 +26,7 @@ import com.ankilock.data.PreferencesManager
 import com.ankilock.receiver.NotificationActionReceiver
 import com.ankilock.util.MediaArtworkGenerator
 import com.ankilock.util.RubyTextRenderer
+import com.ankilock.widget.AnkiAppWidgetProvider
 import kotlin.math.max
     
 class AnkiNotificationService : Service() { 
@@ -194,8 +195,12 @@ class AnkiNotificationService : Service() {
         val stats = optimisticStats ?: ankiHelper.getSelectedDeckStats().also { optimisticStats = it }
         val totalDue = stats.first + stats.second + stats.third
         
-        if (card == null && totalDue == 0) { 
-            return buildAllCaughtUpNotification()
+        if (card == null) { 
+            return if (prefs.isMusicPlayerStyle) { 
+                buildMusicStyleNotification(null, stats)
+            } else { 
+                buildAllCaughtUpNotification()
+            }
         }
         
         return if (prefs.isMusicPlayerStyle) { 
@@ -293,8 +298,13 @@ class AnkiNotificationService : Service() {
         
         mediaSession?.setPlaybackState(playbackState)
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
-            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        } ?: Intent(Intent.ACTION_MAIN).apply { 
+            setPackage("com.ichi2.anki")
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        }
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
@@ -347,21 +357,14 @@ class AnkiNotificationService : Service() {
             .setShowActionsInCompactView(0, 1, 2)
             .setShowCancelButton(true)
         
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(smallIconRes)
             .setColor(cardColor)
             .setStyle(mediaStyle)
-            .setContentTitle(title)
-            .setContentText(artist)
+            .setContentTitle(if (card == null) "All Reviews Complete! 🎉" else title)
+            .setContentText(if (card == null) "お疲れ様でした！また明日頑張りましょう！" else artist)
             .setSubText(deckName)
             .setLargeIcon(artworkBitmap)
-            .addAction(R.drawable.ic_skip_previous, "Again", againPending)
-            .addAction( 
-                if (isRevealed) R.drawable.ic_pause else R.drawable.ic_play, 
-                if (isRevealed) "Hide" else "Reveal", 
-                revealPending
-            )
-            .addAction(R.drawable.ic_skip_next, "Good", goodPending)
             .setContentIntent(openAnkiPending)
             .setDeleteIntent(dismissPending)
             .setOngoing(true)
@@ -370,7 +373,20 @@ class AnkiNotificationService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setSilent(true)
-            .build()
+            
+        if (card != null) { 
+            builder.addAction(R.drawable.ic_skip_previous, "Again", againPending)
+            builder.addAction( 
+                if (isRevealed) R.drawable.ic_pause else R.drawable.ic_play, 
+                if (isRevealed) "Hide" else "Reveal", 
+                revealPending
+            )
+            builder.addAction(R.drawable.ic_skip_next, "Good", goodPending)
+        } else { 
+            builder.addAction(R.drawable.ic_notification, "Open Anki", openAnkiPending)
+        }
+        
+        return builder.build()
     }
     
     private fun buildFlashcardNotification( 
@@ -432,8 +448,13 @@ class AnkiNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
-            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        } ?: Intent(Intent.ACTION_MAIN).apply { 
+            setPackage("com.ichi2.anki")
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        }
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
@@ -636,23 +657,28 @@ class AnkiNotificationService : Service() {
     }
     
     private fun buildAllCaughtUpNotification(): Notification { 
-        val openAnkiIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
-            action = NotificationActionReceiver.ACTION_OPEN_ANKI
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        } ?: Intent(Intent.ACTION_MAIN).apply { 
+            setPackage("com.ichi2.anki")
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         }
-        val openAnkiPending = PendingIntent.getBroadcast( 
+        val openAnkiPending = PendingIntent.getActivity( 
             this, 
             201, 
-            openAnkiIntent, 
+            ankiIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
         return NotificationCompat.Builder(this, CHANNEL_ID) 
             .setSmallIcon(R.drawable.ic_notification) 
-            .setContentTitle(getString(R.string.all_caught_up)) 
-            .setContentText("Tap to open AnkiDroid") 
+            .setContentTitle("お疲れ様でした！ 🎉") 
+            .setContentText("All reviews complete for today! Come back tomorrow.") 
             .setOngoing(true) 
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) 
             .setContentIntent(openAnkiPending) 
+            .addAction(R.drawable.ic_notification, "Open Anki", openAnkiPending) 
             .setPriority(NotificationCompat.PRIORITY_HIGH) 
             .setSilent(true) 
             .build()
@@ -662,8 +688,13 @@ class AnkiNotificationService : Service() {
         val remainingMs = prefs.snoozeUntil - System.currentTimeMillis()
         val remainingMin = (remainingMs / 60000).coerceAtLeast(1)
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
-            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        } ?: Intent(Intent.ACTION_MAIN).apply { 
+            setPackage("com.ichi2.anki")
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        }
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             202, 
@@ -731,6 +762,8 @@ class AnkiNotificationService : Service() {
     fun updateNotification() { 
         val notification = buildNotification()
         notificationManager.notify(NOTIFICATION_ID, notification)
+        AnkiAppWidgetProvider.syncCard(currentCard, isRevealed)
+        AnkiAppWidgetProvider.updateAllWidgets(this)
     }
     
     companion object { 

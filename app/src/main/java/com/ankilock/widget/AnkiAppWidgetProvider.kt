@@ -79,6 +79,11 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
         private var currentCard: CardInfo? = null
         private var isRevealed: Boolean = false
         
+        fun syncCard(card: CardInfo?, revealed: Boolean) { 
+            currentCard = card
+            isRevealed = revealed
+        }
+        
         fun updateAllWidgets(context: Context) { 
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val thisWidget = ComponentName(context, AnkiAppWidgetProvider::class.java)
@@ -106,7 +111,7 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
             val stats = ankiHelper.getSelectedDeckStats()
             val rv = RemoteViews(context.packageName, R.layout.widget_card)
             
-            val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
+            val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "All Decks"
             val newC = stats.first
             val learnC = stats.second
             val revC = stats.third
@@ -115,11 +120,54 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
             rv.setTextViewText(R.id.tv_widget_deck, deckName)
             rv.setTextViewText(R.id.tv_widget_stats, Html.fromHtml(statsHtml, Html.FROM_HTML_MODE_COMPACT))
             
-            val kanjiText = card?.kanji?.ifEmpty { card.question } ?: "Review Deck"
-            val kanjiFurigana = card?.kanjiFurigana ?: ""
-            val kanjiMeaning = card?.kanjiMeaning?.ifEmpty { card.answer } ?: ""
+            val ankiIntent = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            } ?: Intent(Intent.ACTION_MAIN).apply { 
+                setPackage("com.ichi2.anki")
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+            val ankiPending = PendingIntent.getActivity( 
+                context, 
+                304, 
+                ankiIntent, 
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            rv.setOnClickPendingIntent(R.id.btn_widget_open, ankiPending)
+            
+            if (card == null) { 
+                rv.setTextViewText(R.id.tv_widget_kanji, "お疲れ様でした！")
+                rv.setViewVisibility(R.id.tv_widget_furigana, View.GONE)
+                rv.setTextViewText(R.id.tv_widget_meaning, "All reviews complete for today! 🎉")
+                rv.setViewVisibility(R.id.tv_widget_meaning, View.VISIBLE)
+                rv.setTextViewText(R.id.tv_widget_sentence, "また明日頑張りましょう！")
+                rv.setViewVisibility(R.id.tv_widget_sentence, View.VISIBLE)
+                rv.setTextViewText(R.id.tv_widget_sentence_meaning, "Come back tomorrow for your next cards.")
+                rv.setViewVisibility(R.id.tv_widget_sentence_meaning, View.VISIBLE)
+                
+                rv.setViewVisibility(R.id.btn_widget_again, View.GONE)
+                rv.setViewVisibility(R.id.btn_widget_reveal, View.GONE)
+                rv.setViewVisibility(R.id.btn_widget_good, View.GONE)
+                rv.setViewVisibility(R.id.btn_widget_open, View.VISIBLE)
+                rv.setTextViewText(R.id.btn_widget_open, "Open AnkiDroid")
+                
+                rv.setOnClickPendingIntent(R.id.widget_card_content, ankiPending)
+                appWidgetManager.updateAppWidget(widgetId, rv)
+                return
+            }
+            
+            rv.setViewVisibility(R.id.btn_widget_again, View.VISIBLE)
+            rv.setViewVisibility(R.id.btn_widget_reveal, View.VISIBLE)
+            rv.setViewVisibility(R.id.btn_widget_good, View.VISIBLE)
+            rv.setTextViewText(R.id.btn_widget_open, "Anki")
+            
+            val kanjiText = card.kanji.ifEmpty { card.question }
+            val kanjiFurigana = card.kanjiFurigana
+            val kanjiMeaning = card.kanjiMeaning.ifEmpty { card.answer }
             val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "").trim()
-            val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "")?.trim() ?: ""
+            val rawSentence = card.sentence.replace(Regex("<[^>]*>"), "").trim()
+            val sentenceMeaning = card.sentenceMeaning
+            val cleanSentenceMeaning = sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
             
             rv.setTextViewText(R.id.tv_widget_kanji, kanjiText)
             
@@ -137,10 +185,19 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
                 } else { 
                     rv.setViewVisibility(R.id.tv_widget_meaning, View.GONE)
                 }
+                
+                if (cleanSentenceMeaning.isNotBlank()) { 
+                    rv.setTextViewText(R.id.tv_widget_sentence_meaning, cleanSentenceMeaning)
+                    rv.setViewVisibility(R.id.tv_widget_sentence_meaning, View.VISIBLE)
+                } else { 
+                    rv.setViewVisibility(R.id.tv_widget_sentence_meaning, View.GONE)
+                }
+                
                 rv.setTextViewText(R.id.btn_widget_reveal, "Hide")
             } else { 
                 rv.setViewVisibility(R.id.tv_widget_furigana, View.GONE)
                 rv.setViewVisibility(R.id.tv_widget_meaning, View.GONE)
+                rv.setViewVisibility(R.id.tv_widget_sentence_meaning, View.GONE)
                 rv.setTextViewText(R.id.btn_widget_reveal, "Reveal")
             }
             
@@ -184,16 +241,6 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             rv.setOnClickPendingIntent(R.id.btn_widget_good, goodPending)
-            
-            val ankiIntent = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki") 
-                ?: Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-            val ankiPending = PendingIntent.getActivity( 
-                context, 
-                304, 
-                ankiIntent, 
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            rv.setOnClickPendingIntent(R.id.btn_widget_open, ankiPending)
             
             appWidgetManager.updateAppWidget(widgetId, rv)
         }

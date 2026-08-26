@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
     private var savedImageUrisState by mutableStateOf<Set<String>>(emptySet())
     private var blurRadiusState by mutableFloatStateOf(25f)
     private var dimOpacityState by mutableFloatStateOf(0.45f)
+    private var artworkOpacityState by mutableFloatStateOf(1.0f)
     
     private val ankiPermissionLauncher = registerForActivityResult( 
         ActivityResultContracts.RequestPermission()
@@ -171,6 +172,7 @@ class MainActivity : ComponentActivity() {
             if (prefs.isServiceEnabled) { 
                 AnkiNotificationService.update(this)
             }
+            AnkiAppWidgetProvider.updateAllWidgets(this)
         }
     }
     
@@ -185,6 +187,7 @@ class MainActivity : ComponentActivity() {
         savedImageUrisState = prefs.savedImageUris
         blurRadiusState = prefs.blurRadius.toFloat()
         dimOpacityState = prefs.dimOpacity
+        artworkOpacityState = prefs.artworkOpacity
         
         requestInitialPermissions()
         
@@ -212,6 +215,7 @@ class MainActivity : ComponentActivity() {
         savedImageUrisState = prefs.savedImageUris
         blurRadiusState = prefs.blurRadius.toFloat()
         dimOpacityState = prefs.dimOpacity
+        artworkOpacityState = prefs.artworkOpacity
     }
     
     private fun requestInitialPermissions() { 
@@ -391,6 +395,7 @@ class MainActivity : ComponentActivity() {
                     currentType = backgroundTypeState, 
                     blurRadius = blurRadiusState, 
                     dimOpacity = dimOpacityState, 
+                    artworkOpacity = artworkOpacityState, 
                     savedUris = savedImageUrisState, 
                     currentUri = customImageUriState, 
                     onSelectType = { type -> 
@@ -423,6 +428,11 @@ class MainActivity : ComponentActivity() {
                     onOpacityChange = { newOpacity -> 
                         dimOpacityState = newOpacity
                         prefs.dimOpacity = newOpacity
+                        if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                    }, 
+                    onArtworkOpacityChange = { newArtOpacity -> 
+                        artworkOpacityState = newArtOpacity
+                        prefs.artworkOpacity = newArtOpacity
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
                     }
                 )
@@ -745,6 +755,7 @@ class MainActivity : ComponentActivity() {
         currentType: String, 
         blurRadius: Float, 
         dimOpacity: Float, 
+        artworkOpacity: Float, 
         savedUris: Set<String>, 
         currentUri: String?, 
         onSelectType: (String) -> Unit, 
@@ -752,11 +763,12 @@ class MainActivity : ComponentActivity() {
         onRemoveSavedUri: (String) -> Unit, 
         onPickNewImage: () -> Unit, 
         onBlurChange: (Float) -> Unit, 
-        onOpacityChange: (Float) -> Unit
+        onOpacityChange: (Float) -> Unit, 
+        onArtworkOpacityChange: (Float) -> Unit
     ) { 
         val context = LocalContext.current
-        val options = listOf("transparent", "dark_blur", "sunset", "custom")
-        val labels = listOf("Glass", "Dark Blur", "Sunset", "Custom")
+        val options = listOf("anki_lock", "dark_blur", "sunset", "custom", "transparent")
+        val labels = listOf("AnkiLock", "Dark Blur", "Sunset", "Custom", "Glass")
         val selectedIndex = options.indexOf(currentType).coerceAtLeast(0)
         
         Card( 
@@ -835,7 +847,7 @@ class MainActivity : ComponentActivity() {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text( 
-                            "Dimming Opacity: ${(dimOpacity * 100).toInt()}%", 
+                            "Dark Dimming Tint: ${(dimOpacity * 100).toInt()}%", 
                             fontSize = 12.sp, 
                             color = Color(0xFF94A3B8)
                         )
@@ -844,6 +856,31 @@ class MainActivity : ComponentActivity() {
                         value = dimOpacity, 
                         onValueChange = onOpacityChange, 
                         valueRange = 0.0f..0.9f, 
+                        colors = SliderDefaults.colors( 
+                            thumbColor = MaterialTheme.colorScheme.primary, 
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Icon( 
+                            Icons.Filled.AutoAwesome, 
+                            contentDescription = null, 
+                            tint = Color(0xFF94A3B8), 
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text( 
+                            "Artwork Opacity: ${(artworkOpacity * 100).toInt()}%", 
+                            fontSize = 12.sp, 
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    Slider( 
+                        value = artworkOpacity, 
+                        onValueChange = onArtworkOpacityChange, 
+                        valueRange = 0.1f..1.0f, 
                         colors = SliderDefaults.colors( 
                             thumbColor = MaterialTheme.colorScheme.primary, 
                             activeTrackColor = MaterialTheme.colorScheme.primary
@@ -1418,8 +1455,8 @@ class MainActivity : ComponentActivity() {
         onPickImage: () -> Unit
     ) { 
         val context = LocalContext.current
-        val options = listOf("transparent", "dark_blur", "sunset", "custom")
-        val labels = listOf("Glass", "Dark Blur", "Sunset", "Custom")
+        val options = listOf("anki_lock", "dark_blur", "sunset", "custom", "transparent")
+        val labels = listOf("AnkiLock", "Dark Blur", "Sunset", "Custom", "Glass")
         val selectedIndex = options.indexOf(currentType).coerceAtLeast(0)
         
         SettingsCard(icon = Icons.Filled.Style, title = "Music Background Style") { 

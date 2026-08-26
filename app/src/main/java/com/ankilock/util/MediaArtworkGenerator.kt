@@ -13,6 +13,7 @@ import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import com.ankilock.R
 import com.ankilock.data.CardInfo
 import com.ankilock.data.PreferencesManager
 import kotlin.math.max
@@ -35,7 +36,7 @@ object MediaArtworkGenerator {
         
         drawBackground(context, prefs, canvas)
         
-        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
+        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "All Caught Up"
         val deckPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#38FFFFFF")
             style = Paint.Style.FILL
@@ -49,16 +50,17 @@ object MediaArtworkGenerator {
         
         val deckWidth = deckTextPaint.measureText(deckName) + 36f
         val deckHeight = 44f
+        val deckPillLeft = ARTWORK_SIZE - 36f - deckWidth
         val deckRect = RectF( 
+            deckPillLeft, 
             36f, 
-            36f, 
-            36f + deckWidth, 
+            deckPillLeft + deckWidth, 
             36f + deckHeight
         )
         canvas.drawRoundRect(deckRect, 22f, 22f, deckPillPaint)
         canvas.drawText( 
             deckName, 
-            36f + deckWidth / 2f, 
+            deckPillLeft + deckWidth / 2f, 
             36f + 30f, 
             deckTextPaint
         )
@@ -102,7 +104,7 @@ object MediaArtworkGenerator {
         
         val totalStatsWidth = wNew + wDot1 + wLearn + wDot2 + wRev
         val statsPillWidth = totalStatsWidth + 36f
-        val statsPillLeft = ARTWORK_SIZE - 36f - statsPillWidth
+        val statsPillLeft = 36f
         val statsRect = RectF( 
             statsPillLeft, 
             36f, 
@@ -119,7 +121,7 @@ object MediaArtworkGenerator {
         val statsY = 36f + 30f
         
         canvas.drawText(newText, curStatsX, statsY, newPaint)
-        if (cardType == 0) { 
+        if (cardType == 0 && card != null) { 
             val underlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#8AB4F8")
                 style = Paint.Style.FILL
@@ -137,7 +139,7 @@ object MediaArtworkGenerator {
         curStatsX += wDot1
         
         canvas.drawText(learnText, curStatsX, statsY, learnPaint)
-        if (cardType == 1) { 
+        if (cardType == 1 && card != null) { 
             val underlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#F28B82")
                 style = Paint.Style.FILL
@@ -155,7 +157,7 @@ object MediaArtworkGenerator {
         curStatsX += wDot2
         
         canvas.drawText(revText, curStatsX, statsY, revPaint)
-        if (cardType == 2) { 
+        if (cardType == 2 && card != null) { 
             val underlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#81C995")
                 style = Paint.Style.FILL
@@ -168,16 +170,21 @@ object MediaArtworkGenerator {
             )
         }
         
-        val kanjiText = card?.kanji?.ifEmpty { card.question } ?: "Review Deck"
-        val kanjiFurigana = card?.kanjiFurigana ?: ""
-        val kanjiMeaning = card?.kanjiMeaning?.ifEmpty { card.answer } ?: ""
+        if (card == null) { 
+            drawCongratulations(canvas)
+            return bitmap
+        }
+        
+        val kanjiText = card.kanji.ifEmpty { card.question }
+        val kanjiFurigana = card.kanjiFurigana
+        val kanjiMeaning = card.kanjiMeaning.ifEmpty { card.answer }
         val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "").trim()
-        val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "")?.trim() ?: ""
-        val sentenceFurigana = card?.sentenceFurigana ?: ""
-        val sentenceMeaning = card?.sentenceMeaning ?: ""
+        val rawSentence = card.sentence.replace(Regex("<[^>]*>"), "").trim()
+        val sentenceFurigana = card.sentenceFurigana
+        val sentenceMeaning = card.sentenceMeaning
         val cleanSentenceMeaning = sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
         
-        var curY = 145f
+        var curY = 125f
         
         if (isRevealed && kanjiFurigana.isNotBlank()) { 
             val furiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
@@ -192,9 +199,9 @@ object MediaArtworkGenerator {
                 curY, 
                 furiPaint
             )
-            curY += 42f
+            curY += 46f
         } else { 
-            curY += 22f
+            curY += 36f
         }
         
         val kanjiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
@@ -255,7 +262,7 @@ object MediaArtworkGenerator {
         
         var sentenceSectionY = dividerY + 20f
         
-        val rubyBitmap = if (sentenceFurigana.isNotBlank()) { 
+        val rubyBitmap = if (isRevealed && sentenceFurigana.isNotBlank()) { 
             RubyTextRenderer.renderRubyBitmap( 
                 context = context, 
                 rawText = sentenceFurigana, 
@@ -373,13 +380,120 @@ object MediaArtworkGenerator {
         return bitmap
     }
     
+    private fun drawCongratulations(canvas: Canvas) { 
+        val congratsPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.WHITE
+            textSize = 62f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText( 
+            "お疲れ様でした！", 
+            ARTWORK_SIZE / 2f, 
+            ARTWORK_SIZE * 0.35f, 
+            congratsPaint
+        )
+        
+        val subPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#F1F5F9")
+            textSize = 28f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText( 
+            "All reviews complete for today! 🎉", 
+            ARTWORK_SIZE / 2f, 
+            ARTWORK_SIZE * 0.44f, 
+            subPaint
+        )
+        
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#38FFFFFF")
+            strokeWidth = 2f
+        }
+        canvas.drawLine( 
+            ARTWORK_SIZE * 0.15f, 
+            ARTWORK_SIZE * 0.50f, 
+            ARTWORK_SIZE * 0.85f, 
+            ARTWORK_SIZE * 0.50f, 
+            dividerPaint
+        )
+        
+        val cheerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#CBD5E1")
+            textSize = 26f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText( 
+            "また明日頑張りましょう！", 
+            ARTWORK_SIZE / 2f, 
+            ARTWORK_SIZE * 0.58f, 
+            cheerPaint
+        )
+        
+        val tomorrowPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#94A3B8")
+            textSize = 22f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText( 
+            "Come back tomorrow for your next cards.", 
+            ARTWORK_SIZE / 2f, 
+            ARTWORK_SIZE * 0.65f, 
+            tomorrowPaint
+        )
+        
+        val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#8AB4F8")
+            textSize = 21f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText( 
+            "• Tap Open Anki to Study Ahead •", 
+            ARTWORK_SIZE / 2f, 
+            ARTWORK_SIZE - 28f, 
+            hintPaint
+        )
+    }
+    
     private fun drawBackground(context: Context, prefs: PreferencesManager, canvas: Canvas) { 
         val bgType = prefs.backgroundType
         val radius = prefs.blurRadius
         val dimAlpha = (prefs.dimOpacity * 255).toInt().coerceIn(0, 255)
+        val artworkAlpha = (prefs.artworkOpacity * 255).toInt().coerceIn(0, 255)
         val dstRect = RectF(0f, 0f, ARTWORK_SIZE.toFloat(), ARTWORK_SIZE.toFloat())
         
         when (bgType) { 
+            "anki_lock", "default" -> { 
+                try { 
+                    val originalBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.anki_lock)
+                    if (originalBitmap != null) { 
+                        val blurred = if (radius > 0) ImageBlurUtil.fastBlur(originalBitmap, 0.25f, radius) else originalBitmap
+                        val bmpW = blurred.width
+                        val bmpH = blurred.height
+                        val cropSize = min(bmpW, bmpH)
+                        val cropX = (bmpW - cropSize) / 2
+                        val cropY = (bmpH - cropSize) / 2
+                        val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
+                        val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
+                            alpha = artworkAlpha
+                        }
+                        canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
+                        
+                        if (dimAlpha > 0) { 
+                            val dimPaint = Paint().apply { 
+                                color = Color.argb(dimAlpha, 0, 0, 0)
+                            }
+                            canvas.drawRect(dstRect, dimPaint)
+                        }
+                    }
+                } catch (e: Exception) { 
+                    e.printStackTrace()
+                }
+            }
             "custom" -> { 
                 val uriStr = prefs.customImageUri
                 if (!uriStr.isNullOrBlank()) { 
@@ -396,7 +510,10 @@ object MediaArtworkGenerator {
                             val cropX = (bmpW - cropSize) / 2
                             val cropY = (bmpH - cropSize) / 2
                             val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
-                            canvas.drawBitmap(blurred, srcRect, dstRect, Paint(Paint.FILTER_BITMAP_FLAG))
+                            val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
+                                alpha = artworkAlpha
+                            }
+                            canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
                             
                             if (dimAlpha > 0) { 
                                 val dimPaint = Paint().apply { 
@@ -414,7 +531,10 @@ object MediaArtworkGenerator {
                 val preset = ImageBlurUtil.createPresetBackground(bgType, ARTWORK_SIZE, ARTWORK_SIZE)
                 val blurred = ImageBlurUtil.fastBlur(preset, 0.5f, radius)
                 val srcRect = Rect(0, 0, blurred.width, blurred.height)
-                canvas.drawBitmap(blurred, srcRect, dstRect, Paint(Paint.FILTER_BITMAP_FLAG))
+                val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
+                    alpha = artworkAlpha
+                }
+                canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
                 
                 if (dimAlpha > 0) { 
                     val dimPaint = Paint().apply { 

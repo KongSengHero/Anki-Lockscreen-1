@@ -35,7 +35,7 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_MUSIC_PLAYER_STYLE, value).apply()
     
     var backgroundType: String
-        get() = prefs.getString(KEY_BACKGROUND_TYPE, "transparent") ?: "transparent"
+        get() = prefs.getString(KEY_BACKGROUND_TYPE, "anki_lock") ?: "anki_lock"
         set(value) = prefs.edit().putString(KEY_BACKGROUND_TYPE, value).apply()
     
     var customImageUri: String?
@@ -53,6 +53,10 @@ class PreferencesManager(context: Context) {
     var dimOpacity: Float
         get() = prefs.getFloat(KEY_DIM_OPACITY, 0.45f)
         set(value) = prefs.edit().putFloat(KEY_DIM_OPACITY, value).apply()
+    
+    var artworkOpacity: Float
+        get() = prefs.getFloat(KEY_ARTWORK_OPACITY, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_ARTWORK_OPACITY, value).apply()
     
     var isModernUi: Boolean
         get() = prefs.getBoolean(KEY_IS_MODERN_UI, true)
@@ -95,6 +99,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_SAVED_IMAGE_URIS = "saved_image_uris"
         private const val KEY_BLUR_RADIUS = "blur_radius"
         private const val KEY_DIM_OPACITY = "dim_opacity"
+        private const val KEY_ARTWORK_OPACITY = "artwork_opacity"
         private const val KEY_IS_MODERN_UI = "is_modern_ui"
     }
 }

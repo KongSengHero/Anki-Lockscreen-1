@@ -86,18 +86,16 @@ class AnkiDroidHelper(private val context: Context) {
                             }
                         }
                         
+                        if (newC > 100) { 
+                            val dueNew = getNotesDueCount("deck:\"$name\" is:new is:due")
+                            if (dueNew > 0) newC = dueNew
+                        }
+                        
                         if (newC == 0 && learnC == 0 && revC == 0) { 
                             val s = getDeckStatsForDeck(name)
-                            if (s.first > 0 || s.second > 0 || s.third > 0) { 
-                                newC = s.first
-                                learnC = s.second
-                                revC = s.third
-                            } else if (name.contains("Kaishi", true)) { 
-                                val fallback = getSelectedDeckStats()
-                                newC = fallback.first
-                                learnC = fallback.second
-                                revC = fallback.third
-                            }
+                            newC = s.first
+                            learnC = s.second
+                            revC = s.third
                         }
                         
                         decks.add( 
@@ -121,10 +119,10 @@ class AnkiDroidHelper(private val context: Context) {
     
     fun getSelectedDeckStats(): Triple<Int, Int, Int> { 
         val uris = listOf( 
-            Uri.parse("content://$AUTHORITY/decks/"), 
-            Uri.parse("content://$AUTHORITY/decks"), 
+            Uri.parse("content://$AUTHORITY/selected_deck"), 
             Uri.parse("content://$AUTHORITY/selected_deck/"), 
-            Uri.parse("content://$AUTHORITY/selected_deck")
+            Uri.parse("content://$AUTHORITY/decks/"), 
+            Uri.parse("content://$AUTHORITY/decks")
         )
         
         for (uri in uris) { 
@@ -139,15 +137,15 @@ class AnkiDroidHelper(private val context: Context) {
                             val countsStr = cur.getString(countsIdx) ?: ""
                             val nums = Regex("\\d+").findAll(countsStr).map { it.value.toInt() }.toList()
                             if (nums.size >= 3) { 
-                                val c0 = nums[0]
-                                val c1 = nums[1]
-                                val c2 = nums[2]
-                                if (uri.toString().contains("selected_deck")) { 
-                                    if (c0 > 0 || c1 > 0 || c2 > 0) return Triple(c0, c1, c2)
-                                } else { 
-                                    if (name.contains("Kaishi", true) || (c0 > 0 || c1 > 0 || c2 > 0)) { 
-                                        return Triple(c2, c0, c1)
-                                    }
+                                val learnC = nums[0]
+                                val revC = nums[1]
+                                var newC = nums[2]
+                                if (newC > 100) { 
+                                    val dueNew = getNotesDueCount("deck:\"$name\" is:new is:due")
+                                    if (dueNew > 0) newC = dueNew
+                                }
+                                if (learnC > 0 || revC > 0 || newC > 0) { 
+                                    return Triple(newC, learnC, revC)
                                 }
                             }
                         }
@@ -157,19 +155,21 @@ class AnkiDroidHelper(private val context: Context) {
             }
         }
         
-        val newNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:new")
+        val newNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:new is:due").takeIf { it > 0 } 
+            ?: getNotesDueCount("deck:\"Kaishi 1.5k\" is:new")
         val learnNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:learn")
         val dueNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:due -is:learn -is:new")
         if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
             return Triple(newNotes, learnNotes, dueNotes)
         }
         
-        return Triple(10, 15, 65)
+        return Triple(0, 0, 0)
     }
     
     fun getDeckStatsForDeck(deckName: String): Triple<Int, Int, Int> { 
         val cleanDeck = deckName.trim()
-        val newNotes = getNotesDueCount("deck:\"$cleanDeck\" is:new")
+        val newNotes = getNotesDueCount("deck:\"$cleanDeck\" is:new is:due").takeIf { it > 0 } 
+            ?: getNotesDueCount("deck:\"$cleanDeck\" is:new")
         val learnNotes = getNotesDueCount("deck:\"$cleanDeck\" is:learn")
         val dueNotes = getNotesDueCount("deck:\"$cleanDeck\" is:due -is:learn -is:new")
         if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
