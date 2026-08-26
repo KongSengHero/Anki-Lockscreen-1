@@ -120,13 +120,7 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
             rv.setTextViewText(R.id.tv_widget_deck, deckName)
             rv.setTextViewText(R.id.tv_widget_stats, Html.fromHtml(statsHtml, Html.FROM_HTML_MODE_COMPACT))
             
-            val ankiIntent = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-            } ?: Intent(Intent.ACTION_MAIN).apply { 
-                setPackage("com.ichi2.anki")
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-            }
+            val ankiIntent = ankiHelper.getAnkiLaunchIntent()
             val ankiPending = PendingIntent.getActivity( 
                 context, 
                 304, 

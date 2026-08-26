@@ -13,8 +13,3 @@ val DarkSurfaceVariant = Color(0xFF2A2A3D)
 val LightBackground = Color(0xFFF8F8FC)
 val LightSurface = Color(0xFFFFFFFF)
 val LightSurfaceVariant = Color(0xFFE8E8F0)
-    
-val AgainRed = Color(0xFFEF5350)
-val HardOrange = Color(0xFFFFB74D)
-val GoodGreen = Color(0xFF66BB6A)
-val EasyBlue = Color(0xFF42A5F5)

@@ -3,7 +3,6 @@ package com.ankilock.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.data.PreferencesManager
 import com.ankilock.service.AnkiNotificationService
     
@@ -34,21 +33,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
             ACTION_DISMISSED -> { 
                 AnkiNotificationService.update(context)
             }
-            ACTION_OPEN_ANKI -> { 
-                val ankiIntent = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                } ?: Intent(Intent.ACTION_MAIN).apply { 
-                    setPackage("com.ichi2.anki")
-                    addCategory(Intent.CATEGORY_LAUNCHER)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                }
-                try { 
-                    context.startActivity(ankiIntent)
-                } catch (e: Exception) { 
-                    val helper = AnkiDroidHelper(context)
-                    helper.openAnkiDroidReviewer()
-                }
-            }
         }
     }
     
@@ -59,6 +43,5 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_SNOOZE = "com.ankilock.ACTION_SNOOZE"
         const val ACTION_UNSNOOZE = "com.ankilock.ACTION_UNSNOOZE"
         const val ACTION_DISMISSED = "com.ankilock.ACTION_DISMISSED"
-        const val ACTION_OPEN_ANKI = "com.ankilock.ACTION_OPEN_ANKI"
     }
 }

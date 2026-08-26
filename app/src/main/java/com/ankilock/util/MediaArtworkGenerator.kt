@@ -466,32 +466,13 @@ object MediaArtworkGenerator {
         val artworkAlpha = (prefs.artworkOpacity * 255).toInt().coerceIn(0, 255)
         val dstRect = RectF(0f, 0f, ARTWORK_SIZE.toFloat(), ARTWORK_SIZE.toFloat())
         
-        when (bgType) { 
+        val bitmapToDraw: Bitmap? = when (bgType) { 
             "anki_lock", "default" -> { 
                 try { 
-                    val originalBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.anki_lock)
-                    if (originalBitmap != null) { 
-                        val blurred = if (radius > 0) ImageBlurUtil.fastBlur(originalBitmap, 0.25f, radius) else originalBitmap
-                        val bmpW = blurred.width
-                        val bmpH = blurred.height
-                        val cropSize = min(bmpW, bmpH)
-                        val cropX = (bmpW - cropSize) / 2
-                        val cropY = (bmpH - cropSize) / 2
-                        val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
-                        val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
-                            alpha = artworkAlpha
-                        }
-                        canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
-                        
-                        if (dimAlpha > 0) { 
-                            val dimPaint = Paint().apply { 
-                                color = Color.argb(dimAlpha, 0, 0, 0)
-                            }
-                            canvas.drawRect(dstRect, dimPaint)
-                        }
-                    }
+                    val original = BitmapFactory.decodeResource(context.resources, R.drawable.anki_lock)
+                    if (original != null && radius > 0) ImageBlurUtil.fastBlur(original, 0.25f, radius) else original
                 } catch (e: Exception) { 
-                    e.printStackTrace()
+                    null
                 }
             }
             "custom" -> { 
@@ -499,52 +480,50 @@ object MediaArtworkGenerator {
                 if (!uriStr.isNullOrBlank()) { 
                     try { 
                         val uri = Uri.parse(uriStr)
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val originalBitmap = BitmapFactory.decodeStream(inputStream)
-                        inputStream?.close()
-                        if (originalBitmap != null) { 
-                            val blurred = ImageBlurUtil.fastBlur(originalBitmap, 0.25f, radius)
-                            val bmpW = blurred.width
-                            val bmpH = blurred.height
-                            val cropSize = min(bmpW, bmpH)
-                            val cropX = (bmpW - cropSize) / 2
-                            val cropY = (bmpH - cropSize) / 2
-                            val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
-                            val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
-                                alpha = artworkAlpha
-                            }
-                            canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
-                            
-                            if (dimAlpha > 0) { 
-                                val dimPaint = Paint().apply { 
-                                    color = Color.argb(dimAlpha, 0, 0, 0)
-                                }
-                                canvas.drawRect(dstRect, dimPaint)
-                            }
+                        context.contentResolver.openInputStream(uri)?.use { stream -> 
+                            val original = BitmapFactory.decodeStream(stream)
+                            if (original != null) ImageBlurUtil.fastBlur(original, 0.25f, radius) else null
                         }
                     } catch (e: Exception) { 
-                        e.printStackTrace()
+                        null
                     }
-                }
+                } else null
             }
             "dark_blur", "sunset" -> { 
                 val preset = ImageBlurUtil.createPresetBackground(bgType, ARTWORK_SIZE, ARTWORK_SIZE)
-                val blurred = ImageBlurUtil.fastBlur(preset, 0.5f, radius)
-                val srcRect = Rect(0, 0, blurred.width, blurred.height)
-                val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
-                    alpha = artworkAlpha
-                }
-                canvas.drawBitmap(blurred, srcRect, dstRect, bmpPaint)
-                
-                if (dimAlpha > 0) { 
-                    val dimPaint = Paint().apply { 
-                        color = Color.argb(dimAlpha, 0, 0, 0)
-                    }
-                    canvas.drawRect(dstRect, dimPaint)
-                }
+                ImageBlurUtil.fastBlur(preset, 0.5f, radius)
             }
-            else -> { 
+            else -> null
+        }
+        
+        if (bitmapToDraw != null) { 
+            drawCroppedBitmapWithOverlay(canvas, bitmapToDraw, artworkAlpha, dimAlpha, dstRect)
+        }
+    }
+    
+    private fun drawCroppedBitmapWithOverlay( 
+        canvas: Canvas, 
+        bitmap: Bitmap, 
+        artworkAlpha: Int, 
+        dimAlpha: Int, 
+        dstRect: RectF
+    ) { 
+        val bmpW = bitmap.width
+        val bmpH = bitmap.height
+        val cropSize = min(bmpW, bmpH)
+        val cropX = (bmpW - cropSize) / 2
+        val cropY = (bmpH - cropSize) / 2
+        val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
+        val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
+            alpha = artworkAlpha
+        }
+        canvas.drawBitmap(bitmap, srcRect, dstRect, bmpPaint)
+        
+        if (dimAlpha > 0) { 
+            val dimPaint = Paint().apply { 
+                color = Color.argb(dimAlpha, 0, 0, 0)
             }
+            canvas.drawRect(dstRect, dimPaint)
         }
     }
 }

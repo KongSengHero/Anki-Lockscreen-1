@@ -58,10 +58,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getFloat(KEY_ARTWORK_OPACITY, 1.0f)
         set(value) = prefs.edit().putFloat(KEY_ARTWORK_OPACITY, value).apply()
     
-    var isModernUi: Boolean
-        get() = prefs.getBoolean(KEY_IS_MODERN_UI, true)
-        set(value) = prefs.edit().putBoolean(KEY_IS_MODERN_UI, value).apply()
-    
     val isSnoozed: Boolean
         get() = System.currentTimeMillis() < snoozeUntil
     
@@ -100,6 +96,5 @@ class PreferencesManager(context: Context) {
         private const val KEY_BLUR_RADIUS = "blur_radius"
         private const val KEY_DIM_OPACITY = "dim_opacity"
         private const val KEY_ARTWORK_OPACITY = "artwork_opacity"
-        private const val KEY_IS_MODERN_UI = "is_modern_ui"
     }
 }

@@ -3,6 +3,7 @@ package com.ankilock.anki
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -11,18 +12,6 @@ import androidx.core.content.ContextCompat
 import com.ankilock.data.CardInfo
 import com.ankilock.data.DeckInfo
 import java.io.File
-    
-data class CardParsedContent( 
-    val question: String = "", 
-    val answer: String = "", 
-    val kanji: String = "", 
-    val kanjiFurigana: String = "", 
-    val kanjiMeaning: String = "", 
-    val sentence: String = "", 
-    val sentenceFurigana: String = "", 
-    val sentenceMeaning: String = "", 
-    val imageFileName: String = ""
-)
     
 class AnkiDroidHelper(private val context: Context) { 
     
@@ -117,6 +106,16 @@ class AnkiDroidHelper(private val context: Context) {
         return decks
     }
     
+    fun getAnkiLaunchIntent(): Intent { 
+        return context.packageManager.getLaunchIntentForPackage(ANKI_PACKAGE)?.apply { 
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        } ?: Intent(Intent.ACTION_MAIN).apply { 
+            setPackage(ANKI_PACKAGE)
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        }
+    }
+    
     fun getSelectedDeckStats(): Triple<Int, Int, Int> { 
         val uris = listOf( 
             Uri.parse("content://$AUTHORITY/selected_deck"), 
@@ -155,15 +154,7 @@ class AnkiDroidHelper(private val context: Context) {
             }
         }
         
-        val newNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:new is:due").takeIf { it > 0 } 
-            ?: getNotesDueCount("deck:\"Kaishi 1.5k\" is:new")
-        val learnNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:learn")
-        val dueNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:due -is:learn -is:new")
-        if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
-            return Triple(newNotes, learnNotes, dueNotes)
-        }
-        
-        return Triple(0, 0, 0)
+        return getDeckStatsForDeck("Kaishi 1.5k")
     }
     
     fun getDeckStatsForDeck(deckName: String): Triple<Int, Int, Int> { 
@@ -185,29 +176,6 @@ class AnkiDroidHelper(private val context: Context) {
         } catch (e: Exception) { 
             0
         }
-    }
-    
-    fun getDueCount(deckIds: Set<Long>? = null): Int { 
-        val decks = getDeckList()
-        val filtered = if (deckIds == null || deckIds.isEmpty()) { 
-            decks
-        } else { 
-            decks.filter { it.id in deckIds }
-        }
-        val sum = filtered.sumOf { it.totalDue }
-        if (sum > 0) return sum
-        val stats = getSelectedDeckStats()
-        return stats.first + stats.second + stats.third
-    }
-    
-    fun getDueDecksBreakdown(deckIds: Set<Long>? = null): List<DeckInfo> { 
-        val decks = getDeckList()
-        val filtered = if (deckIds == null || deckIds.isEmpty()) { 
-            decks
-        } else { 
-            decks.filter { it.id in deckIds }
-        }
-        return filtered.filter { it.totalDue > 0 }
     }
     
     fun getNextDueCard(deckId: Long? = null, excludeNoteId: Long? = null): CardInfo? { 
@@ -276,21 +244,12 @@ class AnkiDroidHelper(private val context: Context) {
                     
                     val parsed = getCardContent(noteId) 
                     
-                    return CardInfo( 
+                    return parsed.copy( 
                         noteId = noteId, 
                         cardOrd = cardOrd, 
-                        question = parsed.question, 
-                        answer = parsed.answer, 
                         deckName = deckName.ifEmpty { "Kaishi 1.5k" }, 
                         buttonCount = buttonCount, 
                         nextReviewTimes = nextTimes, 
-                        kanji = parsed.kanji, 
-                        kanjiFurigana = parsed.kanjiFurigana, 
-                        kanjiMeaning = parsed.kanjiMeaning, 
-                        sentence = parsed.sentence, 
-                        sentenceFurigana = parsed.sentenceFurigana, 
-                        sentenceMeaning = parsed.sentenceMeaning, 
-                        imageFileName = parsed.imageFileName, 
                         cardType = cardType
                     ) 
                 } 
@@ -302,7 +261,7 @@ class AnkiDroidHelper(private val context: Context) {
         return null
     }
     
-    fun getCardContent(noteId: Long): CardParsedContent { 
+    fun getCardContent(noteId: Long): CardInfo { 
         try { 
             val noteUri = Uri.withAppendedPath(NOTES_URI, noteId.toString())
             resolver.query( 
@@ -323,13 +282,13 @@ class AnkiDroidHelper(private val context: Context) {
         } catch (e: Exception) { 
             e.printStackTrace()
         }
-        return CardParsedContent()
+        return CardInfo(noteId = noteId, cardOrd = 0, question = "", answer = "", deckName = "")
     }
     
-    fun parseCardContent(fields: String): CardParsedContent { 
+    fun parseCardContent(fields: String): CardInfo { 
         val rawParts = fields.split("\u001f")
         if (rawParts.isEmpty()) { 
-            return CardParsedContent()
+            return CardInfo(noteId = 0L, cardOrd = 0, question = "", answer = "", deckName = "")
         }
         
         var detectedKanji = ""
@@ -411,9 +370,12 @@ class AnkiDroidHelper(private val context: Context) {
             }
         }
         
-        return CardParsedContent( 
+        return CardInfo( 
+            noteId = 0L, 
+            cardOrd = 0, 
             question = detectedKanji, 
             answer = detectedKanjiMeaning, 
+            deckName = "", 
             kanji = detectedKanji, 
             kanjiFurigana = detectedKanjiFurigana, 
             kanjiMeaning = detectedKanjiMeaning, 
@@ -516,28 +478,12 @@ class AnkiDroidHelper(private val context: Context) {
         }
     }
     
-    fun openAnkiDroidReviewer(): Boolean { 
-        return try { 
-            val intent = context.packageManager.getLaunchIntentForPackage(ANKI_PACKAGE)
-            if (intent != null) { 
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                true
-            } else { 
-                false
-            }
-        } catch (e: Exception) { 
-            false
-        }
-    }
-    
     companion object { 
         const val ANKI_PACKAGE = "com.ichi2.anki"
         const val PERMISSION_READ_WRITE_DATABASE = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
         private const val AUTHORITY = "com.ichi2.anki.flashcards"
         
         val DECKS_URI: Uri = Uri.parse("content://$AUTHORITY/decks/")
-        val SELECTED_DECK_URI: Uri = Uri.parse("content://$AUTHORITY/selected_deck/")
         val SCHEDULE_URI: Uri = Uri.parse("content://$AUTHORITY/schedule/")
         val NOTES_URI: Uri = Uri.parse("content://$AUTHORITY/notes")
         

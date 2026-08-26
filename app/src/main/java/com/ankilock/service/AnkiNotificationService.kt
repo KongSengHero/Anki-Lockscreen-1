@@ -119,20 +119,18 @@ class AnkiNotificationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     
     private fun createNotificationChannel() { 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
-            val channel = NotificationChannel( 
-                CHANNEL_ID, 
-                getString(R.string.notification_channel_name), 
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply { 
-                description = getString(R.string.notification_channel_description)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setShowBadge(true)
-                enableVibration(false)
-                setSound(null, null)
-            }
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel( 
+            CHANNEL_ID, 
+            getString(R.string.notification_channel_name), 
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply { 
+            description = getString(R.string.notification_channel_description)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(true)
+            enableVibration(false)
+            setSound(null, null)
         }
+        notificationManager.createNotificationChannel(channel)
     }
     
     private fun handleGrade(ease: Int) { 
@@ -193,7 +191,6 @@ class AnkiNotificationService : Service() {
         
         val card = currentCard
         val stats = optimisticStats ?: ankiHelper.getSelectedDeckStats().also { optimisticStats = it }
-        val totalDue = stats.first + stats.second + stats.third
         
         if (card == null) { 
             return if (prefs.isMusicPlayerStyle) { 
@@ -298,13 +295,7 @@ class AnkiNotificationService : Service() {
         
         mediaSession?.setPlaybackState(playbackState)
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        } ?: Intent(Intent.ACTION_MAIN).apply { 
-            setPackage("com.ichi2.anki")
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        }
+        val ankiIntent = ankiHelper.getAnkiLaunchIntent()
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
@@ -448,13 +439,7 @@ class AnkiNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        } ?: Intent(Intent.ACTION_MAIN).apply { 
-            setPackage("com.ichi2.anki")
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        }
+        val ankiIntent = ankiHelper.getAnkiLaunchIntent()
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
@@ -648,22 +633,11 @@ class AnkiNotificationService : Service() {
     }
     
     private fun fromHtmlCompat(html: String): CharSequence { 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) { 
-            Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT)
-        } else { 
-            @Suppress("DEPRECATION")
-            Html.fromHtml(html)
-        }
+        return Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT)
     }
     
     private fun buildAllCaughtUpNotification(): Notification { 
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        } ?: Intent(Intent.ACTION_MAIN).apply { 
-            setPackage("com.ichi2.anki")
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        }
+        val ankiIntent = ankiHelper.getAnkiLaunchIntent()
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             201, 
@@ -688,13 +662,7 @@ class AnkiNotificationService : Service() {
         val remainingMs = prefs.snoozeUntil - System.currentTimeMillis()
         val remainingMin = (remainingMs / 60000).coerceAtLeast(1)
         
-        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")?.apply { 
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        } ?: Intent(Intent.ACTION_MAIN).apply { 
-            setPackage("com.ichi2.anki")
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        }
+        val ankiIntent = ankiHelper.getAnkiLaunchIntent()
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             202, 

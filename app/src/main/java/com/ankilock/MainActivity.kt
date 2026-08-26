@@ -11,9 +11,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -42,19 +39,11 @@ import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Opacity
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -245,8 +234,6 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MainContainer() { 
-        var isModernUi by remember { mutableStateOf(prefs.isModernUi) }
-        
         Scaffold( 
             topBar = { 
                 TopAppBar( 
@@ -269,42 +256,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }, 
-                    actions = { 
-                        OutlinedButton( 
-                            onClick = { 
-                                isModernUi = !isModernUi
-                                prefs.isModernUi = isModernUi
-                            }, 
-                            shape = RoundedCornerShape(20.dp), 
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), 
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                        ) { 
-                            Icon( 
-                                if (isModernUi) Icons.Filled.Dashboard else Icons.Filled.AutoAwesome, 
-                                contentDescription = null, 
-                                modifier = Modifier.size(16.dp), 
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text( 
-                                if (isModernUi) "Classic UI" else "Modern UI", 
-                                fontSize = 12.sp, 
-                                fontWeight = FontWeight.SemiBold, 
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }, 
                     colors = TopAppBarDefaults.topAppBarColors( 
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
             }
         ) { padding -> 
-            if (isModernUi) { 
-                ModernSettingsScreen(padding)
-            } else { 
-                ClassicSettingsScreen(padding)
-            }
+            ModernSettingsScreen(padding)
         }
     }
     
@@ -812,79 +770,27 @@ class MainActivity : ComponentActivity() {
                 }
                 
                 if (currentType != "transparent") { 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Icon( 
-                            Icons.Filled.BlurOn, 
-                            contentDescription = null, 
-                            tint = Color(0xFF94A3B8), 
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text( 
-                            "Blur Radius: ${blurRadius.toInt()}px", 
-                            fontSize = 12.sp, 
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Slider( 
+                    Spacer(modifier = Modifier.height(6.dp))
+                    StudioSliderRow( 
+                        icon = Icons.Filled.BlurOn, 
+                        label = "Blur Radius: ${blurRadius.toInt()}px", 
                         value = blurRadius, 
-                        onValueChange = onBlurChange, 
                         valueRange = 5f..60f, 
-                        colors = SliderDefaults.colors( 
-                            thumbColor = MaterialTheme.colorScheme.primary, 
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
+                        onValueChange = onBlurChange
                     )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Icon( 
-                            Icons.Filled.Opacity, 
-                            contentDescription = null, 
-                            tint = Color(0xFF94A3B8), 
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text( 
-                            "Dark Dimming Tint: ${(dimOpacity * 100).toInt()}%", 
-                            fontSize = 12.sp, 
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Slider( 
+                    StudioSliderRow( 
+                        icon = Icons.Filled.Opacity, 
+                        label = "Dark Dimming Tint: ${(dimOpacity * 100).toInt()}%", 
                         value = dimOpacity, 
-                        onValueChange = onOpacityChange, 
                         valueRange = 0.0f..0.9f, 
-                        colors = SliderDefaults.colors( 
-                            thumbColor = MaterialTheme.colorScheme.primary, 
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
+                        onValueChange = onOpacityChange
                     )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Icon( 
-                            Icons.Filled.AutoAwesome, 
-                            contentDescription = null, 
-                            tint = Color(0xFF94A3B8), 
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text( 
-                            "Artwork Opacity: ${(artworkOpacity * 100).toInt()}%", 
-                            fontSize = 12.sp, 
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Slider( 
+                    StudioSliderRow( 
+                        icon = Icons.Filled.AutoAwesome, 
+                        label = "Artwork Opacity: ${(artworkOpacity * 100).toInt()}%", 
                         value = artworkOpacity, 
-                        onValueChange = onArtworkOpacityChange, 
                         valueRange = 0.1f..1.0f, 
-                        colors = SliderDefaults.colors( 
-                            thumbColor = MaterialTheme.colorScheme.primary, 
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
+                        onValueChange = onArtworkOpacityChange
                     )
                 }
                 
@@ -1144,482 +1050,37 @@ class MainActivity : ComponentActivity() {
     }
     
     @Composable
-    fun ClassicSettingsScreen(padding: PaddingValues) { 
-        var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) }
-        var isMusicPlayerStyle by remember { mutableStateOf(prefs.isMusicPlayerStyle) }
-        val selectedDeckIds = remember { mutableStateListOf<String>() }
-        var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
-        var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
-        
-        remember { 
-            selectedDeckIds.clear()
-            selectedDeckIds.addAll(prefs.selectedDeckIds)
-            true
-        }
-        
-        Column( 
-            modifier = Modifier 
-                .fillMaxSize() 
-                .padding(padding) 
-                .verticalScroll(rememberScrollState()) 
-                .padding(16.dp), 
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) { 
-            StatusCard( 
-                isInstalled = isAnkiInstalledState, 
-                hasPermission = hasPermissionState, 
-                onRequestPermission = { 
-                    ankiPermissionLauncher.launch( 
-                        AnkiDroidHelper.PERMISSION_READ_WRITE_DATABASE
-                    )
-                }
-            )
-            
-            ServiceToggleCard(isEnabled) { enabled -> 
-                isEnabled = enabled
-                prefs.isServiceEnabled = enabled
-                if (enabled) { 
-                    AnkiNotificationService.start(this@MainActivity)
-                    DueCountWorker.schedule( 
-                        this@MainActivity, 
-                        updateInterval.toLong()
-                    )
-                } else { 
-                    AnkiNotificationService.stop(this@MainActivity)
-                    DueCountWorker.cancel(this@MainActivity)
-                }
-                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
-            }
-            
-            NotificationStyleCard(isMusicPlayerStyle) { isMusic -> 
-                isMusicPlayerStyle = isMusic
-                prefs.isMusicPlayerStyle = isMusic
-                if (isEnabled) { 
-                    AnkiNotificationService.update(this@MainActivity)
-                }
-            }
-            
-            if (isMusicPlayerStyle) { 
-                BackgroundStyleCard( 
-                    currentType = backgroundTypeState, 
-                    savedUris = savedImageUrisState, 
-                    currentUri = customImageUriState, 
-                    onSelectType = { type -> 
-                        backgroundTypeState = type
-                        prefs.backgroundType = type
-                        if (isEnabled) { 
-                            AnkiNotificationService.update(this@MainActivity)
-                        }
-                    }, 
-                    onSelectSavedUri = { uriStr -> 
-                        customImageUriState = uriStr
-                        prefs.customImageUri = uriStr
-                        backgroundTypeState = "custom"
-                        prefs.backgroundType = "custom"
-                        if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                    }, 
-                    onRemoveSavedUri = { uriStr -> 
-                        prefs.removeSavedImageUri(uriStr)
-                        savedImageUrisState = prefs.savedImageUris
-                        customImageUriState = prefs.customImageUri
-                        backgroundTypeState = prefs.backgroundType
-                        if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                    }, 
-                    onPickImage = { 
-                        imagePickerLauncher.launch("image/*")
-                    }
-                )
-            }
-            
-            if (decksState.isNotEmpty()) { 
-                DeckSelectorCard(decksState, selectedDeckIds) { deckId, checked -> 
-                    if (checked) { 
-                        selectedDeckIds.add(deckId)
-                    } else { 
-                        selectedDeckIds.remove(deckId)
-                    }
-                    prefs.selectedDeckIds = selectedDeckIds.toSet()
-                    if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                    AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
-                }
-            }
-            
-            UpdateFrequencyCard(updateInterval) { minutes -> 
-                updateInterval = minutes
-                prefs.updateIntervalMinutes = minutes
-                if (isEnabled) { 
-                    DueCountWorker.schedule(this@MainActivity, minutes.toLong())
-                }
-            }
-            
-            SnoozeDurationCard(snoozeDuration) { minutes -> 
-                snoozeDuration = minutes
-                prefs.snoozeDurationMinutes = minutes
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-    }
-    
-    @Composable
-    fun StatusCard( 
-        isInstalled: Boolean, 
-        hasPermission: Boolean, 
-        onRequestPermission: () -> Unit
+    fun StudioSliderRow( 
+        icon: ImageVector, 
+        label: String, 
+        value: Float, 
+        valueRange: ClosedFloatingPointRange<Float>, 
+        onValueChange: (Float) -> Unit
     ) { 
-        SettingsCard( 
-            icon = if (isInstalled && hasPermission) Icons.Filled.CheckCircle 
-                   else Icons.Filled.Error, 
-            title = "AnkiDroid Status"
-        ) { 
-            StatusRow("AnkiDroid Installed", isInstalled)
-            Spacer(modifier = Modifier.height(8.dp))
-            StatusRow("API Permission Granted", hasPermission)
-            
-            if (isInstalled && !hasPermission) { 
-                Spacer(modifier = Modifier.height(12.dp))
-                Button( 
-                    onClick = onRequestPermission, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    shape = RoundedCornerShape(10.dp), 
-                    colors = ButtonDefaults.buttonColors( 
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) { 
-                    Text("Grant AnkiDroid Permission")
-                }
-            }
-        }
-    }
-    
-    @Composable
-    fun StatusRow(label: String, isOk: Boolean) { 
-        val color by animateColorAsState( 
-            if (isOk) MaterialTheme.colorScheme.primary 
-            else MaterialTheme.colorScheme.error, 
-            label = "status"
-        )
-        
-        Row( 
-            verticalAlignment = Alignment.CenterVertically, 
-            modifier = Modifier.fillMaxWidth()
-        ) { 
-            Box( 
-                modifier = Modifier 
-                    .size(8.dp) 
-                    .clip(CircleShape) 
-                    .background(color)
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) { 
+            Icon( 
+                icon, 
+                contentDescription = null, 
+                tint = Color(0xFF94A3B8), 
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text( 
                 label, 
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text( 
-                if (isOk) "Connected" else "Not Connected", 
-                style = MaterialTheme.typography.bodySmall, 
-                color = color
+                fontSize = 12.sp, 
+                color = Color(0xFF94A3B8)
             )
         }
-    }
-    
-    @Composable
-    fun ServiceToggleCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) { 
-        SettingsCard(icon = Icons.Filled.Notifications, title = "Notification Service") { 
-            Row( 
-                verticalAlignment = Alignment.CenterVertically, 
-                modifier = Modifier.fillMaxWidth()
-            ) { 
-                Text( 
-                    if (isEnabled) "Service is running" else "Service is stopped", 
-                    style = MaterialTheme.typography.bodyMedium, 
-                    modifier = Modifier.weight(1f)
-                )
-                Switch( 
-                    checked = isEnabled, 
-                    onCheckedChange = onToggle, 
-                    colors = SwitchDefaults.colors( 
-                        checkedTrackColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-            }
-        }
-    }
-    
-    @Composable
-    fun DeckSelectorCard( 
-        decks: List<DeckInfo>, 
-        selectedIds: List<String>, 
-        onDeckToggle: (String, Boolean) -> Unit
-    ) { 
-        SettingsCard(icon = Icons.Filled.Style, title = "Select Decks") { 
-            Text( 
-                "Leave all unchecked to show all decks", 
-                style = MaterialTheme.typography.bodySmall, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Slider( 
+            value = value, 
+            onValueChange = onValueChange, 
+            valueRange = valueRange, 
+            colors = SliderDefaults.colors( 
+                thumbColor = MaterialTheme.colorScheme.primary, 
+                activeTrackColor = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            decks.forEach { deck -> 
-                val deckIdStr = deck.id.toString()
-                val isSelected = deckIdStr in selectedIds
-                Row( 
-                    verticalAlignment = Alignment.CenterVertically, 
-                    modifier = Modifier 
-                        .fillMaxWidth() 
-                        .clickable { onDeckToggle(deckIdStr, !isSelected) } 
-                        .padding(vertical = 4.dp)
-                ) { 
-                    Checkbox( 
-                        checked = isSelected, 
-                        onCheckedChange = { onDeckToggle(deckIdStr, it) }, 
-                        colors = CheckboxDefaults.colors( 
-                            checkedColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text( 
-                        deck.name, 
-                        style = MaterialTheme.typography.bodyMedium, 
-                        modifier = Modifier.weight(1f)
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Text( 
-                            "${deck.newCount}", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            fontWeight = FontWeight.Bold, 
-                            color = Color(0xFF8AB4F8)
-                        )
-                        Text( 
-                            " · ", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text( 
-                            "${deck.learnCount}", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            fontWeight = FontWeight.Bold, 
-                            color = Color(0xFFF28B82)
-                        )
-                        Text( 
-                            " · ", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text( 
-                            "${deck.reviewCount}", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            fontWeight = FontWeight.Bold, 
-                            color = Color(0xFF81C995)
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun NotificationStyleCard(isMusicStyle: Boolean, onSelect: (Boolean) -> Unit) { 
-        val options = listOf(true, false)
-        val labels = listOf("Music Player", "Classic Card")
-        val selectedIndex = if (isMusicStyle) 0 else 1
-        
-        SettingsCard(icon = Icons.Filled.MusicNote, title = "Display Style") { 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                options.forEachIndexed { index, isMusic -> 
-                    SegmentedButton( 
-                        selected = index == selectedIndex, 
-                        onClick = { onSelect(isMusic) }, 
-                        shape = SegmentedButtonDefaults.itemShape( 
-                            index = index, 
-                            count = options.size
-                        )
-                    ) { 
-                        Text(labels[index], fontSize = 13.sp)
-                    }
-                }
-            }
-        }
-    }
-    
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun BackgroundStyleCard( 
-        currentType: String, 
-        savedUris: Set<String>, 
-        currentUri: String?, 
-        onSelectType: (String) -> Unit, 
-        onSelectSavedUri: (String) -> Unit, 
-        onRemoveSavedUri: (String) -> Unit, 
-        onPickImage: () -> Unit
-    ) { 
-        val context = LocalContext.current
-        val options = listOf("anki_lock", "dark_blur", "sunset", "custom", "transparent")
-        val labels = listOf("AnkiLock", "Dark Blur", "Sunset", "Custom", "Glass")
-        val selectedIndex = options.indexOf(currentType).coerceAtLeast(0)
-        
-        SettingsCard(icon = Icons.Filled.Style, title = "Music Background Style") { 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                options.forEachIndexed { index, type -> 
-                    SegmentedButton( 
-                        selected = index == selectedIndex, 
-                        onClick = { onSelectType(type) }, 
-                        shape = SegmentedButtonDefaults.itemShape( 
-                            index = index, 
-                            count = options.size
-                        )
-                    ) { 
-                        Text(labels[index], fontSize = 12.sp)
-                    }
-                }
-            }
-            
-            if (currentType == "custom") { 
-                Spacer(modifier = Modifier.height(12.dp))
-                if (savedUris.isNotEmpty()) { 
-                    LazyRow( 
-                        horizontalArrangement = Arrangement.spacedBy(8.dp), 
-                        modifier = Modifier.fillMaxWidth()
-                    ) { 
-                        items(savedUris.toList()) { uriStr -> 
-                            val isSelected = (uriStr == currentUri)
-                            Box( 
-                                modifier = Modifier 
-                                    .size(60.dp) 
-                                    .clip(RoundedCornerShape(8.dp)) 
-                                    .border( 
-                                        2.dp, 
-                                        if (isSelected) MaterialTheme.colorScheme.primary 
-                                        else Color.Transparent, 
-                                        RoundedCornerShape(8.dp)
-                                    ) 
-                                    .clickable { onSelectSavedUri(uriStr) }
-                            ) { 
-                                UriThumbnail( 
-                                    context = context, 
-                                    uriStr = uriStr, 
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                                Box( 
-                                    modifier = Modifier 
-                                        .align(Alignment.TopEnd) 
-                                        .padding(2.dp) 
-                                        .size(16.dp) 
-                                        .clip(CircleShape) 
-                                        .background(Color(0xCC000000)) 
-                                        .clickable { onRemoveSavedUri(uriStr) }, 
-                                    contentAlignment = Alignment.Center
-                                ) { 
-                                    Icon( 
-                                        Icons.Filled.Close, 
-                                        contentDescription = "Remove", 
-                                        tint = Color.White, 
-                                        modifier = Modifier.size(10.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                
-                Button( 
-                    onClick = onPickImage, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    shape = RoundedCornerShape(10.dp), 
-                    colors = ButtonDefaults.buttonColors( 
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) { 
-                    Text("Select Picture from Gallery")
-                }
-            }
-        }
-    }
-    
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun UpdateFrequencyCard(currentMinutes: Int, onSelect: (Int) -> Unit) { 
-        val options = listOf(30, 60, 120)
-        val labels = listOf("30 min", "1 hour", "2 hours")
-        val selectedIndex = options.indexOf(currentMinutes).coerceAtLeast(0)
-        
-        SettingsCard(icon = Icons.Filled.Schedule, title = "Update Frequency") { 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                options.forEachIndexed { index, minutes -> 
-                    SegmentedButton( 
-                        selected = index == selectedIndex, 
-                        onClick = { onSelect(minutes) }, 
-                        shape = SegmentedButtonDefaults.itemShape( 
-                            index = index, 
-                            count = options.size
-                        )
-                    ) { 
-                        Text(labels[index], fontSize = 13.sp)
-                    }
-                }
-            }
-        }
-    }
-    
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun SnoozeDurationCard(currentMinutes: Int, onSelect: (Int) -> Unit) { 
-        val options = listOf(30, 60, 120)
-        val labels = listOf("30 min", "1 hour", "2 hours")
-        val selectedIndex = options.indexOf(currentMinutes).coerceAtLeast(0)
-        
-        SettingsCard(icon = Icons.Filled.Snooze, title = "Snooze Duration") { 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                options.forEachIndexed { index, minutes -> 
-                    SegmentedButton( 
-                        selected = index == selectedIndex, 
-                        onClick = { onSelect(minutes) }, 
-                        shape = SegmentedButtonDefaults.itemShape( 
-                            index = index, 
-                            count = options.size
-                        )
-                    ) { 
-                        Text(labels[index], fontSize = 13.sp)
-                    }
-                }
-            }
-        }
-    }
-    
-    @Composable
-    fun SettingsCard( 
-        icon: ImageVector, 
-        title: String, 
-        content: @Composable () -> Unit
-    ) { 
-        Card( 
-            modifier = Modifier.fillMaxWidth(), 
-            shape = RoundedCornerShape(16.dp), 
-            colors = CardDefaults.cardColors( 
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
-        ) { 
-            Column(modifier = Modifier.padding(20.dp)) { 
-                Row(verticalAlignment = Alignment.CenterVertically) { 
-                    Icon( 
-                        icon, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colorScheme.primary, 
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text( 
-                        title, 
-                        style = MaterialTheme.typography.titleMedium, 
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                content()
-            }
-        }
+        )
     }
 }
     
