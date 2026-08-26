@@ -226,7 +226,7 @@ class AnkiNotificationService : Service() {
                 rawText = sentenceFurigana, 
                 highlightWord = kanjiText, 
                 baseTextSizeSp = 15f, 
-                rubyTextSizeSp = 9.5f, 
+                rubyTextSizeSp = 8.5f, 
                 isCentered = true
             )
         } else { 
@@ -239,7 +239,7 @@ class AnkiNotificationService : Service() {
                 rawText = sentenceFurigana, 
                 highlightWord = kanjiText, 
                 baseTextSizeSp = 13f, 
-                rubyTextSizeSp = 8.5f, 
+                rubyTextSizeSp = 7.5f, 
                 isCentered = false
             )
         } else { 

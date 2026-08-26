@@ -24,12 +24,8 @@ object RubyTextRenderer {
         val totalWidth: Float
     )
 
-    private fun isJapanese(text: String): Boolean { 
-        return text.any { char -> 
-            (char in '\u3040'..'\u309F') || 
-            (char in '\u30A0'..'\u30FF') || 
-            (char in '\u4E00'..'\u9FAF')
-        }
+    private fun isKanji(char: Char): Boolean { 
+        return char in '\u4E00'..'\u9FAF' || char in '\u3400'..'\u4DBF'
     }
 
     private fun normalizeRubyString(input: String): String { 
@@ -42,77 +38,98 @@ object RubyTextRenderer {
         return text.trim()
     }
 
+    private fun addPlainTokens(list: MutableList<RubyToken>, text: String) { 
+        val clean = text.replace(" ", "")
+        if (clean.isNotEmpty()) { 
+            list.add(RubyToken(base = clean, ruby = null, isTarget = false))
+        }
+    }
+
     fun parseRubyTokens(rawText: String, highlightWord: String = ""): List<RubyToken> { 
         val normalized = normalizeRubyString(rawText)
         if (normalized.isBlank()) return emptyList()
 
         val tokens = mutableListOf<RubyToken>()
-        val regex = Regex("([^\\[\\s]+)\\[([^\\]]+)\\]")
-        var lastIndex = 0
+        var cursor = 0
 
-        val matches = regex.findAll(normalized)
-        for (match in matches) { 
-            val start = match.range.first
-            val end = match.range.last + 1
-
-            if (start > lastIndex) { 
-                var plain = normalized.substring(lastIndex, start)
-                if (plain.endsWith(" ") && plain.trim().isNotEmpty()) { 
-                    val trimmed = plain.trimEnd()
-                    if (isJapanese(trimmed)) { 
-                        plain = trimmed
-                    }
-                } else if (plain == " ") { 
-                    plain = ""
-                }
-                if (plain.isNotEmpty()) { 
-                    tokens.add(RubyToken(base = plain, ruby = null, isTarget = false))
-                }
+        while (cursor < normalized.length) { 
+            val bracketOpen = normalized.indexOf('[', cursor)
+            if (bracketOpen == -1) { 
+                val remaining = normalized.substring(cursor)
+                addPlainTokens(tokens, remaining)
+                break
             }
 
-            val base = match.groupValues[1]
-            val ruby = match.groupValues[2]
-            tokens.add(RubyToken(base = base, ruby = ruby, isTarget = false))
+            val bracketClose = normalized.indexOf(']', bracketOpen)
+            if (bracketClose == -1) { 
+                val remaining = normalized.substring(cursor)
+                addPlainTokens(tokens, remaining)
+                break
+            }
 
-            lastIndex = end
+            val ruby = normalized.substring(bracketOpen + 1, bracketClose).trim()
+            val beforeBracket = normalized.substring(cursor, bracketOpen)
+
+            val lastSpaceIdx = beforeBracket.lastIndexOf(' ')
+            val baseStart: Int
+            if (lastSpaceIdx != -1) { 
+                val plainPart = beforeBracket.substring(0, lastSpaceIdx)
+                addPlainTokens(tokens, plainPart)
+                baseStart = lastSpaceIdx + 1
+            } else { 
+                var kIdx = beforeBracket.length - 1
+                while (kIdx >= 0 && isKanji(beforeBracket[kIdx])) { 
+                    kIdx--
+                }
+                val plainPart = beforeBracket.substring(0, kIdx + 1)
+                addPlainTokens(tokens, plainPart)
+                baseStart = kIdx + 1
+            }
+
+            val base = beforeBracket.substring(baseStart).trim()
+            if (base.isNotEmpty() && ruby.isNotEmpty()) { 
+                tokens.add(RubyToken(base = base, ruby = ruby, isTarget = false))
+            } else if (base.isNotEmpty()) { 
+                addPlainTokens(tokens, base)
+            }
+
+            cursor = bracketClose + 1
         }
 
-        if (lastIndex < normalized.length) { 
-            val tail = normalized.substring(lastIndex)
-            if (tail.isNotEmpty()) { 
-                tokens.add(RubyToken(base = tail, ruby = null, isTarget = false))
+        val cleanedTokens = mutableListOf<RubyToken>()
+        for (t in tokens) { 
+            if (t.ruby == null) { 
+                val text = t.base.replace(" ", "")
+                if (text.isNotEmpty()) { 
+                    cleanedTokens.add(RubyToken(base = text, ruby = null, isTarget = false))
+                }
+            } else { 
+                cleanedTokens.add(t)
             }
         }
 
         val cleanHighlight = highlightWord.trim()
         if (cleanHighlight.isNotEmpty()) { 
-            var i = 0
-            while (i < tokens.size) { 
-                var accumulated = ""
-                var j = i
-                while (j < tokens.size && accumulated.length < cleanHighlight.length) { 
-                    accumulated += tokens[j].base
-                    if (accumulated == cleanHighlight) { 
-                        for (k in i..j) { 
-                            tokens[k] = tokens[k].copy(isTarget = true)
-                        }
-                        break
-                    }
-                    j++
+            val rootKanji = cleanHighlight.filter { isKanji(it) }
+            for (i in cleanedTokens.indices) { 
+                val t = cleanedTokens[i]
+                if (t.base == cleanHighlight || 
+                    (cleanHighlight.isNotEmpty() && cleanHighlight.contains(t.base) && isKanji(t.base.firstOrNull() ?: ' ')) || 
+                    (rootKanji.isNotEmpty() && rootKanji.contains(t.base))) { 
+                    cleanedTokens[i] = t.copy(isTarget = true)
                 }
-                i++
             }
         }
 
-        return tokens
+        return cleanedTokens
     }
 
     fun renderRubyBitmap( 
         context: Context, 
         rawText: String, 
         highlightWord: String = "", 
-        baseTextSizeSp: Float = 14f, 
-        rubyTextSizeSp: Float = 9f, 
+        baseTextSizeSp: Float = 15f, 
+        rubyTextSizeSp: Float = 8.5f, 
         baseTextColor: Int = Color.WHITE, 
         rubyTextColor: Int = Color.parseColor("#9AA0A6"), 
         highlightColor: Int = Color.parseColor("#8AB4F8"), 
@@ -157,8 +174,8 @@ object RubyTextRenderer {
 
         val hasAnyRuby = tokens.any { !it.ruby.isNullOrBlank() }
         val effectiveRubyHeight = if (hasAnyRuby) rubyHeight else 0f
-        val rubyBaseGap = if (hasAnyRuby) 2f * density else 0f
-        val lineSpacing = 4f * density
+        val rubyBaseGap = if (hasAnyRuby) 1.5f * density else 0f
+        val lineSpacing = 3f * density
         val totalLineHeight = effectiveRubyHeight + rubyBaseGap + baseHeight + lineSpacing
 
         val measuredTokens = tokens.map { token -> 
@@ -173,7 +190,7 @@ object RubyTextRenderer {
         val effectiveMaxWidth = if (maxWidthPx > 0) { 
             maxWidthPx
         } else { 
-            (context.resources.displayMetrics.widthPixels * 0.82f).toInt()
+            (context.resources.displayMetrics.widthPixels * 0.85f).toInt()
         }
 
         val lines = mutableListOf<MutableList<MeasuredToken>>()
