@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
 
+    <queries>
+        <package android:name="com.ichi2.anki" />
+        <provider android:authorities="com.ichi2.anki.flashcards" />
+    </queries>
+
     <application
         android:name=".AnkiLockApp"
         android:allowBackup="true"

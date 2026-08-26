@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.content.ContextCompat
 import com.ankilock.data.CardInfo
 import com.ankilock.data.DeckInfo
 import org.json.JSONArray
@@ -23,6 +24,13 @@ class AnkiDroidHelper(private val context: Context) {
     }
     
     fun hasApiPermission(): Boolean { 
+        val granted = ContextCompat.checkSelfPermission( 
+            context, 
+            PERMISSION_READ_WRITE_DATABASE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) { 
+            return false
+        }
         return try { 
             resolver.query(DECKS_URI, null, null, null, null)?.use { 
                 true
@@ -120,6 +128,13 @@ class AnkiDroidHelper(private val context: Context) {
                         cursor.getColumnIndexOrThrow(COL_NEXT_REVIEW_TIMES)
                     ) ?: ""
                     
+                    val deckNameCol = cursor.getColumnIndex("deck_name")
+                    val deckName = if (deckNameCol >= 0) { 
+                        cursor.getString(deckNameCol) ?: ""
+                    } else { 
+                        getDeckNameForNote(noteId)
+                    }
+                    
                     val cardContent = getCardContent(noteId)
                     
                     return CardInfo( 
@@ -127,7 +142,7 @@ class AnkiDroidHelper(private val context: Context) {
                         cardOrd = cardOrd, 
                         question = cardContent.first, 
                         answer = cardContent.second, 
-                        deckName = getDeckNameForNote(noteId), 
+                        deckName = deckName.ifEmpty { "Anki" }, 
                         buttonCount = buttonCount, 
                         nextReviewTimes = nextTimes
                     )
@@ -208,6 +223,7 @@ class AnkiDroidHelper(private val context: Context) {
     
     companion object { 
         const val ANKI_PACKAGE = "com.ichi2.anki"
+        const val PERMISSION_READ_WRITE_DATABASE = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
         private const val AUTHORITY = "com.ichi2.anki.flashcards"
         
         val DECKS_URI: Uri = Uri.parse("content://$AUTHORITY/decks")

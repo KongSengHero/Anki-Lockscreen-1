@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -49,7 +51,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -76,12 +77,29 @@ class MainActivity : ComponentActivity() {
     private lateinit var ankiHelper: AnkiDroidHelper
     private lateinit var prefs: PreferencesManager
     
+    private var isAnkiInstalledState by mutableStateOf(false)
+    private var hasPermissionState by mutableStateOf(false)
+    private var decksState by mutableStateOf<List<DeckInfo>>(emptyList())
+    
+    private val ankiPermissionLauncher = registerForActivityResult( 
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasPermissionState = granted
+        if (granted) { 
+            refreshData()
+            if (prefs.isServiceEnabled) { 
+                AnkiNotificationService.update(this)
+            }
+        }
+    }
+    
     private val notificationPermissionLauncher = registerForActivityResult( 
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted && prefs.isServiceEnabled) { 
             AnkiNotificationService.start(this)
         }
+        checkAndRequestAnkiPermission()
     }
     
     override fun onCreate(savedInstanceState: Bundle?) { 
@@ -90,7 +108,7 @@ class MainActivity : ComponentActivity() {
         ankiHelper = AnkiDroidHelper(this)
         prefs = PreferencesManager(this)
         
-        requestNotificationPermission()
+        requestInitialPermissions()
         
         setContent { 
             AnkiLockTheme { 
@@ -99,7 +117,20 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    private fun requestNotificationPermission() { 
+    override fun onResume() { 
+        super.onResume()
+        refreshData()
+    }
+    
+    private fun refreshData() { 
+        isAnkiInstalledState = ankiHelper.isAnkiDroidInstalled()
+        hasPermissionState = ankiHelper.hasApiPermission()
+        if (hasPermissionState) { 
+            decksState = ankiHelper.getDeckList()
+        }
+    }
+    
+    private fun requestInitialPermissions() { 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { 
             if (ContextCompat.checkSelfPermission( 
                     this, 
@@ -109,7 +140,17 @@ class MainActivity : ComponentActivity() {
                 notificationPermissionLauncher.launch( 
                     Manifest.permission.POST_NOTIFICATIONS
                 )
+                return
             }
+        }
+        checkAndRequestAnkiPermission()
+    }
+    
+    private fun checkAndRequestAnkiPermission() { 
+        if (!ankiHelper.hasApiPermission()) { 
+            ankiPermissionLauncher.launch( 
+                AnkiDroidHelper.PERMISSION_READ_WRITE_DATABASE
+            )
         }
     }
     
@@ -117,20 +158,14 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SettingsScreen() { 
         var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) }
-        var isAnkiInstalled by remember { mutableStateOf(false) }
-        var hasPermission by remember { mutableStateOf(false) }
-        var decks by remember { mutableStateOf<List<DeckInfo>>(emptyList()) }
         val selectedDeckIds = remember { mutableStateListOf<String>() }
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
         
-        LaunchedEffect(Unit) { 
-            isAnkiInstalled = ankiHelper.isAnkiDroidInstalled()
-            hasPermission = ankiHelper.hasApiPermission()
-            if (hasPermission) { 
-                decks = ankiHelper.getDeckList()
-            }
+        remember { 
+            selectedDeckIds.clear()
             selectedDeckIds.addAll(prefs.selectedDeckIds)
+            true
         }
         
         Scaffold( 
@@ -156,7 +191,15 @@ class MainActivity : ComponentActivity() {
                     .padding(16.dp), 
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) { 
-                StatusCard(isAnkiInstalled, hasPermission)
+                StatusCard( 
+                    isInstalled = isAnkiInstalledState, 
+                    hasPermission = hasPermissionState, 
+                    onRequestPermission = { 
+                        ankiPermissionLauncher.launch( 
+                            AnkiDroidHelper.PERMISSION_READ_WRITE_DATABASE
+                        )
+                    }
+                )
                 
                 ServiceToggleCard(isEnabled) { enabled ->
                     isEnabled = enabled
@@ -173,8 +216,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                if (decks.isNotEmpty()) { 
-                    DeckSelectorCard(decks, selectedDeckIds) { deckId, checked ->
+                if (decksState.isNotEmpty()) { 
+                    DeckSelectorCard(decksState, selectedDeckIds) { deckId, checked ->
                         if (checked) { 
                             selectedDeckIds.add(deckId)
                         } else { 
@@ -204,7 +247,11 @@ class MainActivity : ComponentActivity() {
     }
     
     @Composable
-    fun StatusCard(isInstalled: Boolean, hasPermission: Boolean) { 
+    fun StatusCard( 
+        isInstalled: Boolean, 
+        hasPermission: Boolean, 
+        onRequestPermission: () -> Unit
+    ) { 
         SettingsCard( 
             icon = if (isInstalled && hasPermission) Icons.Filled.CheckCircle 
                    else Icons.Filled.Error, 
@@ -213,6 +260,20 @@ class MainActivity : ComponentActivity() {
             StatusRow("AnkiDroid Installed", isInstalled)
             Spacer(modifier = Modifier.height(8.dp))
             StatusRow("API Permission Granted", hasPermission)
+            
+            if (isInstalled && !hasPermission) { 
+                Spacer(modifier = Modifier.height(12.dp))
+                Button( 
+                    onClick = onRequestPermission, 
+                    modifier = Modifier.fillMaxWidth(), 
+                    shape = RoundedCornerShape(10.dp), 
+                    colors = ButtonDefaults.buttonColors( 
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) { 
+                    Text("Grant AnkiDroid Permission")
+                }
+            }
         }
     }
     

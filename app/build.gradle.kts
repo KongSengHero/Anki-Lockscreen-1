@@ -5,12 +5,12 @@ plugins {
     
 android { 
     namespace = "com.ankilock"
-    compileSdk = 35
+    compileSdk = 34
     
     defaultConfig { 
         applicationId = "com.ankilock"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
     }
@@ -40,7 +40,7 @@ android {
     }
     
     composeOptions { 
-        kotlinCompilerExtensionVersion = "1.5.13"
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
     
