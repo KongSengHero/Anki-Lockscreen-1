@@ -34,8 +34,50 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean(KEY_MUSIC_PLAYER_STYLE, true)
         set(value) = prefs.edit().putBoolean(KEY_MUSIC_PLAYER_STYLE, value).apply()
     
+    var backgroundType: String
+        get() = prefs.getString(KEY_BACKGROUND_TYPE, "transparent") ?: "transparent"
+        set(value) = prefs.edit().putString(KEY_BACKGROUND_TYPE, value).apply()
+    
+    var customImageUri: String?
+        get() = prefs.getString(KEY_CUSTOM_IMAGE_URI, null)
+        set(value) = prefs.edit().putString(KEY_CUSTOM_IMAGE_URI, value).apply()
+    
+    var savedImageUris: Set<String>
+        get() = prefs.getStringSet(KEY_SAVED_IMAGE_URIS, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_SAVED_IMAGE_URIS, value).apply()
+    
+    var blurRadius: Int
+        get() = prefs.getInt(KEY_BLUR_RADIUS, 25)
+        set(value) = prefs.edit().putInt(KEY_BLUR_RADIUS, value).apply()
+    
+    var dimOpacity: Float
+        get() = prefs.getFloat(KEY_DIM_OPACITY, 0.45f)
+        set(value) = prefs.edit().putFloat(KEY_DIM_OPACITY, value).apply()
+    
+    var isModernUi: Boolean
+        get() = prefs.getBoolean(KEY_IS_MODERN_UI, true)
+        set(value) = prefs.edit().putBoolean(KEY_IS_MODERN_UI, value).apply()
+    
     val isSnoozed: Boolean
         get() = System.currentTimeMillis() < snoozeUntil
+    
+    fun addSavedImageUri(uriStr: String) { 
+        val set = savedImageUris.toMutableSet()
+        set.add(uriStr)
+        savedImageUris = set
+    }
+    
+    fun removeSavedImageUri(uriStr: String) { 
+        val set = savedImageUris.toMutableSet()
+        set.remove(uriStr)
+        savedImageUris = set
+        if (customImageUri == uriStr) { 
+            customImageUri = set.firstOrNull()
+            if (customImageUri == null) { 
+                backgroundType = "transparent"
+            }
+        }
+    }
     
     fun getSelectedDeckIdsAsLongs(): Set<Long> { 
         return selectedDeckIds.mapNotNull { it.toLongOrNull() }.toSet()
@@ -48,5 +90,11 @@ class PreferencesManager(context: Context) {
         private const val KEY_UPDATE_INTERVAL = "update_interval"
         private const val KEY_SNOOZE_DURATION = "snooze_duration"
         private const val KEY_SNOOZE_UNTIL = "snooze_until"
+        private const val KEY_BACKGROUND_TYPE = "background_type"
+        private const val KEY_CUSTOM_IMAGE_URI = "custom_image_uri"
+        private const val KEY_SAVED_IMAGE_URIS = "saved_image_uris"
+        private const val KEY_BLUR_RADIUS = "blur_radius"
+        private const val KEY_DIM_OPACITY = "dim_opacity"
+        private const val KEY_IS_MODERN_UI = "is_modern_ui"
     }
 }

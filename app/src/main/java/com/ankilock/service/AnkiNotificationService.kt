@@ -38,6 +38,8 @@ class AnkiNotificationService : Service() {
     private var currentCard: CardInfo? = null
     private var isRevealed: Boolean = false
     private var cardStartTime: Long = 0L
+    private var optimisticStats: Triple<Int, Int, Int>? = null
+    private var lastAnsweredNoteId: Long? = null
     
     override fun onCreate() { 
         super.onCreate()
@@ -141,10 +143,23 @@ class AnkiNotificationService : Service() {
         }
         
         if (card != null) { 
+            val type = card.cardType
+            val current = optimisticStats ?: ankiHelper.getSelectedDeckStats()
+            optimisticStats = when (type) { 
+                0 -> Triple(max(0, current.first - 1), if (ease == 1) current.second + 1 else current.second, current.third)
+                1 -> Triple(current.first, if (ease == 1) current.second else max(0, current.second - 1), current.third)
+                2 -> Triple(current.first, if (ease == 1) current.second + 1 else current.second, max(0, current.third - 1))
+                else -> current
+            }
+            lastAnsweredNoteId = card.noteId
+            isRevealed = false
+            currentCard = null
+            updateNotification()
+            
             Thread { 
                 ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken)
-                isRevealed = false
-                currentCard = null
+                val fresh = ankiHelper.getSelectedDeckStats()
+                optimisticStats = fresh
                 updateNotification()
             }.start()
         } else { 
@@ -171,12 +186,12 @@ class AnkiNotificationService : Service() {
         val deckId = if (selectedDecks.size == 1) selectedDecks.first() else null
         
         if (currentCard == null) { 
-            currentCard = ankiHelper.getNextDueCard(deckId)
+            currentCard = ankiHelper.getNextDueCard(deckId, lastAnsweredNoteId)
             cardStartTime = SystemClock.elapsedRealtime()
         }
         
         val card = currentCard
-        val stats = ankiHelper.getSelectedDeckStats()
+        val stats = optimisticStats ?: ankiHelper.getSelectedDeckStats().also { optimisticStats = it }
         val totalDue = stats.first + stats.second + stats.third
         
         if (card == null && totalDue == 0) { 
@@ -216,9 +231,6 @@ class AnkiNotificationService : Service() {
         val kanjiFurigana = card?.kanjiFurigana ?: ""
         val kanjiMeaning = card?.kanjiMeaning?.ifEmpty { card.answer } ?: ""
         val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "").trim()
-        val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "")?.trim() ?: ""
-        val sentenceMeaning = card?.sentenceMeaning ?: ""
-        val cleanSentenceMeaning = sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
         
         val imageBitmap = if (!card?.imageFileName.isNullOrBlank()) { 
             ankiHelper.getCardImageBitmap(card!!.imageFileName)
@@ -229,6 +241,7 @@ class AnkiNotificationService : Service() {
         val artworkBitmap = MediaArtworkGenerator.generateArtwork( 
             context = this, 
             card = card, 
+            stats = stats, 
             isRevealed = isRevealed, 
             imageBitmap = imageBitmap
         )
@@ -240,19 +253,9 @@ class AnkiNotificationService : Service() {
         }
         
         val artist = if (!isRevealed) { 
-            if (rawSentence.isNotBlank()) rawSentence else "Tap ▶ to Reveal Answer"
+            "Tap ▶ to Reveal Answer"
         } else { 
-            val sentencePart = if (rawSentence.isNotBlank()) rawSentence else ""
-            val meaningPart = if (cleanSentenceMeaning.isNotBlank()) cleanSentenceMeaning else cleanMeaning
-            if (sentencePart.isNotBlank() && meaningPart.isNotBlank()) { 
-                "$sentencePart • $meaningPart"
-            } else if (sentencePart.isNotBlank()) { 
-                sentencePart
-            } else if (cleanMeaning.isNotBlank()) { 
-                cleanMeaning
-            } else { 
-                deckName
-            }
+            if (cleanMeaning.isNotBlank()) cleanMeaning else deckName
         }
         
         val album = "$deckName • Due: $totalDue ($newC · $learnC · $revC)"
@@ -276,18 +279,38 @@ class AnkiNotificationService : Service() {
             .setActions( 
                 PlaybackStateCompat.ACTION_PLAY or 
                 PlaybackStateCompat.ACTION_PAUSE or 
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or 
                 PlaybackStateCompat.ACTION_SKIP_TO_NEXT or 
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or 
                 PlaybackStateCompat.ACTION_STOP
             )
             .setState( 
-                if (isRevealed) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED, 
-                0L, 
+                PlaybackStateCompat.STATE_PLAYING, 
+                if (isRevealed) 1000L else 0L, 
                 1.0f
             )
             .build()
         
         mediaSession?.setPlaybackState(playbackState)
+        
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
+            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val openAnkiPending = PendingIntent.getActivity( 
+            this, 
+            105, 
+            ankiIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val dismissIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_DISMISSED
+        }
+        val dismissPending = PendingIntent.getBroadcast( 
+            this, 
+            999, 
+            dismissIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         
         val revealIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
             action = NotificationActionReceiver.ACTION_REVEAL
@@ -319,16 +342,6 @@ class AnkiNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        val openAnkiIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
-            action = NotificationActionReceiver.ACTION_OPEN_ANKI
-        }
-        val openAnkiPending = PendingIntent.getBroadcast( 
-            this, 
-            105, 
-            openAnkiIntent, 
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        
         val mediaStyle = androidx.media.app.NotificationCompat.MediaStyle()
             .setMediaSession(mediaSession?.sessionToken)
             .setShowActionsInCompactView(0, 1, 2)
@@ -350,6 +363,7 @@ class AnkiNotificationService : Service() {
             )
             .addAction(R.drawable.ic_skip_next, "Good", goodPending)
             .setContentIntent(openAnkiPending)
+            .setDeleteIntent(dismissPending)
             .setOngoing(true)
             .setAutoCancel(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -418,13 +432,22 @@ class AnkiNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        val openAnkiIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
-            action = NotificationActionReceiver.ACTION_OPEN_ANKI
-        }
-        val openAnkiPending = PendingIntent.getBroadcast( 
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
+            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
-            openAnkiIntent, 
+            ankiIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val dismissIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_DISMISSED
+        }
+        val dismissPending = PendingIntent.getBroadcast( 
+            this, 
+            999, 
+            dismissIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
@@ -471,7 +494,7 @@ class AnkiNotificationService : Service() {
                 highlightWord = kanjiText, 
                 baseTextSizeSp = 13f, 
                 rubyTextSizeSp = 7.5f, 
-                isCentered = false
+                isCentered = true
             )
         } else { 
             null
@@ -577,6 +600,7 @@ class AnkiNotificationService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX) 
             .setCategory(NotificationCompat.CATEGORY_STATUS) 
             .setContentIntent(openAnkiPending) 
+            .setDeleteIntent(dismissPending) 
             .setSilent(true) 
             .build()
     }
@@ -638,23 +662,46 @@ class AnkiNotificationService : Service() {
         val remainingMs = prefs.snoozeUntil - System.currentTimeMillis()
         val remainingMin = (remainingMs / 60000).coerceAtLeast(1)
         
-        val openAnkiIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
-            action = NotificationActionReceiver.ACTION_OPEN_ANKI
-        }
-        val openAnkiPending = PendingIntent.getBroadcast( 
+        val ankiIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
+            ?: Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        val openAnkiPending = PendingIntent.getActivity( 
             this, 
             202, 
-            openAnkiIntent, 
+            ankiIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val unsnoozeIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_UNSNOOZE
+        }
+        val unsnoozePending = PendingIntent.getBroadcast( 
+            this, 
+            204, 
+            unsnoozeIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val dismissIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_DISMISSED
+        }
+        val dismissPending = PendingIntent.getBroadcast( 
+            this, 
+            999, 
+            dismissIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
         return NotificationCompat.Builder(this, CHANNEL_ID) 
             .setSmallIcon(R.drawable.ic_notification) 
             .setContentTitle("AnkiLock Snoozed") 
-            .setContentText("Snoozed for ${remainingMin}m · Tap to open AnkiDroid") 
+            .setContentText("Snoozed for ${remainingMin}m · Tap to resume") 
             .setOngoing(true) 
+            .setAutoCancel(false) 
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) 
-            .setContentIntent(openAnkiPending) 
+            .setContentIntent(unsnoozePending) 
+            .setDeleteIntent(dismissPending) 
+            .addAction(R.drawable.ic_play, "Resume Now", unsnoozePending) 
+            .addAction(R.drawable.ic_notification, "Open Anki", openAnkiPending) 
             .setPriority(NotificationCompat.PRIORITY_LOW) 
             .setSilent(true) 
             .build()

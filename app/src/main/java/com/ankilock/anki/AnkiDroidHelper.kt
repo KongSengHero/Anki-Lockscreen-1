@@ -86,6 +86,20 @@ class AnkiDroidHelper(private val context: Context) {
                             }
                         }
                         
+                        if (newC == 0 && learnC == 0 && revC == 0) { 
+                            val s = getDeckStatsForDeck(name)
+                            if (s.first > 0 || s.second > 0 || s.third > 0) { 
+                                newC = s.first
+                                learnC = s.second
+                                revC = s.third
+                            } else if (name.contains("Kaishi", true)) { 
+                                val fallback = getSelectedDeckStats()
+                                newC = fallback.first
+                                learnC = fallback.second
+                                revC = fallback.third
+                            }
+                        }
+                        
                         decks.add( 
                             DeckInfo( 
                                 id = id, 
@@ -147,10 +161,21 @@ class AnkiDroidHelper(private val context: Context) {
         val learnNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:learn")
         val dueNotes = getNotesDueCount("deck:\"Kaishi 1.5k\" is:due -is:learn -is:new")
         if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
-            return Triple(newNotes.coerceAtMost(10), learnNotes.coerceAtLeast(15), dueNotes.coerceAtLeast(65))
+            return Triple(newNotes, learnNotes, dueNotes)
         }
         
         return Triple(10, 15, 65)
+    }
+    
+    fun getDeckStatsForDeck(deckName: String): Triple<Int, Int, Int> { 
+        val cleanDeck = deckName.trim()
+        val newNotes = getNotesDueCount("deck:\"$cleanDeck\" is:new")
+        val learnNotes = getNotesDueCount("deck:\"$cleanDeck\" is:learn")
+        val dueNotes = getNotesDueCount("deck:\"$cleanDeck\" is:due -is:learn -is:new")
+        if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
+            return Triple(newNotes, learnNotes, dueNotes)
+        }
+        return Triple(0, 0, 0)
     }
     
     fun getNotesDueCount(searchQuery: String): Int { 
@@ -185,9 +210,9 @@ class AnkiDroidHelper(private val context: Context) {
         return filtered.filter { it.totalDue > 0 }
     }
     
-    fun getNextDueCard(deckId: Long? = null): CardInfo? { 
+    fun getNextDueCard(deckId: Long? = null, excludeNoteId: Long? = null): CardInfo? { 
         try { 
-            val selection = if (deckId != null) "deckID=$deckId, limit=1" else "limit=1"
+            val selection = if (deckId != null) "deckID=$deckId, limit=10" else "limit=10"
             
             val cursor = resolver.query( 
                 SCHEDULE_URI, 
@@ -198,10 +223,13 @@ class AnkiDroidHelper(private val context: Context) {
             )
             
             cursor?.use { cur -> 
-                if (cur.moveToFirst()) { 
+                while (cur.moveToNext()) { 
                     val noteId = cur.getLong( 
                         cur.getColumnIndexOrThrow(COL_NOTE_ID)
                     )
+                    if (excludeNoteId != null && noteId == excludeNoteId && cur.count > 1) { 
+                        continue
+                    }
                     val cardOrd = cur.getInt( 
                         cur.getColumnIndexOrThrow(COL_CARD_ORD)
                     )
@@ -222,10 +250,9 @@ class AnkiDroidHelper(private val context: Context) {
                         ?: cur.getColumnIndex("card_type").takeIf { it >= 0 } 
                     val queueCol = cur.getColumnIndex("queue").takeIf { it >= 0 } 
                     
-                    var cardType = 0 
-                    if (typeCol != null) { 
+                    val cardType = if (typeCol != null) { 
                         val rawType = cur.getInt(typeCol) 
-                        cardType = when (rawType) { 
+                        when (rawType) { 
                             0 -> 0 
                             1, 3 -> 1 
                             2 -> 2 
@@ -233,14 +260,14 @@ class AnkiDroidHelper(private val context: Context) {
                         } 
                     } else if (queueCol != null) { 
                         val rawQueue = cur.getInt(queueCol) 
-                        cardType = when (rawQueue) { 
+                        when (rawQueue) { 
                             0 -> 0 
                             1, 3 -> 1 
                             2 -> 2 
                             else -> 0 
                         } 
                     } else { 
-                        cardType = when { 
+                        when { 
                             getNotesDueCount("nid:$noteId is:learn") > 0 -> 1 
                             getNotesDueCount("nid:$noteId is:new") > 0 -> 0 
                             else -> 2 

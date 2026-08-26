@@ -4,197 +4,148 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#121318"
-    android:padding="10dp">
+    android:gravity="center"
+    android:background="@android:color/transparent"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/tv_deck_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_deck_stats"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:id="@+id/tv_deck_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Kaishi 1.5k"
-            android:textColor="#9AA0A6"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:singleLine="true"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/tv_deck_stats"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="10 · 15 · 65"
-            android:textColor="#BDC1C6"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:gravity="center"
         android:paddingTop="2dp"
         android:paddingBottom="2dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/tv_kanji_furigana"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:textColor="#7EB6FF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tv_kanji_furigana"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#9AA0A6"
-                android:textSize="11sp"
-                android:visibility="gone" />
+        <TextView
+            android:id="@+id/tv_kanji"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="光"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center" />
 
-            <TextView
-                android:id="@+id/tv_kanji"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="光"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tv_kanji_meaning"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="light, flash"
+            android:textColor="#F1F5F9"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tv_kanji_meaning"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="light, flash"
-                android:textColor="#E0E0E0"
-                android:textSize="12sp"
-                android:visibility="gone" />
+        <TextView
+            android:id="@+id/tv_sentence_furigana"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#9AA0A6"
+            android:textSize="10sp"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tv_sentence_furigana"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#9AA0A6"
-                android:textSize="10sp"
-                android:paddingTop="2dp"
-                android:visibility="gone" />
+        <ImageView
+            android:id="@+id/iv_sentence_ruby"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:adjustViewBounds="true"
+            android:visibility="gone" />
 
-            <ImageView
-                android:id="@+id/iv_sentence_ruby"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start"
-                android:adjustViewBounds="true"
-                android:visibility="gone" />
+        <TextView
+            android:id="@+id/tv_sentence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="この部屋は光がたくさん入って、いいね。"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tv_sentence"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="この部屋は光がたくさん入って、いいね。"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:singleLine="true"
-                android:ellipsize="end" />
-
-            <TextView
-                android:id="@+id/tv_sentence_meaning"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="This room gets a lot of light, which is nice."
-                android:textColor="#BDC1C6"
-                android:textSize="11sp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:visibility="gone" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/tv_sentence_meaning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="This room gets a lot of light, which is nice."
+            android:textColor="#BDC1C6"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:visibility="gone" />
 
         <ImageView
             android:id="@+id/iv_card_image"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_marginStart="8dp"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_gravity="center_horizontal"
             android:scaleType="centerCrop"
             android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/button_container"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="4dp">
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/btn_reveal"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/btn_reveal_bg"
-            android:gravity="center"
-            android:text="Reveal"
-            android:textColor="#90CAF9"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/btn_again"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/btn_again_bg"
-            android:gravity="center"
-            android:text="Again"
-            android:textColor="#EF5350"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/btn_good"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/btn_good_bg"
-            android:gravity="center"
-            android:text="Good"
-            android:textColor="#66BB6A"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/btn_snooze"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/btn_action_bg"
-            android:gravity="center"
-            android:text="Snooze"
-            android:textColor="#E0E0E0"
-            android:textSize="12sp" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/btn_open_anki"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:background="@drawable/btn_action_bg"
-            android:gravity="center"
-            android:text="Open Anki"
-            android:textColor="#E0E0E0"
-            android:textSize="12sp" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
     </LinearLayout>
 
 </LinearLayout>

@@ -26,6 +26,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 prefs.snoozeUntil = System.currentTimeMillis() + durationMs
                 AnkiNotificationService.update(context)
             }
+            ACTION_UNSNOOZE -> { 
+                val prefs = PreferencesManager(context)
+                prefs.snoozeUntil = 0L
+                AnkiNotificationService.update(context)
+            }
+            ACTION_DISMISSED -> { 
+                AnkiNotificationService.update(context)
+            }
             ACTION_OPEN_ANKI -> { 
                 val helper = AnkiDroidHelper(context)
                 helper.openAnkiDroidReviewer()
@@ -38,6 +46,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_GRADE_AGAIN = "com.ankilock.ACTION_GRADE_AGAIN"
         const val ACTION_GRADE_GOOD = "com.ankilock.ACTION_GRADE_GOOD"
         const val ACTION_SNOOZE = "com.ankilock.ACTION_SNOOZE"
+        const val ACTION_UNSNOOZE = "com.ankilock.ACTION_UNSNOOZE"
+        const val ACTION_DISMISSED = "com.ankilock.ACTION_DISMISSED"
         const val ACTION_OPEN_ANKI = "com.ankilock.ACTION_OPEN_ANKI"
     }
 }
