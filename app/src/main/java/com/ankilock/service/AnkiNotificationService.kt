@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
@@ -199,11 +200,25 @@ class AnkiNotificationService : Service() {
         val revC = stats.third
         val totalDue = newC + learnC + revC
         
+        val cardType = card?.cardType ?: 0
+        val cardColor = when (cardType) { 
+            1 -> Color.parseColor("#EF5350")
+            2 -> Color.parseColor("#66BB6A")
+            else -> Color.parseColor("#42A5F5")
+        }
+        val smallIconRes = when (cardType) { 
+            1 -> R.drawable.ic_card_learn
+            2 -> R.drawable.ic_card_review
+            else -> R.drawable.ic_card_new
+        }
+        
         val kanjiText = card?.kanji?.ifEmpty { card.question } ?: "Review Deck"
         val kanjiFurigana = card?.kanjiFurigana ?: ""
         val kanjiMeaning = card?.kanjiMeaning?.ifEmpty { card.answer } ?: ""
-        val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "")
-        val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "") ?: ""
+        val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "").trim()
+        val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "")?.trim() ?: ""
+        val sentenceMeaning = card?.sentenceMeaning ?: ""
+        val cleanSentenceMeaning = sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
         
         val imageBitmap = if (!card?.imageFileName.isNullOrBlank()) { 
             ankiHelper.getCardImageBitmap(card!!.imageFileName)
@@ -212,6 +227,7 @@ class AnkiNotificationService : Service() {
         }
         
         val artworkBitmap = MediaArtworkGenerator.generateArtwork( 
+            context = this, 
             card = card, 
             isRevealed = isRevealed, 
             imageBitmap = imageBitmap
@@ -226,7 +242,17 @@ class AnkiNotificationService : Service() {
         val artist = if (!isRevealed) { 
             if (rawSentence.isNotBlank()) rawSentence else "Tap ▶ to Reveal Answer"
         } else { 
-            if (cleanMeaning.isNotBlank()) cleanMeaning else deckName
+            val sentencePart = if (rawSentence.isNotBlank()) rawSentence else ""
+            val meaningPart = if (cleanSentenceMeaning.isNotBlank()) cleanSentenceMeaning else cleanMeaning
+            if (sentencePart.isNotBlank() && meaningPart.isNotBlank()) { 
+                "$sentencePart • $meaningPart"
+            } else if (sentencePart.isNotBlank()) { 
+                sentencePart
+            } else if (cleanMeaning.isNotBlank()) { 
+                cleanMeaning
+            } else { 
+                deckName
+            }
         }
         
         val album = "$deckName • Due: $totalDue ($newC · $learnC · $revC)"
@@ -309,7 +335,8 @@ class AnkiNotificationService : Service() {
             .setShowCancelButton(true)
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(smallIconRes)
+            .setColor(cardColor)
             .setStyle(mediaStyle)
             .setContentTitle(title)
             .setContentText(artist)
@@ -336,6 +363,18 @@ class AnkiNotificationService : Service() {
         card: CardInfo?, 
         stats: Triple<Int, Int, Int>
     ): Notification { 
+        val cardType = card?.cardType ?: 0
+        val cardColor = when (cardType) { 
+            1 -> Color.parseColor("#EF5350")
+            2 -> Color.parseColor("#66BB6A")
+            else -> Color.parseColor("#42A5F5")
+        }
+        val smallIconRes = when (cardType) { 
+            1 -> R.drawable.ic_card_learn
+            2 -> R.drawable.ic_card_review
+            else -> R.drawable.ic_card_new
+        }
+        
         val collapsedViews = RemoteViews(packageName, R.layout.notification_card_collapsed)
         val expandedViews = RemoteViews(packageName, R.layout.notification_card_expanded)
         
@@ -527,7 +566,8 @@ class AnkiNotificationService : Service() {
         }
         
         return NotificationCompat.Builder(this, CHANNEL_ID) 
-            .setSmallIcon(R.drawable.ic_notification) 
+            .setSmallIcon(smallIconRes) 
+            .setColor(cardColor) 
             .setStyle(NotificationCompat.DecoratedCustomViewStyle()) 
             .setCustomContentView(collapsedViews) 
             .setCustomBigContentView(expandedViews) 

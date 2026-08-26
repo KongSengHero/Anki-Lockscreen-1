@@ -24,5 +24,6 @@ data class CardInfo(
     val sentence: String = "", 
     val sentenceFurigana: String = "", 
     val sentenceMeaning: String = "", 
-    val imageFileName: String = ""
+    val imageFileName: String = "", 
+    val cardType: Int = 0
 )

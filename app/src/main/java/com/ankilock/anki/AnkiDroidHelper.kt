@@ -218,7 +218,36 @@ class AnkiDroidHelper(private val context: Context) {
                         getDeckNameForNote(noteId)
                     }
                     
-                    val parsed = getCardContent(noteId)
+                    val typeCol = cur.getColumnIndex("type").takeIf { it >= 0 } 
+                        ?: cur.getColumnIndex("card_type").takeIf { it >= 0 } 
+                    val queueCol = cur.getColumnIndex("queue").takeIf { it >= 0 } 
+                    
+                    var cardType = 0 
+                    if (typeCol != null) { 
+                        val rawType = cur.getInt(typeCol) 
+                        cardType = when (rawType) { 
+                            0 -> 0 
+                            1, 3 -> 1 
+                            2 -> 2 
+                            else -> 0 
+                        } 
+                    } else if (queueCol != null) { 
+                        val rawQueue = cur.getInt(queueCol) 
+                        cardType = when (rawQueue) { 
+                            0 -> 0 
+                            1, 3 -> 1 
+                            2 -> 2 
+                            else -> 0 
+                        } 
+                    } else { 
+                        cardType = when { 
+                            getNotesDueCount("nid:$noteId is:learn") > 0 -> 1 
+                            getNotesDueCount("nid:$noteId is:new") > 0 -> 0 
+                            else -> 2 
+                        } 
+                    } 
+                    
+                    val parsed = getCardContent(noteId) 
                     
                     return CardInfo( 
                         noteId = noteId, 
@@ -234,9 +263,10 @@ class AnkiDroidHelper(private val context: Context) {
                         sentence = parsed.sentence, 
                         sentenceFurigana = parsed.sentenceFurigana, 
                         sentenceMeaning = parsed.sentenceMeaning, 
-                        imageFileName = parsed.imageFileName
-                    )
-                }
+                        imageFileName = parsed.imageFileName, 
+                        cardType = cardType
+                    ) 
+                } 
             }
         } catch (e: Exception) { 
             e.printStackTrace()
