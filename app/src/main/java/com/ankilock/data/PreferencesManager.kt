@@ -30,6 +30,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
         set(value) = prefs.edit().putLong(KEY_SNOOZE_UNTIL, value).apply()
     
+    var isMusicPlayerStyle: Boolean
+        get() = prefs.getBoolean(KEY_MUSIC_PLAYER_STYLE, true)
+        set(value) = prefs.edit().putBoolean(KEY_MUSIC_PLAYER_STYLE, value).apply()
+    
     val isSnoozed: Boolean
         get() = System.currentTimeMillis() < snoozeUntil
     
@@ -39,6 +43,7 @@ class PreferencesManager(context: Context) {
     
     companion object { 
         private const val KEY_SERVICE_ENABLED = "service_enabled"
+        private const val KEY_MUSIC_PLAYER_STYLE = "music_player_style"
         private const val KEY_SELECTED_DECKS = "selected_decks"
         private const val KEY_UPDATE_INTERVAL = "update_interval"
         private const val KEY_SNOOZE_DURATION = "snooze_duration"

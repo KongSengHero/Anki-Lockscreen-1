@@ -10,6 +10,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.text.Html
 import android.view.View
 import android.widget.RemoteViews
@@ -20,13 +23,16 @@ import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.data.CardInfo
 import com.ankilock.data.PreferencesManager
 import com.ankilock.receiver.NotificationActionReceiver
+import com.ankilock.util.MediaArtworkGenerator
 import com.ankilock.util.RubyTextRenderer
+import kotlin.math.max
     
 class AnkiNotificationService : Service() { 
     
     private lateinit var ankiHelper: AnkiDroidHelper
     private lateinit var prefs: PreferencesManager
     private lateinit var notificationManager: NotificationManager
+    private var mediaSession: MediaSessionCompat? = null
     
     private var currentCard: CardInfo? = null
     private var isRevealed: Boolean = false
@@ -38,12 +44,51 @@ class AnkiNotificationService : Service() {
         prefs = PreferencesManager(this)
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
+        setupMediaSession()
+    }
+    
+    override fun onDestroy() { 
+        mediaSession?.isActive = false
+        mediaSession?.release()
+        mediaSession = null
+        super.onDestroy()
+    }
+    
+    private fun setupMediaSession() { 
+        mediaSession = MediaSessionCompat(this, "AnkiLockSession").apply { 
+            setCallback(object : MediaSessionCompat.Callback() { 
+                override fun onPlay() { 
+                    isRevealed = true
+                    updateNotification()
+                }
+                
+                override fun onPause() { 
+                    isRevealed = !isRevealed
+                    updateNotification()
+                }
+                
+                override fun onSkipToNext() { 
+                    handleGrade(3)
+                }
+                
+                override fun onSkipToPrevious() { 
+                    handleGrade(1)
+                }
+                
+                override fun onStop() { 
+                    val durationMs = prefs.snoozeDurationMinutes * 60 * 1000L
+                    prefs.snoozeUntil = System.currentTimeMillis() + durationMs
+                    updateNotification()
+                }
+            })
+            isActive = true
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { 
         when (intent?.action) { 
             ACTION_REVEAL_INTERNAL -> { 
-                isRevealed = true
+                isRevealed = !isRevealed
                 updateNotification()
             }
             ACTION_GRADE_INTERNAL -> { 
@@ -137,7 +182,154 @@ class AnkiNotificationService : Service() {
             return buildAllCaughtUpNotification()
         }
         
-        return buildFlashcardNotification(card, stats)
+        return if (prefs.isMusicPlayerStyle) { 
+            buildMusicStyleNotification(card, stats)
+        } else { 
+            buildFlashcardNotification(card, stats)
+        }
+    }
+    
+    private fun buildMusicStyleNotification( 
+        card: CardInfo?, 
+        stats: Triple<Int, Int, Int>
+    ): Notification { 
+        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
+        val newC = stats.first
+        val learnC = stats.second
+        val revC = stats.third
+        val totalDue = newC + learnC + revC
+        
+        val kanjiText = card?.kanji?.ifEmpty { card.question } ?: "Review Deck"
+        val kanjiFurigana = card?.kanjiFurigana ?: ""
+        val kanjiMeaning = card?.kanjiMeaning?.ifEmpty { card.answer } ?: ""
+        val cleanMeaning = kanjiMeaning.replace(Regex("<[^>]*>"), "")
+        val rawSentence = card?.sentence?.replace(Regex("<[^>]*>"), "") ?: ""
+        
+        val imageBitmap = if (!card?.imageFileName.isNullOrBlank()) { 
+            ankiHelper.getCardImageBitmap(card!!.imageFileName)
+        } else { 
+            null
+        }
+        
+        val artworkBitmap = MediaArtworkGenerator.generateArtwork( 
+            card = card, 
+            isRevealed = isRevealed, 
+            imageBitmap = imageBitmap
+        )
+        
+        val title = if (!isRevealed) { 
+            kanjiText
+        } else { 
+            if (kanjiFurigana.isNotBlank()) "$kanjiText [$kanjiFurigana]" else kanjiText
+        }
+        
+        val artist = if (!isRevealed) { 
+            if (rawSentence.isNotBlank()) rawSentence else "Tap ▶ to Reveal Answer"
+        } else { 
+            if (cleanMeaning.isNotBlank()) cleanMeaning else deckName
+        }
+        
+        val album = "$deckName • Due: $totalDue ($newC · $learnC · $revC)"
+        
+        val metadata = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, max(1, totalDue).toLong() * 1000L)
+            .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artworkBitmap)
+            .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artworkBitmap)
+            .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, artworkBitmap)
+            .build()
+        
+        mediaSession?.setMetadata(metadata)
+        
+        val playbackState = PlaybackStateCompat.Builder()
+            .setActions( 
+                PlaybackStateCompat.ACTION_PLAY or 
+                PlaybackStateCompat.ACTION_PAUSE or 
+                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or 
+                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or 
+                PlaybackStateCompat.ACTION_STOP
+            )
+            .setState( 
+                if (isRevealed) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED, 
+                0L, 
+                1.0f
+            )
+            .build()
+        
+        mediaSession?.setPlaybackState(playbackState)
+        
+        val revealIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_REVEAL
+        }
+        val revealPending = PendingIntent.getBroadcast( 
+            this, 
+            101, 
+            revealIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val againIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_GRADE_AGAIN
+        }
+        val againPending = PendingIntent.getBroadcast( 
+            this, 
+            102, 
+            againIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val goodIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_GRADE_GOOD
+        }
+        val goodPending = PendingIntent.getBroadcast( 
+            this, 
+            103, 
+            goodIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val openAnkiIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_OPEN_ANKI
+        }
+        val openAnkiPending = PendingIntent.getBroadcast( 
+            this, 
+            105, 
+            openAnkiIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val mediaStyle = androidx.media.app.NotificationCompat.MediaStyle()
+            .setMediaSession(mediaSession?.sessionToken)
+            .setShowActionsInCompactView(0, 1, 2)
+            .setShowCancelButton(true)
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setStyle(mediaStyle)
+            .setContentTitle(title)
+            .setContentText(artist)
+            .setSubText(deckName)
+            .setLargeIcon(artworkBitmap)
+            .addAction(R.drawable.ic_skip_previous, "Again", againPending)
+            .addAction( 
+                if (isRevealed) R.drawable.ic_pause else R.drawable.ic_play, 
+                if (isRevealed) "Hide" else "Reveal", 
+                revealPending
+            )
+            .addAction(R.drawable.ic_skip_next, "Good", goodPending)
+            .setContentIntent(openAnkiPending)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+            .setSilent(true)
+            .build()
     }
     
     private fun buildFlashcardNotification( 

@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Snooze
@@ -158,6 +159,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SettingsScreen() { 
         var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) }
+        var isMusicPlayerStyle by remember { mutableStateOf(prefs.isMusicPlayerStyle) }
         val selectedDeckIds = remember { mutableStateListOf<String>() }
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
@@ -213,6 +215,14 @@ class MainActivity : ComponentActivity() {
                     } else { 
                         AnkiNotificationService.stop(this@MainActivity)
                         DueCountWorker.cancel(this@MainActivity)
+                    }
+                }
+                
+                NotificationStyleCard(isMusicPlayerStyle) { isMusic ->
+                    isMusicPlayerStyle = isMusic
+                    prefs.isMusicPlayerStyle = isMusic
+                    if (isEnabled) { 
+                        AnkiNotificationService.update(this@MainActivity)
                     }
                 }
                 
@@ -374,6 +384,31 @@ class MainActivity : ComponentActivity() {
                         color = if (deck.totalDue > 0) MaterialTheme.colorScheme.primary 
                                else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+    }
+    
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun NotificationStyleCard(isMusicStyle: Boolean, onSelect: (Boolean) -> Unit) { 
+        val options = listOf(true, false)
+        val labels = listOf("Music Player", "Classic Card")
+        val selectedIndex = if (isMusicStyle) 0 else 1
+        
+        SettingsCard(icon = Icons.Filled.MusicNote, title = "Display Style") { 
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
+                options.forEachIndexed { index, isMusic ->
+                    SegmentedButton( 
+                        selected = index == selectedIndex, 
+                        onClick = { onSelect(isMusic) }, 
+                        shape = SegmentedButtonDefaults.itemShape( 
+                            index = index, 
+                            count = options.size
+                        )
+                    ) { 
+                        Text(labels[index], fontSize = 13.sp)
+                    }
                 }
             }
         }
