@@ -124,37 +124,62 @@ object RubyTextRenderer {
         return cleanedTokens
     }
 
-    fun renderRubyBitmap( 
+    fun buildRubyVocab(vocab: String, furiganaOrKana: String): String { 
+        val cleanVocab = vocab.trim()
+        val cleanFuri = furiganaOrKana.trim()
+        if (cleanFuri.isBlank() || cleanVocab.isBlank()) return cleanVocab
+        if (cleanFuri.contains("[") && cleanFuri.contains("]")) return cleanFuri
+        if (cleanFuri.contains("<ruby>")) return cleanFuri
+        if (cleanVocab == cleanFuri) return cleanVocab
+        if (cleanVocab.all { !isKanji(it) }) return cleanVocab
+        
+        var commonSuffixLen = 0
+        while (commonSuffixLen < cleanVocab.length && 
+               commonSuffixLen < cleanFuri.length && 
+               cleanVocab[cleanVocab.length - 1 - commonSuffixLen] == cleanFuri[cleanFuri.length - 1 - commonSuffixLen]) { 
+            commonSuffixLen++
+        }
+        
+        if (commonSuffixLen > 0) { 
+            val kanjiPart = cleanVocab.substring(0, cleanVocab.length - commonSuffixLen)
+            val kanaPart = cleanFuri.substring(0, cleanFuri.length - commonSuffixLen)
+            val suffix = cleanVocab.substring(cleanVocab.length - commonSuffixLen)
+            if (kanjiPart.isNotEmpty() && kanaPart.isNotEmpty()) { 
+                return "$kanjiPart[$kanaPart]$suffix"
+            }
+        }
+        
+        return "$cleanVocab[$cleanFuri]"
+    }
+
+    fun renderRubyBitmapPx( 
         context: Context, 
         rawText: String, 
         highlightWord: String = "", 
-        baseTextSizeSp: Float = 15f, 
-        rubyTextSizeSp: Float = 8.5f, 
+        baseTextSizePx: Float = 42f, 
+        rubyTextSizePx: Float = 20f, 
         baseTextColor: Int = Color.WHITE, 
         rubyTextColor: Int = Color.parseColor("#9AA0A6"), 
         highlightColor: Int = Color.parseColor("#8AB4F8"), 
         maxWidthPx: Int = 0, 
-        isCentered: Boolean = true
+        isCentered: Boolean = true, 
+        isBold: Boolean = false
     ): Bitmap? { 
         val tokens = parseRubyTokens(rawText, highlightWord)
         if (tokens.isEmpty()) return null
-
-        val density = context.resources.displayMetrics.density
-        val baseTextSizePx = baseTextSizeSp * density
-        val rubyTextSizePx = rubyTextSizeSp * density
 
         val basePaint = TextPaint().apply { 
             isAntiAlias = true
             textSize = baseTextSizePx
             color = baseTextColor
-            typeface = Typeface.DEFAULT
+            typeface = if (isBold) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
         }
 
         val rubyPaint = TextPaint().apply { 
             isAntiAlias = true
             textSize = rubyTextSizePx
             color = rubyTextColor
-            typeface = Typeface.DEFAULT
+            typeface = if (isBold) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
         }
 
         val targetBasePaint = TextPaint(basePaint).apply { 
@@ -164,6 +189,7 @@ object RubyTextRenderer {
 
         val targetRubyPaint = TextPaint(rubyPaint).apply { 
             color = highlightColor
+            isFakeBoldText = true
         }
 
         val baseMetrics = basePaint.fontMetrics
@@ -174,8 +200,8 @@ object RubyTextRenderer {
 
         val hasAnyRuby = tokens.any { !it.ruby.isNullOrBlank() }
         val effectiveRubyHeight = if (hasAnyRuby) rubyHeight else 0f
-        val rubyBaseGap = if (hasAnyRuby) 1.5f * density else 0f
-        val lineSpacing = 3f * density
+        val rubyBaseGap = if (hasAnyRuby) 2.5f else 0f
+        val lineSpacing = 5f
         val totalLineHeight = effectiveRubyHeight + rubyBaseGap + baseHeight + lineSpacing
 
         val measuredTokens = tokens.map { token -> 
@@ -215,7 +241,7 @@ object RubyTextRenderer {
             line.sumOf { it.totalWidth.toDouble() }.toFloat()
         } ?: 0f
 
-        val bitmapWidth = max(1, min(effectiveMaxWidth, maxLineWidth.toInt() + (8f * density).toInt()))
+        val bitmapWidth = max(1, min(effectiveMaxWidth, maxLineWidth.toInt() + 16))
         val bitmapHeight = max(1, (lines.size * totalLineHeight).toInt())
 
         val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
@@ -227,7 +253,7 @@ object RubyTextRenderer {
             var currentX = if (isCentered) { 
                 max(0f, (bitmapWidth - lineWidth) / 2f)
             } else { 
-                2f * density
+                4f
             }
 
             val rubyBaseline = currentY - rubyMetrics.ascent
@@ -252,5 +278,33 @@ object RubyTextRenderer {
         }
 
         return bitmap
+    }
+
+    fun renderRubyBitmap( 
+        context: Context, 
+        rawText: String, 
+        highlightWord: String = "", 
+        baseTextSizeSp: Float = 15f, 
+        rubyTextSizeSp: Float = 8.5f, 
+        baseTextColor: Int = Color.WHITE, 
+        rubyTextColor: Int = Color.parseColor("#9AA0A6"), 
+        highlightColor: Int = Color.parseColor("#8AB4F8"), 
+        maxWidthPx: Int = 0, 
+        isCentered: Boolean = true
+    ): Bitmap? { 
+        val density = context.resources.displayMetrics.density
+        return renderRubyBitmapPx( 
+            context = context, 
+            rawText = rawText, 
+            highlightWord = highlightWord, 
+            baseTextSizePx = baseTextSizeSp * density, 
+            rubyTextSizePx = rubyTextSizeSp * density, 
+            baseTextColor = baseTextColor, 
+            rubyTextColor = rubyTextColor, 
+            highlightColor = highlightColor, 
+            maxWidthPx = maxWidthPx, 
+            isCentered = isCentered, 
+            isBold = false
+        )
     }
 }

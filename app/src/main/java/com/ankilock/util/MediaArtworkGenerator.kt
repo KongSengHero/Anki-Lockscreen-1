@@ -184,47 +184,33 @@ object MediaArtworkGenerator {
         val sentenceMeaning = card.sentenceMeaning
         val cleanSentenceMeaning = sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
         
-        var curY = 125f
-        
-        if (isRevealed && kanjiFurigana.isNotBlank()) { 
-            val furiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
-                color = Color.parseColor("#7EB6FF")
-                textSize = 30f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textAlign = Paint.Align.CENTER
-            }
-            canvas.drawText( 
-                kanjiFurigana, 
-                ARTWORK_SIZE / 2f, 
-                curY, 
-                furiPaint
-            )
-            curY += 46f
+        val vocabRubyText = if (isRevealed && kanjiFurigana.isNotBlank()) { 
+            RubyTextRenderer.buildRubyVocab(kanjiText, kanjiFurigana)
         } else { 
-            curY += 36f
+            kanjiText
         }
         
-        val kanjiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.WHITE
-            textSize = if (kanjiText.length > 5) 56f else 72f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        canvas.drawText( 
-            kanjiText, 
-            ARTWORK_SIZE / 2f, 
-            curY + 12f, 
-            kanjiPaint
+        val vocabRubyBmp = RubyTextRenderer.renderRubyBitmapPx( 
+            context = context, 
+            rawText = vocabRubyText, 
+            baseTextSizePx = if (kanjiText.length > 5) 64f else 78f, 
+            rubyTextSizePx = if (isRevealed) 30f else 0f, 
+            baseTextColor = Color.WHITE, 
+            rubyTextColor = Color.parseColor("#7EB6FF"), 
+            highlightColor = Color.WHITE, 
+            maxWidthPx = (ARTWORK_SIZE * 0.88f).toInt(), 
+            isCentered = true, 
+            isBold = true
         )
-        curY += 54f
+        val vocabH = vocabRubyBmp?.height?.toFloat() ?: 80f
         
-        if (isRevealed && cleanMeaning.isNotBlank()) { 
+        val meaningLayout = if (isRevealed && cleanMeaning.isNotBlank()) { 
             val meaningPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#F1F5F9")
-                textSize = if (cleanMeaning.length > 30) 28f else 32f
+                textSize = if (cleanMeaning.length > 30) 32f else 36f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
-            val meaningLayout = StaticLayout.Builder.obtain( 
+            StaticLayout.Builder.obtain( 
                 cleanMeaning, 
                 0, 
                 cleanMeaning.length, 
@@ -234,62 +220,40 @@ object MediaArtworkGenerator {
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(2) 
             .build()
-            
-            canvas.save()
-            canvas.translate( 
-                ARTWORK_SIZE * 0.08f, 
-                curY
-            )
-            meaningLayout.draw(canvas)
-            canvas.restore()
-            curY += meaningLayout.height + 14f
         } else { 
-            curY += 16f
+            null
         }
+        val meaningH = meaningLayout?.height?.toFloat() ?: 0f
         
-        val dividerY = max(curY, 290f)
-        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.parseColor("#38FFFFFF")
-            strokeWidth = 2f
-        }
-        canvas.drawLine( 
-            ARTWORK_SIZE * 0.15f, 
-            dividerY, 
-            ARTWORK_SIZE * 0.85f, 
-            dividerY, 
-            dividerPaint
-        )
+        val dividerGapTop = 16f
+        val dividerGapBottom = 18f
+        val dividerH = dividerGapTop + 2f + dividerGapBottom
         
-        var sentenceSectionY = dividerY + 20f
-        
-        val rubyBitmap = if (isRevealed && sentenceFurigana.isNotBlank()) { 
-            RubyTextRenderer.renderRubyBitmap( 
+        val sentenceRubyBmp = if (isRevealed && sentenceFurigana.isNotBlank()) { 
+            RubyTextRenderer.renderRubyBitmapPx( 
                 context = context, 
                 rawText = sentenceFurigana, 
                 highlightWord = kanjiText, 
-                baseTextSizeSp = 15f, 
-                rubyTextSizeSp = 8.5f, 
+                baseTextSizePx = 42f, 
+                rubyTextSizePx = 20f, 
                 baseTextColor = Color.WHITE, 
                 rubyTextColor = Color.parseColor("#90CAF9"), 
                 highlightColor = Color.parseColor("#8AB4F8"), 
                 maxWidthPx = (ARTWORK_SIZE * 0.86f).toInt(), 
-                isCentered = true
+                isCentered = true, 
+                isBold = false
             )
         } else { 
             null
         }
         
-        if (rubyBitmap != null) { 
-            val rubyX = (ARTWORK_SIZE - rubyBitmap.width) / 2f
-            canvas.drawBitmap(rubyBitmap, rubyX, sentenceSectionY, Paint(Paint.ANTI_ALIAS_FLAG))
-            sentenceSectionY += rubyBitmap.height + 12f
-        } else if (rawSentence.isNotBlank()) { 
+        val sentenceLayout = if (sentenceRubyBmp == null && rawSentence.isNotBlank()) { 
             val sentencePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.WHITE
-                textSize = 26f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                textSize = 42f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
-            val sentenceLayout = StaticLayout.Builder.obtain( 
+            StaticLayout.Builder.obtain( 
                 rawSentence, 
                 0, 
                 rawSentence.length, 
@@ -299,24 +263,20 @@ object MediaArtworkGenerator {
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(3) 
             .build()
-            
-            canvas.save()
-            canvas.translate( 
-                ARTWORK_SIZE * 0.08f, 
-                sentenceSectionY
-            )
-            sentenceLayout.draw(canvas)
-            canvas.restore()
-            sentenceSectionY += sentenceLayout.height + 12f
+        } else { 
+            null
         }
+        val sentenceH = sentenceRubyBmp?.height?.toFloat() 
+            ?: sentenceLayout?.height?.toFloat() 
+            ?: 0f
         
-        if (isRevealed && cleanSentenceMeaning.isNotBlank()) { 
+        val sentMeaningLayout = if (isRevealed && cleanSentenceMeaning.isNotBlank()) { 
             val sentMeaningPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#CBD5E1")
-                textSize = 23f
+                textSize = 30f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             }
-            val sentMeaningLayout = StaticLayout.Builder.obtain( 
+            StaticLayout.Builder.obtain( 
                 cleanSentenceMeaning, 
                 0, 
                 cleanSentenceMeaning.length, 
@@ -326,33 +286,97 @@ object MediaArtworkGenerator {
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(3) 
             .build()
-            
-            canvas.save()
-            canvas.translate( 
-                ARTWORK_SIZE * 0.08f, 
-                sentenceSectionY
-            )
-            sentMeaningLayout.draw(canvas)
-            canvas.restore()
-            sentenceSectionY += sentMeaningLayout.height + 12f
+        } else { 
+            null
+        }
+        val sentMeaningH = sentMeaningLayout?.height?.toFloat() ?: 0f
+        
+        val maxImgWidth = (ARTWORK_SIZE * 0.38f).toInt()
+        val maxImgHeight = 100f
+        val imgDrawWidth: Float
+        val imgDrawHeight: Float
+        if (imageBitmap != null) { 
+            val imgAspect = imageBitmap.width.toFloat() / max(1, imageBitmap.height).toFloat()
+            if (imgAspect > 1f) { 
+                imgDrawWidth = min(maxImgWidth.toFloat(), imageBitmap.width.toFloat())
+                imgDrawHeight = imgDrawWidth / imgAspect
+            } else { 
+                imgDrawHeight = min(maxImgHeight, imageBitmap.height.toFloat())
+                imgDrawWidth = imgDrawHeight * imgAspect
+            }
+        } else { 
+            imgDrawWidth = 0f
+            imgDrawHeight = 0f
         }
         
-        if (imageBitmap != null) { 
-            val maxImgWidth = (ARTWORK_SIZE * 0.40f).toInt()
-            val maxImgHeight = 110
-            val imgAspect = imageBitmap.width.toFloat() / max(1, imageBitmap.height).toFloat()
-            val drawWidth: Float
-            val drawHeight: Float
-            if (imgAspect > 1f) { 
-                drawWidth = min(maxImgWidth.toFloat(), imageBitmap.width.toFloat())
-                drawHeight = drawWidth / imgAspect
-            } else { 
-                drawHeight = min(maxImgHeight.toFloat(), imageBitmap.height.toFloat())
-                drawWidth = drawHeight * imgAspect
-            }
-            val imgLeft = (ARTWORK_SIZE - drawWidth) / 2f
-            val imgTop = min(sentenceSectionY + 8f, ARTWORK_SIZE - drawHeight - 50f)
-            val dstRect = RectF(imgLeft, imgTop, imgLeft + drawWidth, imgTop + drawHeight)
+        val contentTop = 92f
+        val contentBottom = 736f
+        val availableH = contentBottom - contentTop
+        
+        var totalContentH = vocabH
+        if (meaningH > 0f) totalContentH += 12f + meaningH
+        totalContentH += dividerH
+        totalContentH += sentenceH
+        if (sentMeaningH > 0f) totalContentH += 14f + sentMeaningH
+        if (imgDrawHeight > 0f) totalContentH += 16f + imgDrawHeight
+        
+        val startY = contentTop + max(0f, (availableH - totalContentH) / 2f)
+        var curY = startY
+        
+        if (vocabRubyBmp != null) { 
+            val vocabX = (ARTWORK_SIZE - vocabRubyBmp.width) / 2f
+            canvas.drawBitmap(vocabRubyBmp, vocabX, curY, null)
+            curY += vocabH
+        }
+        
+        if (meaningLayout != null) { 
+            curY += 12f
+            canvas.save()
+            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            meaningLayout.draw(canvas)
+            canvas.restore()
+            curY += meaningH
+        }
+        
+        curY += dividerGapTop
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
+            color = Color.parseColor("#38FFFFFF")
+            strokeWidth = 2f
+        }
+        canvas.drawLine( 
+            ARTWORK_SIZE * 0.15f, 
+            curY, 
+            ARTWORK_SIZE * 0.85f, 
+            curY, 
+            dividerPaint
+        )
+        curY += 2f + dividerGapBottom
+        
+        if (sentenceRubyBmp != null) { 
+            val sentenceX = (ARTWORK_SIZE - sentenceRubyBmp.width) / 2f
+            canvas.drawBitmap(sentenceRubyBmp, sentenceX, curY, null)
+            curY += sentenceH
+        } else if (sentenceLayout != null) { 
+            canvas.save()
+            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            sentenceLayout.draw(canvas)
+            canvas.restore()
+            curY += sentenceH
+        }
+        
+        if (sentMeaningLayout != null) { 
+            curY += 14f
+            canvas.save()
+            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            sentMeaningLayout.draw(canvas)
+            canvas.restore()
+            curY += sentMeaningH
+        }
+        
+        if (imageBitmap != null && imgDrawHeight > 0f) { 
+            curY += 16f
+            val imgLeft = (ARTWORK_SIZE - imgDrawWidth) / 2f
+            val dstRect = RectF(imgLeft, curY, imgLeft + imgDrawWidth, curY + imgDrawHeight)
             val imgPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             canvas.save()
             val clipPath = android.graphics.Path().apply { 

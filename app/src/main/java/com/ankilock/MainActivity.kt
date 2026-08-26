@@ -554,9 +554,14 @@ class MainActivity : ComponentActivity() {
                             .padding(18.dp), 
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) { 
-                        if (isRevealed && card.kanjiFurigana.isNotBlank()) { 
+                        val cleanFuri = if (card.kanjiFurigana.contains("[")) { 
+                            Regex("\\[([^\\]]+)\\]").findAll(card.kanjiFurigana).map { it.groupValues[1] }.joinToString("")
+                        } else { 
+                            card.kanjiFurigana
+                        }
+                        if (isRevealed && cleanFuri.isNotBlank() && cleanFuri != card.kanji) { 
                             Text( 
-                                card.kanjiFurigana, 
+                                cleanFuri, 
                                 color = Color(0xFF7EB6FF), 
                                 fontSize = 14.sp, 
                                 fontWeight = FontWeight.Bold

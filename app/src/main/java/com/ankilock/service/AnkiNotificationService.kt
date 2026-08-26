@@ -251,7 +251,12 @@ class AnkiNotificationService : Service() {
         val title = if (!isRevealed) { 
             kanjiText
         } else { 
-            if (kanjiFurigana.isNotBlank()) "$kanjiText [$kanjiFurigana]" else kanjiText
+            val cleanReading = if (kanjiFurigana.contains("[") && kanjiFurigana.contains("]")) { 
+                Regex("\\[([^\\]]+)\\]").findAll(kanjiFurigana).map { it.groupValues[1] }.joinToString("")
+            } else { 
+                kanjiFurigana.trim()
+            }
+            if (cleanReading.isNotBlank() && cleanReading != kanjiText) "$kanjiText [$cleanReading]" else kanjiText
         }
         
         val artist = if (!isRevealed) { 

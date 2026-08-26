@@ -313,9 +313,7 @@ class AnkiDroidHelper(private val context: Context) {
             
             detectedKanji = cleanVocab
             if (vocabWithFurigana.contains("[") && vocabWithFurigana.contains("]")) { 
-                val rubyMatches = Regex("([^\\[\\s]+)\\[([^\\]]+)\\]").findAll(vocabWithFurigana)
-                val combined = rubyMatches.joinToString("") { it.groupValues[2] }
-                detectedKanjiFurigana = combined.ifEmpty { cleanHtml(vocabWithFurigana) }
+                detectedKanjiFurigana = vocabWithFurigana
             } else if (rawParts.size > 1) { 
                 val cleanKana = cleanHtml(rawParts[1])
                 if (cleanKana != cleanVocab && isJapanese(cleanKana)) { 
@@ -345,8 +343,7 @@ class AnkiDroidHelper(private val context: Context) {
         } else { 
             val rawVocab = rawParts[0]
             if (rawVocab.contains("[") && rawVocab.contains("]")) { 
-                val rubyMatches = Regex("([^\\[\\s]+)\\[([^\\]]+)\\]").findAll(rawVocab)
-                detectedKanjiFurigana = rubyMatches.joinToString("") { it.groupValues[2] }
+                detectedKanjiFurigana = rawVocab
                 detectedKanji = cleanFuriganaToKanji(rawVocab)
             } else { 
                 detectedKanji = cleanHtml(rawVocab)
