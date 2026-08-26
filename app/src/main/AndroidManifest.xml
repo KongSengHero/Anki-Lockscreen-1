@@ -34,16 +34,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".ReviewActivity"
-            android:exported="false"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.AnkiLock.Review"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:launchMode="singleInstance" />
-
         <service
             android:name=".service.AnkiNotificationService"
             android:foregroundServiceType="specialUse"

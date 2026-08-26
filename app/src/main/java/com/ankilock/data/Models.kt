@@ -17,5 +17,12 @@ data class CardInfo(
     val answer: String, 
     val deckName: String, 
     val buttonCount: Int = 4, 
-    val nextReviewTimes: String = ""
+    val nextReviewTimes: String = "", 
+    val kanji: String = "", 
+    val kanjiFurigana: String = "", 
+    val kanjiMeaning: String = "", 
+    val sentence: String = "", 
+    val sentenceFurigana: String = "", 
+    val sentenceMeaning: String = "", 
+    val imageFileName: String = ""
 )
