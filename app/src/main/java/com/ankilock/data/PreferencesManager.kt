@@ -47,15 +47,15 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putStringSet(KEY_SAVED_IMAGE_URIS, value).apply()
     
     var blurRadius: Int
-        get() = prefs.getInt(KEY_BLUR_RADIUS, 25)
+        get() = prefs.getInt(KEY_BLUR_RADIUS, 20)
         set(value) = prefs.edit().putInt(KEY_BLUR_RADIUS, value).apply()
     
     var dimOpacity: Float
-        get() = prefs.getFloat(KEY_DIM_OPACITY, 0.45f)
+        get() = prefs.getFloat(KEY_DIM_OPACITY, 0.10f)
         set(value) = prefs.edit().putFloat(KEY_DIM_OPACITY, value).apply()
     
     var artworkOpacity: Float
-        get() = prefs.getFloat(KEY_ARTWORK_OPACITY, 1.0f)
+        get() = prefs.getFloat(KEY_ARTWORK_OPACITY, 0.5f)
         set(value) = prefs.edit().putFloat(KEY_ARTWORK_OPACITY, value).apply()
     
     val isSnoozed: Boolean

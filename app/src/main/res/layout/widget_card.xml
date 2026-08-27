@@ -5,103 +5,15 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="16dp">
+    android:padding="8dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingBottom="8dp">
-
-        <TextView
-            android:id="@+id/tv_widget_stats"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="9 · 6 · 57"
-            android:textColor="#94A3B8"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_widget_deck"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Kaishi 1.5k"
-            android:textColor="#E2E8F0"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:gravity="end"
-            android:singleLine="true"
-            android:ellipsize="end" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/widget_card_content"
+    <ImageView
+        android:id="@+id/iv_widget_artwork"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center">
-
-        <TextView
-            android:id="@+id/tv_widget_furigana"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#7EB6FF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tv_widget_kanji"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="戦う"
-            android:textColor="#FFFFFF"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/tv_widget_meaning"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="to wage war, to fight"
-            android:textColor="#F1F5F9"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:paddingTop="3dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tv_widget_sentence"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="彼は最後まで戦ったよ。"
-            android:textColor="#CBD5E1"
-            android:textSize="13sp"
-            android:gravity="center"
-            android:maxLines="2"
-            android:ellipsize="end"
-            android:paddingTop="6dp" />
-
-        <TextView
-            android:id="@+id/tv_widget_sentence_meaning"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="He fought to the very end."
-            android:textColor="#94A3B8"
-            android:textSize="12sp"
-            android:gravity="center"
-            android:maxLines="2"
-            android:ellipsize="end"
-            android:paddingTop="2dp"
-            android:visibility="gone" />
-    </LinearLayout>
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="true" />
 
     <LinearLayout
         android:id="@+id/widget_button_container"
@@ -109,7 +21,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="8dp">
+        android:paddingTop="6dp">
 
         <TextView
             android:id="@+id/btn_widget_again"

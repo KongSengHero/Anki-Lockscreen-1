@@ -22,6 +22,7 @@ import com.ankilock.MainActivity
 import com.ankilock.R
 import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.data.CardInfo
+import com.ankilock.data.CardSessionManager
 import com.ankilock.data.PreferencesManager
 import com.ankilock.receiver.NotificationActionReceiver
 import com.ankilock.util.MediaArtworkGenerator
@@ -36,11 +37,7 @@ class AnkiNotificationService : Service() {
     private lateinit var notificationManager: NotificationManager
     private var mediaSession: MediaSessionCompat? = null
     
-    private var currentCard: CardInfo? = null
-    private var isRevealed: Boolean = false
     private var cardStartTime: Long = 0L
-    private var optimisticStats: Triple<Int, Int, Int>? = null
-    private var lastAnsweredNoteId: Long? = null
     
     override fun onCreate() { 
         super.onCreate()
@@ -62,21 +59,21 @@ class AnkiNotificationService : Service() {
         mediaSession = MediaSessionCompat(this, "AnkiLockSession").apply { 
             setCallback(object : MediaSessionCompat.Callback() { 
                 override fun onPlay() { 
-                    isRevealed = true
-                    updateNotification()
+                    CardSessionManager.reveal(this@AnkiNotificationService)
                 }
                 
                 override fun onPause() { 
-                    isRevealed = !isRevealed
-                    updateNotification()
+                    CardSessionManager.toggleReveal(this@AnkiNotificationService)
                 }
                 
                 override fun onSkipToNext() { 
-                    handleGrade(3)
+                    val timeTaken = if (cardStartTime > 0L) SystemClock.elapsedRealtime() - cardStartTime else 5000L
+                    CardSessionManager.gradeCard(this@AnkiNotificationService, 3, timeTaken)
                 }
                 
                 override fun onSkipToPrevious() { 
-                    handleGrade(1)
+                    val timeTaken = if (cardStartTime > 0L) SystemClock.elapsedRealtime() - cardStartTime else 5000L
+                    CardSessionManager.gradeCard(this@AnkiNotificationService, 1, timeTaken)
                 }
                 
                 override fun onStop() { 
@@ -92,16 +89,14 @@ class AnkiNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { 
         when (intent?.action) { 
             ACTION_REVEAL_INTERNAL -> { 
-                isRevealed = !isRevealed
-                updateNotification()
+                CardSessionManager.toggleReveal(this)
             }
             ACTION_GRADE_INTERNAL -> { 
                 val ease = intent.getIntExtra(EXTRA_EASE, 3)
-                handleGrade(ease)
+                val timeTaken = if (cardStartTime > 0L) SystemClock.elapsedRealtime() - cardStartTime else 5000L
+                CardSessionManager.gradeCard(this, ease, timeTaken)
             }
             ACTION_UPDATE -> { 
-                isRevealed = false
-                currentCard = null
                 updateNotification()
             }
             ACTION_STOP -> { 
@@ -133,41 +128,6 @@ class AnkiNotificationService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
     
-    private fun handleGrade(ease: Int) { 
-        val card = currentCard
-        val timeTaken = if (cardStartTime > 0L) { 
-            SystemClock.elapsedRealtime() - cardStartTime
-        } else { 
-            5000L
-        }
-        
-        if (card != null) { 
-            val type = card.cardType
-            val current = optimisticStats ?: ankiHelper.getSelectedDeckStats()
-            optimisticStats = when (type) { 
-                0 -> Triple(max(0, current.first - 1), if (ease == 1) current.second + 1 else current.second, current.third)
-                1 -> Triple(current.first, if (ease == 1) current.second else max(0, current.second - 1), current.third)
-                2 -> Triple(current.first, if (ease == 1) current.second + 1 else current.second, max(0, current.third - 1))
-                else -> current
-            }
-            lastAnsweredNoteId = card.noteId
-            isRevealed = false
-            currentCard = null
-            updateNotification()
-            
-            Thread { 
-                ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken)
-                val fresh = ankiHelper.getSelectedDeckStats()
-                optimisticStats = fresh
-                updateNotification()
-            }.start()
-        } else { 
-            isRevealed = false
-            currentCard = null
-            updateNotification()
-        }
-    }
-    
     private fun buildNotification(): Notification { 
         if (prefs.isSnoozed) { 
             return buildSnoozedNotification()
@@ -181,16 +141,9 @@ class AnkiNotificationService : Service() {
             return buildErrorNotification(getString(R.string.api_permission_needed))
         }
         
-        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
-        val deckId = if (selectedDecks.size == 1) selectedDecks.first() else null
-        
-        if (currentCard == null) { 
-            currentCard = ankiHelper.getNextDueCard(deckId, lastAnsweredNoteId)
-            cardStartTime = SystemClock.elapsedRealtime()
-        }
-        
-        val card = currentCard
-        val stats = optimisticStats ?: ankiHelper.getSelectedDeckStats().also { optimisticStats = it }
+        val card = CardSessionManager.getOrFetchCard(this)
+        cardStartTime = SystemClock.elapsedRealtime()
+        val stats = CardSessionManager.currentStats
         
         if (card == null) { 
             return if (prefs.isMusicPlayerStyle) { 
@@ -211,6 +164,7 @@ class AnkiNotificationService : Service() {
         card: CardInfo?, 
         stats: Triple<Int, Int, Int>
     ): Notification { 
+        val isRevealed = CardSessionManager.isRevealed
         val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
         val newC = stats.first
         val learnC = stats.second
@@ -389,6 +343,7 @@ class AnkiNotificationService : Service() {
         card: CardInfo?, 
         stats: Triple<Int, Int, Int>
     ): Notification { 
+        val isRevealed = CardSessionManager.isRevealed
         val cardType = card?.cardType ?: 0
         val cardColor = when (cardType) { 
             1 -> Color.parseColor("#EF5350")
@@ -735,7 +690,6 @@ class AnkiNotificationService : Service() {
     fun updateNotification() { 
         val notification = buildNotification()
         notificationManager.notify(NOTIFICATION_ID, notification)
-        AnkiAppWidgetProvider.syncCard(currentCard, isRevealed)
         AnkiAppWidgetProvider.updateAllWidgets(this)
     }
     
@@ -761,18 +715,11 @@ class AnkiNotificationService : Service() {
         }
         
         fun revealCard(context: Context) { 
-            val intent = Intent(context, AnkiNotificationService::class.java).apply { 
-                action = ACTION_REVEAL_INTERNAL
-            }
-            context.startService(intent)
+            CardSessionManager.toggleReveal(context)
         }
         
         fun gradeCurrentCard(context: Context, ease: Int) { 
-            val intent = Intent(context, AnkiNotificationService::class.java).apply { 
-                action = ACTION_GRADE_INTERNAL
-                putExtra(EXTRA_EASE, ease)
-            }
-            context.startService(intent)
+            CardSessionManager.gradeCard(context, ease)
         }
         
         fun stop(context: Context) { 

@@ -85,6 +85,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -94,12 +96,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.data.CardInfo
+import com.ankilock.data.CardSessionManager
 import com.ankilock.data.DeckInfo
 import com.ankilock.data.PreferencesManager
 import com.ankilock.service.AnkiNotificationService
 import com.ankilock.ui.theme.AnkiLockTheme
+import com.ankilock.util.MediaArtworkGenerator
 import com.ankilock.widget.AnkiAppWidgetProvider
 import com.ankilock.worker.DueCountWorker
+import kotlin.math.roundToInt
     
 class MainActivity : ComponentActivity() { 
     
@@ -113,9 +118,9 @@ class MainActivity : ComponentActivity() {
     private var backgroundTypeState by mutableStateOf("transparent")
     private var customImageUriState by mutableStateOf<String?>(null)
     private var savedImageUrisState by mutableStateOf<Set<String>>(emptySet())
-    private var blurRadiusState by mutableFloatStateOf(25f)
-    private var dimOpacityState by mutableFloatStateOf(0.45f)
-    private var artworkOpacityState by mutableFloatStateOf(1.0f)
+    private var blurRadiusState by mutableFloatStateOf(20f)
+    private var dimOpacityState by mutableFloatStateOf(0.10f)
+    private var artworkOpacityState by mutableFloatStateOf(0.5f)
     
     private val ankiPermissionLauncher = registerForActivityResult( 
         ActivityResultContracts.RequestPermission()
@@ -197,7 +202,7 @@ class MainActivity : ComponentActivity() {
         hasPermissionState = ankiHelper.hasApiPermission()
         if (hasPermissionState) { 
             decksState = ankiHelper.getDeckList()
-            previewCardState = ankiHelper.getNextDueCard()
+            previewCardState = CardSessionManager.getOrFetchCard(this)
         }
         backgroundTypeState = prefs.backgroundType
         customImageUriState = prefs.customImageUri
@@ -273,7 +278,22 @@ class MainActivity : ComponentActivity() {
         val selectedDeckIds = remember { mutableStateListOf<String>() }
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
-        var isPreviewRevealed by remember { mutableStateOf(false) }
+        
+        var activeCard by remember { mutableStateOf(CardSessionManager.getOrFetchCard(this@MainActivity)) }
+        var isRevealed by remember { mutableStateOf(CardSessionManager.isRevealed) }
+        var stats by remember { mutableStateOf(CardSessionManager.currentStats) }
+        
+        DisposableEffect(Unit) { 
+            val listener = { 
+                activeCard = CardSessionManager.currentCard
+                isRevealed = CardSessionManager.isRevealed
+                stats = CardSessionManager.currentStats
+            }
+            CardSessionManager.addListener(listener)
+            onDispose { 
+                CardSessionManager.removeListener(listener)
+            }
+        }
         
         remember { 
             selectedDeckIds.clear()
@@ -305,42 +325,19 @@ class MainActivity : ComponentActivity() {
                 }
             )
             
-            if (previewCardState != null) { 
-                ModernPreviewCard( 
-                    card = previewCardState!!, 
-                    isRevealed = isPreviewRevealed, 
-                    onToggleReveal = { isPreviewRevealed = !isPreviewRevealed }, 
-                    onRefresh = { refreshData() }, 
-                    onAgain = { 
-                        val card = previewCardState
-                        if (card != null) { 
-                            Thread { 
-                                ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L)
-                                previewCardState = ankiHelper.getNextDueCard(excludeNoteId = card.noteId)
-                                isPreviewRevealed = false
-                                if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
-                            }.start()
-                        }
-                    }, 
-                    onGood = { 
-                        val card = previewCardState
-                        if (card != null) { 
-                            Thread { 
-                                ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L)
-                                previewCardState = ankiHelper.getNextDueCard(excludeNoteId = card.noteId)
-                                isPreviewRevealed = false
-                                if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
-                            }.start()
-                        }
-                    }, 
-                    onOpenAnki = { 
-                        val launchIntent = packageManager.getLaunchIntentForPackage("com.ichi2.anki")
-                        if (launchIntent != null) startActivity(launchIntent)
-                    }
-                )
-            }
+            ModernPreviewCard( 
+                card = activeCard, 
+                stats = stats, 
+                isRevealed = isRevealed, 
+                onToggleReveal = { CardSessionManager.toggleReveal(this@MainActivity) }, 
+                onRefresh = { CardSessionManager.refresh(this@MainActivity) }, 
+                onAgain = { CardSessionManager.gradeCard(this@MainActivity, 1) }, 
+                onGood = { CardSessionManager.gradeCard(this@MainActivity, 3) }, 
+                onOpenAnki = { 
+                    val launchIntent = ankiHelper.getAnkiLaunchIntent()
+                    startActivity(launchIntent)
+                }
+            )
             
             ModernStyleCard(isMusicPlayerStyle) { isMusic -> 
                 isMusicPlayerStyle = isMusic
@@ -360,6 +357,7 @@ class MainActivity : ComponentActivity() {
                         backgroundTypeState = type
                         prefs.backgroundType = type
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }, 
                     onSelectSavedUri = { uriStr -> 
                         customImageUriState = uriStr
@@ -367,6 +365,7 @@ class MainActivity : ComponentActivity() {
                         backgroundTypeState = "custom"
                         prefs.backgroundType = "custom"
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }, 
                     onRemoveSavedUri = { uriStr -> 
                         prefs.removeSavedImageUri(uriStr)
@@ -374,24 +373,34 @@ class MainActivity : ComponentActivity() {
                         customImageUriState = prefs.customImageUri
                         backgroundTypeState = prefs.backgroundType
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }, 
                     onPickNewImage = { 
                         imagePickerLauncher.launch("image/*")
                     }, 
                     onBlurChange = { newRadius -> 
                         blurRadiusState = newRadius
-                        prefs.blurRadius = newRadius.toInt()
+                    }, 
+                    onBlurCommit = { 
+                        prefs.blurRadius = blurRadiusState.toInt()
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }, 
                     onOpacityChange = { newOpacity -> 
                         dimOpacityState = newOpacity
-                        prefs.dimOpacity = newOpacity
+                    }, 
+                    onOpacityCommit = { 
+                        prefs.dimOpacity = dimOpacityState
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }, 
                     onArtworkOpacityChange = { newArtOpacity -> 
                         artworkOpacityState = newArtOpacity
-                        prefs.artworkOpacity = newArtOpacity
+                    }, 
+                    onArtworkOpacityCommit = { 
+                        prefs.artworkOpacity = artworkOpacityState
                         if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                        AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
                     }
                 )
             }
@@ -490,7 +499,8 @@ class MainActivity : ComponentActivity() {
     
     @Composable
     fun ModernPreviewCard( 
-        card: CardInfo, 
+        card: CardInfo?, 
+        stats: Triple<Int, Int, Int>, 
         isRevealed: Boolean, 
         onToggleReveal: () -> Unit, 
         onRefresh: () -> Unit, 
@@ -498,6 +508,36 @@ class MainActivity : ComponentActivity() {
         onGood: () -> Unit, 
         onOpenAnki: () -> Unit
     ) { 
+        val context = LocalContext.current
+        val imageBitmap = remember(card) { 
+            if (!card?.imageFileName.isNullOrBlank()) { 
+                ankiHelper.getCardImageBitmap(card!!.imageFileName)
+            } else { 
+                null
+            }
+        }
+        
+        val previewArtwork = remember( 
+            card, 
+            stats, 
+            isRevealed, 
+            imageBitmap, 
+            backgroundTypeState, 
+            customImageUriState, 
+            blurRadiusState, 
+            dimOpacityState, 
+            artworkOpacityState
+        ) { 
+            MediaArtworkGenerator.generateArtwork( 
+                context = context, 
+                card = card, 
+                stats = stats, 
+                isRevealed = isRevealed, 
+                imageBitmap = imageBitmap, 
+                showBottomControls = false
+            )
+        }
+        
         Card( 
             modifier = Modifier.fillMaxWidth(), 
             shape = RoundedCornerShape(20.dp), 
@@ -506,7 +546,7 @@ class MainActivity : ComponentActivity() {
             ), 
             border = BorderStroke(1.dp, Color(0xFF334155))
         ) { 
-            Column(modifier = Modifier.padding(18.dp)) { 
+            Column(modifier = Modifier.padding(16.dp)) { 
                 Row( 
                     verticalAlignment = Alignment.CenterVertically, 
                     modifier = Modifier.fillMaxWidth()
@@ -538,90 +578,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
-                Surface( 
+                Image( 
+                    bitmap = previewArtwork.asImageBitmap(), 
+                    contentDescription = "Live Card Artwork", 
                     modifier = Modifier 
                         .fillMaxWidth() 
+                        .aspectRatio(1f) 
                         .clip(RoundedCornerShape(16.dp)) 
+                        .border(BorderStroke(1.dp, Color(0xFF475569).copy(alpha = 0.5f)), RoundedCornerShape(16.dp)) 
                         .clickable { onToggleReveal() }, 
-                    color = Color(0xFF1E293B).copy(alpha = 0.7f), 
-                    border = BorderStroke(1.dp, Color(0xFF475569).copy(alpha = 0.5f))
-                ) { 
-                    Column( 
-                        modifier = Modifier 
-                            .fillMaxWidth() 
-                            .padding(18.dp), 
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) { 
-                        val cleanFuri = if (card.kanjiFurigana.contains("[")) { 
-                            Regex("\\[([^\\]]+)\\]").findAll(card.kanjiFurigana).map { it.groupValues[1] }.joinToString("")
-                        } else { 
-                            card.kanjiFurigana
-                        }
-                        if (isRevealed && cleanFuri.isNotBlank() && cleanFuri != card.kanji) { 
-                            Text( 
-                                cleanFuri, 
-                                color = Color(0xFF7EB6FF), 
-                                fontSize = 14.sp, 
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
-                        
-                        Text( 
-                            card.kanji.ifEmpty { card.question }, 
-                            color = Color.White, 
-                            fontSize = 32.sp, 
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        if (!isRevealed) { 
-                            Text( 
-                                "Tap to Reveal Answer", 
-                                color = Color(0xFF94A3B8), 
-                                fontSize = 12.sp
-                            )
-                        } else { 
-                            val cleanMeaning = card.kanjiMeaning.replace(Regex("<[^>]*>"), "").trim()
-                            if (cleanMeaning.isNotBlank()) { 
-                                Text( 
-                                    cleanMeaning, 
-                                    color = Color(0xFFF1F5F9), 
-                                    fontSize = 14.sp, 
-                                    fontWeight = FontWeight.SemiBold, 
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        
-                        if (card.sentence.isNotBlank()) { 
-                            Spacer(modifier = Modifier.height(10.dp))
-                            val cleanSent = card.sentence.replace(Regex("<[^>]*>"), "").trim()
-                            Text( 
-                                cleanSent, 
-                                color = Color(0xFFCBD5E1), 
-                                fontSize = 12.sp, 
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                        
-                        if (isRevealed && card.sentenceMeaning.isNotBlank()) { 
-                            Spacer(modifier = Modifier.height(4.dp))
-                            val cleanSentMeaning = card.sentenceMeaning.replace(Regex("<[^>]*>"), "").trim()
-                            Text( 
-                                cleanSentMeaning, 
-                                color = Color(0xFF94A3B8), 
-                                fontSize = 11.sp, 
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
+                    contentScale = ContentScale.Fit
+                )
                 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 Row( 
                     modifier = Modifier.fillMaxWidth(), 
@@ -631,7 +602,9 @@ class MainActivity : ComponentActivity() {
                         onClick = onAgain, 
                         modifier = Modifier.weight(1f).height(38.dp), 
                         shape = RoundedCornerShape(10.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = Color(0xFFEF5350).copy(alpha = 0.75f)
+                        )
                     ) { 
                         Text("Again", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
@@ -639,15 +612,24 @@ class MainActivity : ComponentActivity() {
                         onClick = onToggleReveal, 
                         modifier = Modifier.weight(1.2f).height(38.dp), 
                         shape = RoundedCornerShape(10.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8))
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = Color(0xFF38BDF8).copy(alpha = 0.75f)
+                        )
                     ) { 
-                        Text(if (isRevealed) "Hide" else "Reveal", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        Text( 
+                            if (isRevealed) "Hide" else "Reveal", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = Color.White
+                        )
                     }
                     Button( 
                         onClick = onGood, 
                         modifier = Modifier.weight(1f).height(38.dp), 
                         shape = RoundedCornerShape(10.dp), 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = Color(0xFF10B981).copy(alpha = 0.75f)
+                        )
                     ) { 
                         Text("Good", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
@@ -655,7 +637,10 @@ class MainActivity : ComponentActivity() {
                         onClick = onOpenAnki, 
                         modifier = Modifier.weight(0.9f).height(38.dp), 
                         shape = RoundedCornerShape(10.dp), 
-                        border = BorderStroke(1.dp, Color(0xFF64748B))
+                        colors = ButtonDefaults.outlinedButtonColors( 
+                            containerColor = Color(0xFF334155).copy(alpha = 0.5f)
+                        ), 
+                        border = BorderStroke(1.dp, Color(0xFF64748B).copy(alpha = 0.5f))
                     ) { 
                         Text("Anki", fontSize = 12.sp, color = Color(0xFFE2E8F0))
                     }
@@ -726,8 +711,11 @@ class MainActivity : ComponentActivity() {
         onRemoveSavedUri: (String) -> Unit, 
         onPickNewImage: () -> Unit, 
         onBlurChange: (Float) -> Unit, 
+        onBlurCommit: () -> Unit, 
         onOpacityChange: (Float) -> Unit, 
-        onArtworkOpacityChange: (Float) -> Unit
+        onOpacityCommit: () -> Unit, 
+        onArtworkOpacityChange: (Float) -> Unit, 
+        onArtworkOpacityCommit: () -> Unit
     ) { 
         val context = LocalContext.current
         val options = listOf("anki_lock", "dark_blur", "sunset", "custom", "transparent")
@@ -759,17 +747,38 @@ class MainActivity : ComponentActivity() {
                 
                 Spacer(modifier = Modifier.height(14.dp))
                 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                    options.forEachIndexed { index, type -> 
-                        SegmentedButton( 
-                            selected = index == selectedIndex, 
+                LazyRow( 
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), 
+                    modifier = Modifier.fillMaxWidth()
+                ) { 
+                    items(options.indices.toList()) { index -> 
+                        val type = options[index]
+                        val isSelected = (index == selectedIndex)
+                        Surface( 
                             onClick = { onSelectType(type) }, 
-                            shape = SegmentedButtonDefaults.itemShape( 
-                                index = index, 
-                                count = options.size
-                            )
+                            shape = RoundedCornerShape(12.dp), 
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) 
+                                    else Color(0xFF1E293B).copy(alpha = 0.6f), 
+                            border = BorderStroke( 
+                                1.dp, 
+                                if (isSelected) MaterialTheme.colorScheme.primary 
+                                else Color(0xFF475569).copy(alpha = 0.4f)
+                            ), 
+                            modifier = Modifier.height(36.dp)
                         ) { 
-                            Text(labels[index], fontSize = 12.sp)
+                            Box( 
+                                contentAlignment = Alignment.Center, 
+                                modifier = Modifier.padding(horizontal = 14.dp)
+                            ) { 
+                                Text( 
+                                    text = labels[index], 
+                                    fontSize = 13.sp, 
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+                                    color = if (isSelected) Color.White else Color(0xFFCBD5E1), 
+                                    maxLines = 1, 
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
                 }
@@ -781,21 +790,33 @@ class MainActivity : ComponentActivity() {
                         label = "Blur Radius: ${blurRadius.toInt()}px", 
                         value = blurRadius, 
                         valueRange = 5f..60f, 
-                        onValueChange = onBlurChange
+                        steps = 10, 
+                        onValueChange = { newRadius -> 
+                            onBlurChange(((newRadius / 5f).roundToInt() * 5f).coerceIn(5f, 60f))
+                        }, 
+                        onValueChangeFinished = onBlurCommit
                     )
                     StudioSliderRow( 
                         icon = Icons.Filled.Opacity, 
                         label = "Dark Dimming Tint: ${(dimOpacity * 100).toInt()}%", 
                         value = dimOpacity, 
                         valueRange = 0.0f..0.9f, 
-                        onValueChange = onOpacityChange
+                        steps = 17, 
+                        onValueChange = { newOpacity -> 
+                            onOpacityChange(((newOpacity * 20f).roundToInt() / 20f).coerceIn(0f, 0.9f))
+                        }, 
+                        onValueChangeFinished = onOpacityCommit
                     )
                     StudioSliderRow( 
                         icon = Icons.Filled.AutoAwesome, 
                         label = "Artwork Opacity: ${(artworkOpacity * 100).toInt()}%", 
                         value = artworkOpacity, 
                         valueRange = 0.1f..1.0f, 
-                        onValueChange = onArtworkOpacityChange
+                        steps = 17, 
+                        onValueChange = { newArtOpacity -> 
+                            onArtworkOpacityChange(((newArtOpacity * 20f).roundToInt() / 20f).coerceIn(0.1f, 1.0f))
+                        }, 
+                        onValueChangeFinished = onArtworkOpacityCommit
                     )
                 }
                 
@@ -1060,7 +1081,9 @@ class MainActivity : ComponentActivity() {
         label: String, 
         value: Float, 
         valueRange: ClosedFloatingPointRange<Float>, 
-        onValueChange: (Float) -> Unit
+        steps: Int = 0, 
+        onValueChange: (Float) -> Unit, 
+        onValueChangeFinished: (() -> Unit)? = null
     ) { 
         Spacer(modifier = Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) { 
@@ -1080,7 +1103,9 @@ class MainActivity : ComponentActivity() {
         Slider( 
             value = value, 
             onValueChange = onValueChange, 
+            onValueChangeFinished = onValueChangeFinished, 
             valueRange = valueRange, 
+            steps = steps, 
             colors = SliderDefaults.colors( 
                 thumbColor = MaterialTheme.colorScheme.primary, 
                 activeTrackColor = MaterialTheme.colorScheme.primary

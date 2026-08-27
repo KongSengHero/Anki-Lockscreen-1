@@ -28,7 +28,8 @@ object MediaArtworkGenerator {
         card: CardInfo?, 
         stats: Triple<Int, Int, Int>, 
         isRevealed: Boolean, 
-        imageBitmap: Bitmap?
+        imageBitmap: Bitmap?, 
+        showBottomControls: Boolean = true
     ): Bitmap { 
         val prefs = PreferencesManager(context)
         val bitmap = Bitmap.createBitmap(ARTWORK_SIZE, ARTWORK_SIZE, Bitmap.Config.ARGB_8888)
@@ -171,7 +172,7 @@ object MediaArtworkGenerator {
         }
         
         if (card == null) { 
-            drawCongratulations(canvas)
+            drawCongratulations(canvas, showBottomControls)
             return bitmap
         }
         
@@ -310,7 +311,7 @@ object MediaArtworkGenerator {
         }
         
         val contentTop = 92f
-        val contentBottom = 736f
+        val contentBottom = if (showBottomControls) 736f else 760f
         val availableH = contentBottom - contentTop
         
         var totalContentH = vocabH
@@ -387,24 +388,26 @@ object MediaArtworkGenerator {
             canvas.restore()
         }
         
-        val hintText = if (!isRevealed) "|◀ Again   •   ▶ Reveal   •   ▶| Good" else "|◀ Again   •   ❚❚ Hide   •   ▶| Good"
-        val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.parseColor("#94A3B8")
-            textSize = 21f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
+        if (showBottomControls) { 
+            val hintText = if (!isRevealed) "|◀ Again   •   ▶ Reveal   •   ▶| Good" else "|◀ Again   •   ❚❚ Hide   •   ▶| Good"
+            val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+                color = Color.parseColor("#94A3B8")
+                textSize = 21f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText( 
+                hintText, 
+                ARTWORK_SIZE / 2f, 
+                ARTWORK_SIZE - 28f, 
+                hintPaint
+            )
         }
-        canvas.drawText( 
-            hintText, 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE - 28f, 
-            hintPaint
-        )
         
         return bitmap
     }
     
-    private fun drawCongratulations(canvas: Canvas) { 
+    private fun drawCongratulations(canvas: Canvas, showBottomControls: Boolean = true) { 
         val congratsPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.WHITE
             textSize = 62f
@@ -469,18 +472,20 @@ object MediaArtworkGenerator {
             tomorrowPaint
         )
         
-        val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.parseColor("#8AB4F8")
-            textSize = 21f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
+        if (showBottomControls) { 
+            val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
+                color = Color.parseColor("#8AB4F8")
+                textSize = 21f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText( 
+                "• Tap Open Anki to Study Ahead •", 
+                ARTWORK_SIZE / 2f, 
+                ARTWORK_SIZE - 28f, 
+                hintPaint
+            )
         }
-        canvas.drawText( 
-            "• Tap Open Anki to Study Ahead •", 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE - 28f, 
-            hintPaint
-        )
     }
     
     private fun drawBackground(context: Context, prefs: PreferencesManager, canvas: Canvas) { 
