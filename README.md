@@ -1,5 +1,7 @@
 # 📱 AnkiLock
 
+[![Download Latest APK](https://img.shields.io/github/v/release/KongSengHero/Anki-Lockscreen-1?label=Download%20APK%20(v2.5)&logo=android&color=success)](https://github.com/KongSengHero/Anki-Lockscreen-1/releases/latest)
+
 > **Learn flashcards every time you look at your phone!**
 
 AnkiLock puts your Anki flashcards directly onto your Android **Lock Screen** (styled like a music player) and your **Home Screen** (as a widget).
@@ -26,10 +28,10 @@ With AnkiLock, you don't even have to open the app. Every time you turn on your 
 
 ## 🚀 Quick Setup (3 Easy Steps)
 
-### Step 0: Downloading 
-1. Download the AnkiLock.apk inside thi respo. 
-2. If the system prompt you that this app is unknown and dangerous, just click the dropdown button and "Install Anyway". 
-3. There are no virus, and your data are all local, you can ask AI or use online scanner if you don't trust this apk. 
+### Step 0: Downloading
+1. Download the latest **[AnkiLock (v2.5) APK](https://github.com/KongSengHero/Anki-Lockscreen-1/releases/latest)** directly from the **[Releases](https://github.com/KongSengHero/Anki-Lockscreen-1/releases)** section (or grab `AnkiLock_(v2.5).apk` inside this repository).
+2. If the system prompts you that this app is unknown or dangerous, tap the dropdown and select **"Install Anyway"**.
+3. There is no malware, all your data stays 100% local on your device, and no internet access is required. 
 
 ### Step 1: Allow AnkiDroid API
 1. Open **AnkiDroid**.
