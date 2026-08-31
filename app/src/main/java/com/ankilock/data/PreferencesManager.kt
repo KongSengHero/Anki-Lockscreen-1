@@ -58,6 +58,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getFloat(KEY_ARTWORK_OPACITY, 0.5f)
         set(value) = prefs.edit().putFloat(KEY_ARTWORK_OPACITY, value).apply()
     
+    var classicRevealedAction: String
+        get() = prefs.getString(KEY_CLASSIC_REVEALED_ACTION, "suspend") ?: "suspend"
+        set(value) = prefs.edit().putString(KEY_CLASSIC_REVEALED_ACTION, value).apply()
+    
     val isSnoozed: Boolean
         get() = System.currentTimeMillis() < snoozeUntil
     
@@ -96,5 +100,6 @@ class PreferencesManager(context: Context) {
         private const val KEY_BLUR_RADIUS = "blur_radius"
         private const val KEY_DIM_OPACITY = "dim_opacity"
         private const val KEY_ARTWORK_OPACITY = "artwork_opacity"
+        private const val KEY_CLASSIC_REVEALED_ACTION = "classic_revealed_action"
     }
 }

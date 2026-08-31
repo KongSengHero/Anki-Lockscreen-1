@@ -275,6 +275,7 @@ class MainActivity : ComponentActivity() {
     fun ModernSettingsScreen(padding: PaddingValues) { 
         var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) }
         var isMusicPlayerStyle by remember { mutableStateOf(prefs.isMusicPlayerStyle) }
+        var classicRevealedAction by remember { mutableStateOf(prefs.classicRevealedAction) }
         val selectedDeckIds = remember { mutableStateListOf<String>() }
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
@@ -343,6 +344,14 @@ class MainActivity : ComponentActivity() {
                 isMusicPlayerStyle = isMusic
                 prefs.isMusicPlayerStyle = isMusic
                 if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+            }
+            
+            if (!isMusicPlayerStyle) { 
+                ModernClassicActionCard(classicRevealedAction) { action -> 
+                    classicRevealedAction = action
+                    prefs.classicRevealedAction = action
+                    if (isEnabled) AnkiNotificationService.update(this@MainActivity)
+                }
             }
             
             if (isMusicPlayerStyle) { 
@@ -684,6 +693,54 @@ class MainActivity : ComponentActivity() {
                         SegmentedButton( 
                             selected = index == selectedIndex, 
                             onClick = { onSelect(isMusic) }, 
+                            shape = SegmentedButtonDefaults.itemShape( 
+                                index = index, 
+                                count = options.size
+                            )
+                        ) { 
+                            Text(labels[index], fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun ModernClassicActionCard(currentAction: String, onSelect: (String) -> Unit) { 
+        val options = listOf("suspend", "open_anki", "undo", "open_app")
+        val labels = listOf("Suspend", "Open Anki", "Undo", "Open App")
+        val selectedIndex = options.indexOf(currentAction).coerceAtLeast(0)
+        
+        Card( 
+            modifier = Modifier.fillMaxWidth(), 
+            shape = RoundedCornerShape(20.dp), 
+            colors = CardDefaults.cardColors( 
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+        ) { 
+            Column(modifier = Modifier.padding(18.dp)) { 
+                Row(verticalAlignment = Alignment.CenterVertically) { 
+                    Icon( 
+                        Icons.Filled.AutoAwesome, 
+                        contentDescription = null, 
+                        tint = MaterialTheme.colorScheme.primary, 
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text( 
+                        "Classic Action (Revealed)", 
+                        fontWeight = FontWeight.SemiBold, 
+                        fontSize = 15.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
+                    options.forEachIndexed { index, action -> 
+                        SegmentedButton( 
+                            selected = index == selectedIndex, 
+                            onClick = { onSelect(action) }, 
                             shape = SegmentedButtonDefaults.itemShape( 
                                 index = index, 
                                 count = options.size

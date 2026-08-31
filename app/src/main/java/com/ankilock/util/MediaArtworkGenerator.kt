@@ -29,40 +29,39 @@ object MediaArtworkGenerator {
         stats: Triple<Int, Int, Int>, 
         isRevealed: Boolean, 
         imageBitmap: Bitmap?, 
-        showBottomControls: Boolean = true
+        showBottomControls: Boolean = true, 
+        targetWidth: Int = ARTWORK_SIZE, 
+        targetHeight: Int = ARTWORK_SIZE, 
+        fontScaleMultiplier: Float = 1.0f
     ): Bitmap { 
         val prefs = PreferencesManager(context)
-        val bitmap = Bitmap.createBitmap(ARTWORK_SIZE, ARTWORK_SIZE, Bitmap.Config.ARGB_8888)
+        val width = if (targetWidth > 0) targetWidth else ARTWORK_SIZE
+        val height = if (targetHeight > 0) targetHeight else ARTWORK_SIZE
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         
-        drawBackground(context, prefs, canvas)
+        drawBackground(context, prefs, canvas, width, height)
+        
+        val baseDensity = (width.toFloat() / 360f).coerceIn(0.9f, 4.0f)
+        val fontScale = fontScaleMultiplier.coerceIn(0.7f, 2.5f)
+        val sp = baseDensity * fontScale
+        
+        val topInset = max(38f * baseDensity, height * 0.085f)
+        val statsY = topInset + 10f * baseDensity
+        val sideInset = max(22f * baseDensity, width * 0.06f)
         
         val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "All Caught Up"
-        val deckPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.parseColor("#38FFFFFF")
-            style = Paint.Style.FILL
-        }
         val deckTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#E2E8F0")
-            textSize = 24f
+            textSize = 11.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
+            textAlign = Paint.Align.RIGHT
         }
         
-        val deckWidth = deckTextPaint.measureText(deckName) + 36f
-        val deckHeight = 44f
-        val deckPillLeft = ARTWORK_SIZE - 36f - deckWidth
-        val deckRect = RectF( 
-            deckPillLeft, 
-            36f, 
-            deckPillLeft + deckWidth, 
-            36f + deckHeight
-        )
-        canvas.drawRoundRect(deckRect, 22f, 22f, deckPillPaint)
         canvas.drawText( 
             deckName, 
-            deckPillLeft + deckWidth / 2f, 
-            36f + 30f, 
+            width - sideInset, 
+            statsY, 
             deckTextPaint
         )
         
@@ -78,22 +77,22 @@ object MediaArtworkGenerator {
         
         val newPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#8AB4F8")
-            textSize = 22f
+            textSize = 11.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val dotPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#94A3B8")
-            textSize = 20f
+            textSize = 10.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val learnPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#F28B82")
-            textSize = 22f
+            textSize = 11.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val revPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#81C995")
-            textSize = 22f
+            textSize = 11.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         
@@ -103,23 +102,7 @@ object MediaArtworkGenerator {
         val wDot2 = dotPaint.measureText(dotText)
         val wRev = revPaint.measureText(revText)
         
-        val totalStatsWidth = wNew + wDot1 + wLearn + wDot2 + wRev
-        val statsPillWidth = totalStatsWidth + 36f
-        val statsPillLeft = 36f
-        val statsRect = RectF( 
-            statsPillLeft, 
-            36f, 
-            statsPillLeft + statsPillWidth, 
-            36f + deckHeight
-        )
-        val statsPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
-            color = Color.parseColor("#38FFFFFF")
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(statsRect, 22f, 22f, statsPillPaint)
-        
-        var curStatsX = statsPillLeft + 18f
-        val statsY = 36f + 30f
+        var curStatsX = sideInset
         
         canvas.drawText(newText, curStatsX, statsY, newPaint)
         if (cardType == 0 && card != null) { 
@@ -128,7 +111,7 @@ object MediaArtworkGenerator {
                 style = Paint.Style.FILL
             }
             canvas.drawRoundRect( 
-                RectF(curStatsX, statsY + 5f, curStatsX + wNew, statsY + 9f), 
+                RectF(curStatsX, statsY + 4f * baseDensity, curStatsX + wNew, statsY + 6.5f * baseDensity), 
                 2f, 
                 2f, 
                 underlinePaint
@@ -146,7 +129,7 @@ object MediaArtworkGenerator {
                 style = Paint.Style.FILL
             }
             canvas.drawRoundRect( 
-                RectF(curStatsX, statsY + 5f, curStatsX + wLearn, statsY + 9f), 
+                RectF(curStatsX, statsY + 4f * baseDensity, curStatsX + wLearn, statsY + 6.5f * baseDensity), 
                 2f, 
                 2f, 
                 underlinePaint
@@ -164,7 +147,7 @@ object MediaArtworkGenerator {
                 style = Paint.Style.FILL
             }
             canvas.drawRoundRect( 
-                RectF(curStatsX, statsY + 5f, curStatsX + wRev, statsY + 9f), 
+                RectF(curStatsX, statsY + 4f * baseDensity, curStatsX + wRev, statsY + 6.5f * baseDensity), 
                 2f, 
                 2f, 
                 underlinePaint
@@ -172,7 +155,7 @@ object MediaArtworkGenerator {
         }
         
         if (card == null) { 
-            drawCongratulations(canvas, showBottomControls)
+            drawCongratulations(canvas, width, height, showBottomControls, sp, baseDensity)
             return bitmap
         }
         
@@ -194,21 +177,21 @@ object MediaArtworkGenerator {
         val vocabRubyBmp = RubyTextRenderer.renderRubyBitmapPx( 
             context = context, 
             rawText = vocabRubyText, 
-            baseTextSizePx = if (kanjiText.length > 5) 64f else 78f, 
-            rubyTextSizePx = if (isRevealed) 30f else 0f, 
+            baseTextSizePx = if (kanjiText.length > 5) 22f * sp else 28f * sp, 
+            rubyTextSizePx = if (isRevealed) 11f * sp else 0f, 
             baseTextColor = Color.WHITE, 
             rubyTextColor = Color.parseColor("#7EB6FF"), 
             highlightColor = Color.WHITE, 
-            maxWidthPx = (ARTWORK_SIZE * 0.88f).toInt(), 
+            maxWidthPx = (width * 0.88f).toInt(), 
             isCentered = true, 
             isBold = true
         )
-        val vocabH = vocabRubyBmp?.height?.toFloat() ?: 80f
+        val vocabH = vocabRubyBmp?.height?.toFloat() ?: (28f * sp)
         
         val meaningLayout = if (isRevealed && cleanMeaning.isNotBlank()) { 
             val meaningPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#F1F5F9")
-                textSize = if (cleanMeaning.length > 30) 32f else 36f
+                textSize = (if (cleanMeaning.length > 30) 11.5f else 13.5f) * sp
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             StaticLayout.Builder.obtain( 
@@ -216,7 +199,7 @@ object MediaArtworkGenerator {
                 0, 
                 cleanMeaning.length, 
                 meaningPaint, 
-                (ARTWORK_SIZE * 0.84f).toInt()
+                (width * 0.84f).toInt()
             ) 
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(2) 
@@ -226,8 +209,8 @@ object MediaArtworkGenerator {
         }
         val meaningH = meaningLayout?.height?.toFloat() ?: 0f
         
-        val dividerGapTop = 16f
-        val dividerGapBottom = 18f
+        val dividerGapTop = 8f * baseDensity
+        val dividerGapBottom = 10f * baseDensity
         val dividerH = dividerGapTop + 2f + dividerGapBottom
         
         val sentenceRubyBmp = if (isRevealed && sentenceFurigana.isNotBlank()) { 
@@ -235,12 +218,12 @@ object MediaArtworkGenerator {
                 context = context, 
                 rawText = sentenceFurigana, 
                 highlightWord = kanjiText, 
-                baseTextSizePx = 42f, 
-                rubyTextSizePx = 20f, 
+                baseTextSizePx = 14.5f * sp, 
+                rubyTextSizePx = 7f * sp, 
                 baseTextColor = Color.WHITE, 
                 rubyTextColor = Color.parseColor("#90CAF9"), 
                 highlightColor = Color.parseColor("#8AB4F8"), 
-                maxWidthPx = (ARTWORK_SIZE * 0.86f).toInt(), 
+                maxWidthPx = (width * 0.86f).toInt(), 
                 isCentered = true, 
                 isBold = false
             )
@@ -251,7 +234,7 @@ object MediaArtworkGenerator {
         val sentenceLayout = if (sentenceRubyBmp == null && rawSentence.isNotBlank()) { 
             val sentencePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.WHITE
-                textSize = 42f
+                textSize = 14.5f * sp
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             StaticLayout.Builder.obtain( 
@@ -259,7 +242,7 @@ object MediaArtworkGenerator {
                 0, 
                 rawSentence.length, 
                 sentencePaint, 
-                (ARTWORK_SIZE * 0.84f).toInt()
+                (width * 0.84f).toInt()
             ) 
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(3) 
@@ -274,7 +257,7 @@ object MediaArtworkGenerator {
         val sentMeaningLayout = if (isRevealed && cleanSentenceMeaning.isNotBlank()) { 
             val sentMeaningPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#CBD5E1")
-                textSize = 30f
+                textSize = 11f * sp
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             }
             StaticLayout.Builder.obtain( 
@@ -282,7 +265,7 @@ object MediaArtworkGenerator {
                 0, 
                 cleanSentenceMeaning.length, 
                 sentMeaningPaint, 
-                (ARTWORK_SIZE * 0.84f).toInt()
+                (width * 0.84f).toInt()
             ) 
             .setAlignment(Layout.Alignment.ALIGN_CENTER) 
             .setMaxLines(3) 
@@ -292,8 +275,8 @@ object MediaArtworkGenerator {
         }
         val sentMeaningH = sentMeaningLayout?.height?.toFloat() ?: 0f
         
-        val maxImgWidth = (ARTWORK_SIZE * 0.38f).toInt()
-        val maxImgHeight = 100f
+        val maxImgWidth = (width * 0.38f).toInt()
+        val maxImgHeight = min(height * 0.20f, 100f * baseDensity)
         val imgDrawWidth: Float
         val imgDrawHeight: Float
         if (imageBitmap != null) { 
@@ -310,30 +293,30 @@ object MediaArtworkGenerator {
             imgDrawHeight = 0f
         }
         
-        val contentTop = 92f
-        val contentBottom = if (showBottomControls) 736f else 760f
-        val availableH = contentBottom - contentTop
+        val contentTop = statsY + 16f * baseDensity
+        val contentBottom = if (showBottomControls) (height - 30f * baseDensity) else (height - 16f * baseDensity)
+        val availableH = max(60f * baseDensity, contentBottom - contentTop)
         
         var totalContentH = vocabH
-        if (meaningH > 0f) totalContentH += 12f + meaningH
+        if (meaningH > 0f) totalContentH += 6f * baseDensity + meaningH
         totalContentH += dividerH
         totalContentH += sentenceH
-        if (sentMeaningH > 0f) totalContentH += 14f + sentMeaningH
-        if (imgDrawHeight > 0f) totalContentH += 16f + imgDrawHeight
+        if (sentMeaningH > 0f) totalContentH += 6f * baseDensity + sentMeaningH
+        if (imgDrawHeight > 0f) totalContentH += 8f * baseDensity + imgDrawHeight
         
         val startY = contentTop + max(0f, (availableH - totalContentH) / 2f)
         var curY = startY
         
         if (vocabRubyBmp != null) { 
-            val vocabX = (ARTWORK_SIZE - vocabRubyBmp.width) / 2f
+            val vocabX = (width - vocabRubyBmp.width) / 2f
             canvas.drawBitmap(vocabRubyBmp, vocabX, curY, null)
             curY += vocabH
         }
         
         if (meaningLayout != null) { 
-            curY += 12f
+            curY += 6f * baseDensity
             canvas.save()
-            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            canvas.translate(width * 0.08f, curY)
             meaningLayout.draw(canvas)
             canvas.restore()
             curY += meaningH
@@ -345,43 +328,43 @@ object MediaArtworkGenerator {
             strokeWidth = 2f
         }
         canvas.drawLine( 
-            ARTWORK_SIZE * 0.15f, 
+            width * 0.15f, 
             curY, 
-            ARTWORK_SIZE * 0.85f, 
+            width * 0.85f, 
             curY, 
             dividerPaint
         )
         curY += 2f + dividerGapBottom
         
         if (sentenceRubyBmp != null) { 
-            val sentenceX = (ARTWORK_SIZE - sentenceRubyBmp.width) / 2f
+            val sentenceX = (width - sentenceRubyBmp.width) / 2f
             canvas.drawBitmap(sentenceRubyBmp, sentenceX, curY, null)
             curY += sentenceH
         } else if (sentenceLayout != null) { 
             canvas.save()
-            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            canvas.translate(width * 0.08f, curY)
             sentenceLayout.draw(canvas)
             canvas.restore()
             curY += sentenceH
         }
         
         if (sentMeaningLayout != null) { 
-            curY += 14f
+            curY += 6f * baseDensity
             canvas.save()
-            canvas.translate(ARTWORK_SIZE * 0.08f, curY)
+            canvas.translate(width * 0.08f, curY)
             sentMeaningLayout.draw(canvas)
             canvas.restore()
             curY += sentMeaningH
         }
         
         if (imageBitmap != null && imgDrawHeight > 0f) { 
-            curY += 16f
-            val imgLeft = (ARTWORK_SIZE - imgDrawWidth) / 2f
+            curY += 8f * baseDensity
+            val imgLeft = (width - imgDrawWidth) / 2f
             val dstRect = RectF(imgLeft, curY, imgLeft + imgDrawWidth, curY + imgDrawHeight)
             val imgPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             canvas.save()
             val clipPath = android.graphics.Path().apply { 
-                addRoundRect(dstRect, 14f, 14f, android.graphics.Path.Direction.CW)
+                addRoundRect(dstRect, 10f * baseDensity, 10f * baseDensity, android.graphics.Path.Direction.CW)
             }
             canvas.clipPath(clipPath)
             canvas.drawBitmap(imageBitmap, null, dstRect, imgPaint)
@@ -392,14 +375,14 @@ object MediaArtworkGenerator {
             val hintText = if (!isRevealed) "|◀ Again   •   ▶ Reveal   •   ▶| Good" else "|◀ Again   •   ❚❚ Hide   •   ▶| Good"
             val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#94A3B8")
-                textSize = 21f
+                textSize = 9.5f * sp
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
             canvas.drawText( 
                 hintText, 
-                ARTWORK_SIZE / 2f, 
-                ARTWORK_SIZE - 28f, 
+                width / 2f, 
+                height - 12f * baseDensity, 
                 hintPaint
             )
         }
@@ -407,30 +390,37 @@ object MediaArtworkGenerator {
         return bitmap
     }
     
-    private fun drawCongratulations(canvas: Canvas, showBottomControls: Boolean = true) { 
+    private fun drawCongratulations( 
+        canvas: Canvas, 
+        width: Int, 
+        height: Int, 
+        showBottomControls: Boolean = true, 
+        sp: Float = 2.2f, 
+        baseDensity: Float = 2.2f
+    ) { 
         val congratsPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.WHITE
-            textSize = 62f
+            textSize = 26f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
         canvas.drawText( 
             "お疲れ様でした！", 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE * 0.35f, 
+            width / 2f, 
+            height * 0.35f, 
             congratsPaint
         )
         
         val subPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#F1F5F9")
-            textSize = 28f
+            textSize = 13f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
         canvas.drawText( 
             "All reviews complete for today! 🎉", 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE * 0.44f, 
+            width / 2f, 
+            height * 0.44f, 
             subPaint
         )
         
@@ -439,61 +429,61 @@ object MediaArtworkGenerator {
             strokeWidth = 2f
         }
         canvas.drawLine( 
-            ARTWORK_SIZE * 0.15f, 
-            ARTWORK_SIZE * 0.50f, 
-            ARTWORK_SIZE * 0.85f, 
-            ARTWORK_SIZE * 0.50f, 
+            width * 0.15f, 
+            height * 0.50f, 
+            width * 0.85f, 
+            height * 0.50f, 
             dividerPaint
         )
         
         val cheerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#CBD5E1")
-            textSize = 26f
+            textSize = 12f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
         canvas.drawText( 
             "また明日頑張りましょう！", 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE * 0.58f, 
+            width / 2f, 
+            height * 0.58f, 
             cheerPaint
         )
         
         val tomorrowPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#94A3B8")
-            textSize = 22f
+            textSize = 10.5f * sp
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
         canvas.drawText( 
             "Come back tomorrow for your next cards.", 
-            ARTWORK_SIZE / 2f, 
-            ARTWORK_SIZE * 0.65f, 
+            width / 2f, 
+            height * 0.65f, 
             tomorrowPaint
         )
         
         if (showBottomControls) { 
             val hintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#8AB4F8")
-                textSize = 21f
+                textSize = 9.5f * sp
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
             canvas.drawText( 
                 "• Tap Open Anki to Study Ahead •", 
-                ARTWORK_SIZE / 2f, 
-                ARTWORK_SIZE - 28f, 
+                width / 2f, 
+                height - 12f * baseDensity, 
                 hintPaint
             )
         }
     }
     
-    private fun drawBackground(context: Context, prefs: PreferencesManager, canvas: Canvas) { 
+    private fun drawBackground(context: Context, prefs: PreferencesManager, canvas: Canvas, width: Int, height: Int) { 
         val bgType = prefs.backgroundType
         val radius = prefs.blurRadius
         val dimAlpha = (prefs.dimOpacity * 255).toInt().coerceIn(0, 255)
         val artworkAlpha = (prefs.artworkOpacity * 255).toInt().coerceIn(0, 255)
-        val dstRect = RectF(0f, 0f, ARTWORK_SIZE.toFloat(), ARTWORK_SIZE.toFloat())
+        val dstRect = RectF(0f, 0f, width.toFloat(), height.toFloat())
         
         val bitmapToDraw: Bitmap? = when (bgType) { 
             "anki_lock", "default" -> { 
@@ -519,7 +509,7 @@ object MediaArtworkGenerator {
                 } else null
             }
             "dark_blur", "sunset" -> { 
-                val preset = ImageBlurUtil.createPresetBackground(bgType, ARTWORK_SIZE, ARTWORK_SIZE)
+                val preset = ImageBlurUtil.createPresetBackground(bgType, width, height)
                 ImageBlurUtil.fastBlur(preset, 0.5f, radius)
             }
             else -> null
@@ -537,12 +527,20 @@ object MediaArtworkGenerator {
         dimAlpha: Int, 
         dstRect: RectF
     ) { 
-        val bmpW = bitmap.width
-        val bmpH = bitmap.height
-        val cropSize = min(bmpW, bmpH)
-        val cropX = (bmpW - cropSize) / 2
-        val cropY = (bmpH - cropSize) / 2
-        val srcRect = Rect(cropX, cropY, cropX + cropSize, cropY + cropSize)
+        val bmpW = bitmap.width.toFloat()
+        val bmpH = bitmap.height.toFloat()
+        val targetW = dstRect.width()
+        val targetH = dstRect.height()
+        
+        val scale = max(targetW / bmpW, targetH / bmpH)
+        val scaledW = bmpW * scale
+        val scaledH = bmpH * scale
+        val cropX = max(0f, (scaledW - targetW) / (2f * scale))
+        val cropY = max(0f, (scaledH - targetH) / (2f * scale))
+        val cropW = min(bmpW - cropX, targetW / scale)
+        val cropH = min(bmpH - cropY, targetH / scale)
+        
+        val srcRect = Rect(cropX.toInt(), cropY.toInt(), (cropX + cropW).toInt(), (cropY + cropH).toInt())
         val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { 
             alpha = artworkAlpha
         }

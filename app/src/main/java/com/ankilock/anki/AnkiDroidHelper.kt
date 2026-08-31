@@ -475,6 +475,20 @@ class AnkiDroidHelper(private val context: Context) {
         }
     }
     
+    fun suspendCard(noteId: Long, cardOrd: Int): Boolean { 
+        return try { 
+            val values = ContentValues().apply { 
+                put(COL_NOTE_ID, noteId)
+                put(COL_CARD_ORD, cardOrd)
+                put(COL_SUSPEND, 1)
+            }
+            resolver.update(SCHEDULE_URI, values, null, null) > 0
+        } catch (e: Exception) { 
+            e.printStackTrace()
+            false
+        }
+    }
+    
     companion object { 
         const val ANKI_PACKAGE = "com.ichi2.anki"
         const val PERMISSION_READ_WRITE_DATABASE = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
@@ -494,5 +508,6 @@ class AnkiDroidHelper(private val context: Context) {
         private const val COL_FLDS = "flds"
         private const val COL_EASE = "answer_ease"
         private const val COL_TIME_TAKEN = "time_taken"
+        private const val COL_SUSPEND = "suspended"
     }
 }

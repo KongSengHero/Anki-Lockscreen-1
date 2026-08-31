@@ -15,18 +15,6 @@
         android:paddingBottom="6dp">
 
         <TextView
-            android:id="@+id/tv_deck_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Kaishi 1.5k"
-            android:textColor="#9AA0A6"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:singleLine="true"
-            android:ellipsize="end" />
-
-        <TextView
             android:id="@+id/tv_deck_stats"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -34,6 +22,20 @@
             android:textColor="#BDC1C6"
             android:textSize="12sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_deck_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:textAlignment="viewEnd"
+            android:text="Kaishi 1.5k"
+            android:textColor="#9AA0A6"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
     </LinearLayout>
 
     <LinearLayout

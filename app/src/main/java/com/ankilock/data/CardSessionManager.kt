@@ -12,6 +12,9 @@ object CardSessionManager {
     
     var currentCard: CardInfo? = null
         private set
+    var previousCard: CardInfo? = null
+        private set
+    private var previousStats: Triple<Int, Int, Int>? = null
     var isRevealed: Boolean = false
         private set
     var currentStats: Triple<Int, Int, Int> = Triple(0, 0, 0)
@@ -78,6 +81,8 @@ object CardSessionManager {
         
         if (card != null) { 
             val oldStats = currentStats
+            previousCard = card
+            previousStats = oldStats
             currentStats = when (ease) { 
                 1 -> Triple( 
                     (oldStats.first - (if (card.cardType == 0) 1 else 0)).coerceAtLeast(0), 
@@ -109,6 +114,51 @@ object CardSessionManager {
             isRevealed = false
             notifyAllSurfaces(context)
             onComplete?.invoke(null)
+        }
+    }
+    
+    fun suspendCurrentCard( 
+        context: Context, 
+        onComplete: ((CardInfo?) -> Unit)? = null
+    ) { 
+        val card = currentCard ?: getOrFetchCard(context)
+        val ankiHelper = AnkiDroidHelper(context)
+        val prefs = PreferencesManager(context)
+        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
+        val deckId = if (selectedDecks.size == 1) selectedDecks.first() else null
+        
+        if (card != null) { 
+            previousCard = card
+            previousStats = currentStats
+            Thread { 
+                ankiHelper.suspendCard(card.noteId, card.cardOrd)
+                val nextCard = ankiHelper.getNextDueCard(deckId, excludeNoteId = card.noteId)
+                val freshStats = ankiHelper.getSelectedDeckStats()
+                
+                mainHandler.post { 
+                    currentCard = nextCard
+                    currentStats = freshStats
+                    isRevealed = false
+                    notifyAllSurfaces(context)
+                    onComplete?.invoke(nextCard)
+                }
+            }.start()
+        } else { 
+            onComplete?.invoke(null)
+        }
+    }
+    
+    fun undoLastReview(context: Context) { 
+        val prev = previousCard
+        if (prev != null) { 
+            currentCard = prev
+            if (previousStats != null) { 
+                currentStats = previousStats!!
+            }
+            isRevealed = false
+            previousCard = null
+            previousStats = null
+            notifyAllSurfaces(context)
         }
     }
     

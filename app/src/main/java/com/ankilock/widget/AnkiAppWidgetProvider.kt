@@ -6,12 +6,14 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.widget.RemoteViews
 import com.ankilock.R
 import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.data.CardInfo
 import com.ankilock.data.CardSessionManager
 import com.ankilock.util.MediaArtworkGenerator
+import kotlin.math.max
     
 class AnkiAppWidgetProvider : AppWidgetProvider() { 
     
@@ -23,6 +25,16 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
         for (widgetId in appWidgetIds) { 
             updateWidget(context, appWidgetManager, widgetId)
         }
+    }
+    
+    override fun onAppWidgetOptionsChanged( 
+        context: Context, 
+        appWidgetManager: AppWidgetManager, 
+        appWidgetId: Int, 
+        newOptions: Bundle
+    ) { 
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateWidget(context, appWidgetManager, appWidgetId)
     }
     
     override fun onReceive(context: Context, intent: Intent) { 
@@ -51,7 +63,6 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
         const val ACTION_WIDGET_REFRESH = "com.ankilock.widget.ACTION_REFRESH"
         
         fun syncCard(card: CardInfo?, revealed: Boolean) { 
-            // Handled via CardSessionManager
         }
         
         fun updateAllWidgets(context: Context) { 
@@ -79,13 +90,34 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
                 null
             }
             
+            val options = appWidgetManager.getAppWidgetOptions(widgetId)
+            val minWidthDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
+            val minHeightDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
+            val density = context.resources.displayMetrics.density
+            
+            val widthDp = if (minWidthDp > 0) minWidthDp else 280
+            val heightDp = if (minHeightDp > 0) minHeightDp else 320
+            
+            val scaleTier = when { 
+                widthDp >= 320 -> 1.20f 
+                widthDp >= 250 -> 1.00f 
+                widthDp >= 180 -> 0.85f 
+                else -> 0.75f 
+            }
+            
+            val targetW = (widthDp * density).toInt().coerceAtLeast(300)
+            val targetH = (heightDp * density).toInt().coerceAtLeast(300)
+            
             val artwork = MediaArtworkGenerator.generateArtwork( 
                 context = context, 
                 card = card, 
                 stats = stats, 
                 isRevealed = isRevealed, 
                 imageBitmap = imageBitmap, 
-                showBottomControls = false
+                showBottomControls = false, 
+                targetWidth = targetW, 
+                targetHeight = targetH, 
+                fontScaleMultiplier = scaleTier
             )
             
             val rv = RemoteViews(context.packageName, R.layout.widget_card)

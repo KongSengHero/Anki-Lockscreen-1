@@ -315,7 +315,7 @@ class AnkiNotificationService : Service() {
             .setContentText(if (card == null) "お疲れ様でした！また明日頑張りましょう！" else artist)
             .setSubText(deckName)
             .setLargeIcon(artworkBitmap)
-            .setContentIntent(openAnkiPending)
+            .setContentIntent(revealPending)
             .setDeleteIntent(dismissPending)
             .setOngoing(true)
             .setAutoCancel(false)
@@ -399,11 +399,41 @@ class AnkiNotificationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        val ankiIntent = ankiHelper.getAnkiLaunchIntent()
+        val openAnkiIntent = ankiHelper.getAnkiLaunchIntent()
         val openAnkiPending = PendingIntent.getActivity( 
             this, 
             105, 
-            ankiIntent, 
+            openAnkiIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val suspendIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_SUSPEND
+        }
+        val suspendPending = PendingIntent.getBroadcast( 
+            this, 
+            106, 
+            suspendIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val undoIntent = Intent(this, NotificationActionReceiver::class.java).apply { 
+            action = NotificationActionReceiver.ACTION_UNDO
+        }
+        val undoPending = PendingIntent.getBroadcast( 
+            this, 
+            107, 
+            undoIntent, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        val openAppIntent = Intent(this, MainActivity::class.java).apply { 
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openAppPending = PendingIntent.getActivity( 
+            this, 
+            108, 
+            openAppIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
@@ -416,6 +446,19 @@ class AnkiNotificationService : Service() {
             dismissIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        
+        val revealedActionPending = when (prefs.classicRevealedAction) { 
+            "suspend" -> suspendPending
+            "undo" -> undoPending
+            "open_app" -> openAppPending
+            else -> openAnkiPending
+        }
+        val revealedActionLabel = when (prefs.classicRevealedAction) { 
+            "suspend" -> "Suspend"
+            "undo" -> "Undo"
+            "open_app" -> "Open App"
+            else -> "Open Anki"
+        }
         
         val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
         val newC = stats.first
@@ -483,8 +526,7 @@ class AnkiNotificationService : Service() {
                 rv.setViewVisibility(R.id.iv_card_image, View.GONE)
             }
             
-            rv.setOnClickPendingIntent(R.id.notification_root, openAnkiPending)
-            rv.setOnClickPendingIntent(R.id.btn_open_anki, openAnkiPending)
+            rv.setOnClickPendingIntent(R.id.notification_root, revealPending)
             rv.setOnClickPendingIntent(R.id.btn_reveal, revealPending)
             rv.setOnClickPendingIntent(R.id.btn_again, againPending)
             rv.setOnClickPendingIntent(R.id.btn_good, goodPending)
@@ -494,6 +536,8 @@ class AnkiNotificationService : Service() {
                 rv.setViewVisibility(R.id.btn_reveal, View.VISIBLE)
                 rv.setViewVisibility(R.id.btn_snooze, View.VISIBLE)
                 rv.setViewVisibility(R.id.btn_open_anki, View.VISIBLE)
+                rv.setTextViewText(R.id.btn_open_anki, "Anki")
+                rv.setOnClickPendingIntent(R.id.btn_open_anki, openAnkiPending)
                 rv.setViewVisibility(R.id.btn_again, View.GONE)
                 rv.setViewVisibility(R.id.btn_good, View.GONE)
                 
@@ -513,6 +557,8 @@ class AnkiNotificationService : Service() {
                 rv.setViewVisibility(R.id.btn_reveal, View.GONE)
                 rv.setViewVisibility(R.id.btn_snooze, View.GONE)
                 rv.setViewVisibility(R.id.btn_open_anki, View.VISIBLE)
+                rv.setTextViewText(R.id.btn_open_anki, revealedActionLabel)
+                rv.setOnClickPendingIntent(R.id.btn_open_anki, revealedActionPending)
                 rv.setViewVisibility(R.id.btn_again, View.VISIBLE)
                 rv.setViewVisibility(R.id.btn_good, View.VISIBLE)
                 
@@ -565,7 +611,7 @@ class AnkiNotificationService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) 
             .setPriority(NotificationCompat.PRIORITY_MAX) 
             .setCategory(NotificationCompat.CATEGORY_STATUS) 
-            .setContentIntent(openAnkiPending) 
+            .setContentIntent(revealPending) 
             .setDeleteIntent(dismissPending) 
             .setSilent(true) 
             .build()
