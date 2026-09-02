@@ -30,7 +30,7 @@
             android:layout_weight="1"
             android:gravity="end"
             android:textAlignment="viewEnd"
-            android:text="Kaishi 1.5k"
+            android:text="AnkiLock"
             android:textColor="#9AA0A6"
             android:textSize="12sp"
             android:textStyle="bold"

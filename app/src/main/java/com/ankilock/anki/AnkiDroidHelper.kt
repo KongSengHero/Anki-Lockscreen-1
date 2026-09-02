@@ -116,45 +116,25 @@ class AnkiDroidHelper(private val context: Context) {
         }
     }
     
-    fun getSelectedDeckStats(): Triple<Int, Int, Int> { 
-        val uris = listOf( 
-            Uri.parse("content://$AUTHORITY/selected_deck"), 
-            Uri.parse("content://$AUTHORITY/selected_deck/"), 
-            Uri.parse("content://$AUTHORITY/decks/"), 
-            Uri.parse("content://$AUTHORITY/decks")
-        )
+    fun getSelectedDeckStats(selectedDeckIds: Set<Long> = emptySet()): Triple<Int, Int, Int> { 
+        val decks = getDeckList()
+        if (decks.isEmpty()) return Triple(0, 0, 0)
         
-        for (uri in uris) { 
-            try { 
-                resolver.query(uri, null, null, null, null)?.use { cur -> 
-                    val countsIdx = cur.getColumnIndex(COL_DECK_COUNTS)
-                    val nameIdx = cur.getColumnIndex(COL_DECK_NAME)
-                    
-                    while (cur.moveToNext()) { 
-                        val name = if (nameIdx >= 0) cur.getString(nameIdx) ?: "" else ""
-                        if (countsIdx >= 0) { 
-                            val countsStr = cur.getString(countsIdx) ?: ""
-                            val nums = Regex("\\d+").findAll(countsStr).map { it.value.toInt() }.toList()
-                            if (nums.size >= 3) { 
-                                val learnC = nums[0]
-                                val revC = nums[1]
-                                var newC = nums[2]
-                                if (newC > 100) { 
-                                    val dueNew = getNotesDueCount("deck:\"$name\" is:new is:due")
-                                    if (dueNew > 0) newC = dueNew
-                                }
-                                if (learnC > 0 || revC > 0 || newC > 0) { 
-                                    return Triple(newC, learnC, revC)
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) { 
-            }
+        val targetDecks = if (selectedDeckIds.isNotEmpty()) { 
+            decks.filter { it.id in selectedDeckIds }
+        } else { 
+            decks
         }
         
-        return getDeckStatsForDeck("Kaishi 1.5k")
+        var newC = 0
+        var learnC = 0
+        var revC = 0
+        for (deck in targetDecks) { 
+            newC += deck.newCount
+            learnC += deck.learnCount
+            revC += deck.reviewCount
+        }
+        return Triple(newC, learnC, revC)
     }
     
     fun getDeckStatsForDeck(deckName: String): Triple<Int, Int, Int> { 
@@ -178,7 +158,26 @@ class AnkiDroidHelper(private val context: Context) {
         }
     }
     
-    fun getNextDueCard(deckId: Long? = null, excludeNoteId: Long? = null): CardInfo? { 
+    fun getNextDueCard(deckIds: Set<Long> = emptySet(), excludeNoteId: Long? = null): CardInfo? { 
+        val decks = getDeckList()
+        val queryDeckIds = if (deckIds.isNotEmpty()) deckIds.toList() else listOf<Long?>(null)
+        
+        for (deckId in queryDeckIds) { 
+            val card = queryNextDueCardForDeck(deckId, excludeNoteId, decks)
+            if (card != null) return card
+        }
+        return null
+    }
+    
+    fun getNextDueCard(deckId: Long?, excludeNoteId: Long? = null): CardInfo? { 
+        return getNextDueCard(if (deckId != null) setOf(deckId) else emptySet(), excludeNoteId)
+    }
+    
+    private fun queryNextDueCardForDeck( 
+        deckId: Long?, 
+        excludeNoteId: Long?, 
+        decks: List<DeckInfo>
+    ): CardInfo? { 
         try { 
             val selection = if (deckId != null) "deckID=$deckId, limit=10" else "limit=10"
             
@@ -209,9 +208,9 @@ class AnkiDroidHelper(private val context: Context) {
                     ) ?: ""
                     
                     val deckName = if (deckId != null) { 
-                        getDeckList().find { it.id == deckId }?.name ?: getDeckNameForNote(noteId)
+                        decks.find { it.id == deckId }?.name ?: getDeckNameForNote(noteId, decks)
                     } else { 
-                        getDeckNameForNote(noteId)
+                        getDeckNameForNote(noteId, decks)
                     }
                     
                     val typeCol = cur.getColumnIndex("type").takeIf { it >= 0 } 
@@ -247,7 +246,7 @@ class AnkiDroidHelper(private val context: Context) {
                     return parsed.copy( 
                         noteId = noteId, 
                         cardOrd = cardOrd, 
-                        deckName = deckName.ifEmpty { "Kaishi 1.5k" }, 
+                        deckName = deckName.ifEmpty { decks.firstOrNull()?.name ?: "" }, 
                         buttonCount = buttonCount, 
                         nextReviewTimes = nextTimes, 
                         cardType = cardType
@@ -257,7 +256,6 @@ class AnkiDroidHelper(private val context: Context) {
         } catch (e: Exception) { 
             e.printStackTrace()
         }
-        
         return null
     }
     
@@ -298,6 +296,25 @@ class AnkiDroidHelper(private val context: Context) {
         var detectedSentenceFurigana = ""
         var detectedSentenceMeaning = ""
         var detectedImage = ""
+        var detectedWordAudio = ""
+        var detectedSentenceAudio = ""
+        
+        val soundRegex = Regex("\\[sound:\\s*([^\\]]+)\\s*\\]", RegexOption.IGNORE_CASE)
+        fun extractSound(text: String): String { 
+            val m = soundRegex.find(text)
+            if (m != null) return cleanHtml(m.groupValues[1]).trim()
+            val clean = cleanHtml(text).trim()
+            if (clean.endsWith(".mp3", ignoreCase = true) || 
+                clean.endsWith(".ogg", ignoreCase = true) || 
+                clean.endsWith(".wav", ignoreCase = true) || 
+                clean.endsWith(".m4a", ignoreCase = true) || 
+                clean.endsWith(".aac", ignoreCase = true) || 
+                clean.endsWith(".opus", ignoreCase = true)
+            ) { 
+                return clean
+            }
+            return ""
+        }
         
         val imgRegex = Regex("<img[^>]+src=[\"']?([^\"'>\\s]+)[\"']?")
         for (part in rawParts) { 
@@ -310,6 +327,11 @@ class AnkiDroidHelper(private val context: Context) {
         if (rawParts.size >= 8) { 
             val cleanVocab = cleanHtml(rawParts[0])
             val vocabWithFurigana = rawParts.getOrNull(3) ?: ""
+            val rawVocabAudio = rawParts.getOrNull(4) ?: ""
+            val rawSentenceAudio = rawParts.getOrNull(8) ?: ""
+            
+            detectedWordAudio = extractSound(rawVocabAudio)
+            detectedSentenceAudio = extractSound(rawSentenceAudio)
             
             detectedKanji = cleanVocab
             if (vocabWithFurigana.contains("[") && vocabWithFurigana.contains("]")) { 
@@ -367,6 +389,32 @@ class AnkiDroidHelper(private val context: Context) {
             }
         }
         
+        if (detectedWordAudio.isEmpty() || detectedSentenceAudio.isEmpty()) { 
+            val foundSounds = mutableListOf<String>()
+            for (part in rawParts) { 
+                soundRegex.findAll(part).forEach { match -> 
+                    val soundName = match.groupValues[1].trim()
+                    if (soundName.isNotEmpty() && !foundSounds.contains(soundName)) { 
+                        foundSounds.add(soundName)
+                    }
+                }
+                val rawSound = extractSound(part)
+                if (rawSound.isNotEmpty() && !foundSounds.contains(rawSound)) { 
+                    foundSounds.add(rawSound)
+                }
+            }
+            if (detectedWordAudio.isEmpty() && foundSounds.isNotEmpty()) { 
+                detectedWordAudio = foundSounds[0]
+            }
+            if (detectedSentenceAudio.isEmpty()) { 
+                if (detectedWordAudio.isNotEmpty() && foundSounds.size > 1) { 
+                    detectedSentenceAudio = foundSounds.firstOrNull { it != detectedWordAudio } ?: ""
+                } else if (detectedWordAudio.isEmpty() && foundSounds.size > 1) { 
+                    detectedSentenceAudio = foundSounds[1]
+                }
+            }
+        }
+        
         return CardInfo( 
             noteId = 0L, 
             cardOrd = 0, 
@@ -379,7 +427,9 @@ class AnkiDroidHelper(private val context: Context) {
             sentence = detectedSentence, 
             sentenceFurigana = detectedSentenceFurigana, 
             sentenceMeaning = detectedSentenceMeaning, 
-            imageFileName = detectedImage
+            imageFileName = detectedImage, 
+            wordAudio = detectedWordAudio, 
+            sentenceAudio = detectedSentenceAudio
         )
     }
     
@@ -419,6 +469,50 @@ class AnkiDroidHelper(private val context: Context) {
         return null
     }
     
+    fun getAudioFile(audioFileName: String): File? { 
+        if (audioFileName.isBlank()) return null
+        val cleanName = audioFileName.trim()
+        
+        val possibleFolders = listOf( 
+            File("/storage/emulated/0/Android/data/com.ichi2.anki/files/AnkiDroid/collection.media"), 
+            File("/storage/emulated/0/AnkiDroid/collection.media"), 
+            File("/sdcard/AnkiDroid/collection.media"), 
+            File("/storage/emulated/0/Download/AnkiDroid/collection.media"), 
+            File("/storage/emulated/0/Download/collection.media"), 
+            File("/storage/emulated/0/Documents/AnkiDroid/collection.media"), 
+            File("/storage/emulated/0/Documents/collection.media"), 
+            File(context.filesDir.parentFile?.parentFile, "com.ichi2.anki/files/AnkiDroid/collection.media"), 
+            File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "com.ichi2.anki/files/AnkiDroid/collection.media")
+        )
+        
+        for (folder in possibleFolders) { 
+            val file = File(folder, cleanName)
+            if (file.exists() && file.canRead()) { 
+                return file
+            }
+        }
+        
+        try { 
+            val mediaUri = Uri.parse("content://$AUTHORITY/media/" + Uri.encode(cleanName))
+            resolver.openInputStream(mediaUri)?.use { inputStream -> 
+                val cacheDir = File(context.cacheDir, "anki_audio")
+                if (!cacheDir.exists()) cacheDir.mkdirs()
+                val cacheFile = File(cacheDir, cleanName)
+                if (!cacheFile.exists() || cacheFile.length() == 0L) { 
+                    cacheFile.outputStream().use { outStream -> 
+                        inputStream.copyTo(outStream)
+                    }
+                }
+                if (cacheFile.exists() && cacheFile.length() > 0L) { 
+                    return cacheFile
+                }
+            }
+        } catch (e: Exception) { 
+            e.printStackTrace()
+        }
+        return null
+    }
+    
     private fun isJapanese(text: String): Boolean { 
         return text.any { char -> 
             (char in '\u3040'..'\u309F') || 
@@ -450,10 +544,15 @@ class AnkiDroidHelper(private val context: Context) {
         return cleanHtml(text)
     }
     
-    private fun getDeckNameForNote(noteId: Long): String { 
+    private fun getDeckNameForNote(noteId: Long, decks: List<DeckInfo> = emptyList()): String { 
         try { 
-            val decks = getDeckList()
-            if (decks.isNotEmpty()) return decks.first().name
+            val targetDecks = if (decks.isNotEmpty()) decks else getDeckList()
+            for (deck in targetDecks) { 
+                if (getNotesDueCount("nid:$noteId deck:\"${deck.name}\"") > 0) { 
+                    return deck.name
+                }
+            }
+            if (targetDecks.isNotEmpty()) return targetDecks.first().name
         } catch (e: Exception) { 
             e.printStackTrace()
         }

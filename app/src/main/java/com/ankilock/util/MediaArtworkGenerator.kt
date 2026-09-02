@@ -50,7 +50,16 @@ object MediaArtworkGenerator {
         val statsY = topInset + 10f * baseDensity
         val sideInset = max(22f * baseDensity, width * 0.06f)
         
-        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "All Caught Up"
+        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
+        val deckName = when { 
+            !card?.deckName.isNullOrBlank() -> card!!.deckName
+            selectedDecks.size == 1 -> { 
+                val singleId = selectedDecks.first()
+                com.ankilock.anki.AnkiDroidHelper(context).getDeckList().find { it.id == singleId }?.name ?: "All Caught Up"
+            }
+            selectedDecks.size > 1 -> "${selectedDecks.size} Decks"
+            else -> "All Caught Up"
+        }
         val deckTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
             color = Color.parseColor("#E2E8F0")
             textSize = 11.5f * sp

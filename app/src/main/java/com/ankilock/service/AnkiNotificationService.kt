@@ -165,7 +165,16 @@ class AnkiNotificationService : Service() {
         stats: Triple<Int, Int, Int>
     ): Notification { 
         val isRevealed = CardSessionManager.isRevealed
-        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
+        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
+        val deckName = when { 
+            !card?.deckName.isNullOrBlank() -> card!!.deckName
+            selectedDecks.size == 1 -> { 
+                val singleId = selectedDecks.first()
+                ankiHelper.getDeckList().find { it.id == singleId }?.name ?: "All Caught Up"
+            }
+            selectedDecks.size > 1 -> "${selectedDecks.size} Decks"
+            else -> "All Caught Up"
+        }
         val newC = stats.first
         val learnC = stats.second
         val revC = stats.third
@@ -460,7 +469,16 @@ class AnkiNotificationService : Service() {
             else -> "Open Anki"
         }
         
-        val deckName = card?.deckName?.ifEmpty { "Kaishi 1.5k" } ?: "Kaishi 1.5k"
+        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
+        val deckName = when { 
+            !card?.deckName.isNullOrBlank() -> card!!.deckName
+            selectedDecks.size == 1 -> { 
+                val singleId = selectedDecks.first()
+                ankiHelper.getDeckList().find { it.id == singleId }?.name ?: "All Caught Up"
+            }
+            selectedDecks.size > 1 -> "${selectedDecks.size} Decks"
+            else -> "All Caught Up"
+        }
         val newC = stats.first
         val learnC = stats.second
         val revC = stats.third

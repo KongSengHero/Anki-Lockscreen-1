@@ -62,6 +62,30 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString(KEY_CLASSIC_REVEALED_ACTION, "suspend") ?: "suspend"
         set(value) = prefs.edit().putString(KEY_CLASSIC_REVEALED_ACTION, value).apply()
     
+    var isAutoPlayAudio: Boolean
+        get() = prefs.getBoolean(KEY_AUTOPLAY_AUDIO, true)
+        set(value) = prefs.edit().putBoolean(KEY_AUTOPLAY_AUDIO, value).apply()
+    
+    var aiApiKey: String
+        get() = prefs.getString(KEY_AI_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_AI_API_KEY, value).apply()
+    
+    var aiProvider: String
+        get() = prefs.getString(KEY_AI_PROVIDER, "gemini") ?: "gemini"
+        set(value) = prefs.edit().putString(KEY_AI_PROVIDER, value).apply()
+    
+    var aiModel: String
+        get() = prefs.getString(KEY_AI_MODEL, "auto") ?: "auto"
+        set(value) = prefs.edit().putString(KEY_AI_MODEL, value).apply()
+    
+    var storyGenre: String
+        get() = prefs.getString(KEY_STORY_GENRE, "IT & Workplace") ?: "IT & Workplace"
+        set(value) = prefs.edit().putString(KEY_STORY_GENRE, value).apply()
+    
+    var storyLevel: String
+        get() = prefs.getString(KEY_STORY_LEVEL, "Intermediate") ?: "Intermediate"
+        set(value) = prefs.edit().putString(KEY_STORY_LEVEL, value).apply()
+    
     val isSnoozed: Boolean
         get() = System.currentTimeMillis() < snoozeUntil
     
@@ -101,5 +125,11 @@ class PreferencesManager(context: Context) {
         private const val KEY_DIM_OPACITY = "dim_opacity"
         private const val KEY_ARTWORK_OPACITY = "artwork_opacity"
         private const val KEY_CLASSIC_REVEALED_ACTION = "classic_revealed_action"
+        private const val KEY_AUTOPLAY_AUDIO = "autoplay_audio"
+        private const val KEY_AI_API_KEY = "ai_api_key"
+        private const val KEY_AI_PROVIDER = "ai_provider"
+        private const val KEY_AI_MODEL = "ai_model"
+        private const val KEY_STORY_GENRE = "story_genre"
+        private const val KEY_STORY_LEVEL = "story_level"
     }
 }

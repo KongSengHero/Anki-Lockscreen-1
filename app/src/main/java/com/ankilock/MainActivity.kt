@@ -46,6 +46,11 @@ import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,6 +61,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -100,7 +108,12 @@ import com.ankilock.data.CardSessionManager
 import com.ankilock.data.DeckInfo
 import com.ankilock.data.PreferencesManager
 import com.ankilock.service.AnkiNotificationService
+import com.ankilock.ui.components.AiKeyConfigDialog
+import com.ankilock.ui.study.ListeningDictationScreen
+import com.ankilock.ui.study.ForgeStoryScreen
 import com.ankilock.ui.theme.AnkiLockTheme
+import com.ankilock.util.AudioPlayerHelper
+import com.ankilock.util.AudioTrackPlaying
 import com.ankilock.util.MediaArtworkGenerator
 import com.ankilock.widget.AnkiAppWidgetProvider
 import com.ankilock.worker.DueCountWorker
@@ -110,6 +123,7 @@ class MainActivity : ComponentActivity() {
     
     private lateinit var ankiHelper: AnkiDroidHelper
     private lateinit var prefs: PreferencesManager
+    private lateinit var audioPlayer: AudioPlayerHelper
     
     private var isAnkiInstalledState by mutableStateOf(false)
     private var hasPermissionState by mutableStateOf(false)
@@ -175,6 +189,7 @@ class MainActivity : ComponentActivity() {
         
         ankiHelper = AnkiDroidHelper(this)
         prefs = PreferencesManager(this)
+        audioPlayer = AudioPlayerHelper(this)
         
         backgroundTypeState = prefs.backgroundType
         customImageUriState = prefs.customImageUri
@@ -192,6 +207,13 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    override fun onDestroy() { 
+        super.onDestroy()
+        if (::audioPlayer.isInitialized) { 
+            audioPlayer.release()
+        }
+    }
+    
     override fun onResume() { 
         super.onResume()
         refreshData()
@@ -202,7 +224,7 @@ class MainActivity : ComponentActivity() {
         hasPermissionState = ankiHelper.hasApiPermission()
         if (hasPermissionState) { 
             decksState = ankiHelper.getDeckList()
-            previewCardState = CardSessionManager.getOrFetchCard(this)
+            previewCardState = CardSessionManager.getOrFetchCard(this, forceRefresh = true)
         }
         backgroundTypeState = prefs.backgroundType
         customImageUriState = prefs.customImageUri
@@ -239,6 +261,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MainContainer() { 
+        var currentTab by remember { mutableIntStateOf(0) }
+        var showAiConfigDialog by remember { mutableStateOf(false) }
+        
         Scaffold( 
             topBar = { 
                 TopAppBar( 
@@ -255,9 +280,22 @@ class MainActivity : ComponentActivity() {
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text( 
-                                "AnkiLock", 
+                                when (currentTab) { 
+                                    1 -> "Listening Quiz"
+                                    2 -> "Forge Story"
+                                    else -> "AnkiLock"
+                                }, 
                                 fontWeight = FontWeight.Bold, 
                                 fontSize = 20.sp
+                            )
+                        }
+                    }, 
+                    actions = { 
+                        IconButton(onClick = { showAiConfigDialog = true }) { 
+                            Icon( 
+                                Icons.Default.SmartToy, 
+                                contentDescription = "AI Settings", 
+                                tint = if (prefs.aiApiKey.isNotBlank()) Color(0xFF38BDF8) else Color(0xFF94A3B8)
                             )
                         }
                     }, 
@@ -265,9 +303,88 @@ class MainActivity : ComponentActivity() {
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
+            }, 
+            bottomBar = { 
+                NavigationBar( 
+                    containerColor = Color(0xFF0F172A), 
+                    tonalElevation = 8.dp
+                ) { 
+                    NavigationBarItem( 
+                        selected = currentTab == 0, 
+                        onClick = { 
+                            audioPlayer.stop()
+                            currentTab = 0 
+                        }, 
+                        icon = { Icon(Icons.Default.Lock, contentDescription = "Lockscreen") }, 
+                        label = { Text("Lockscreen", fontSize = 11.sp) }, 
+                        colors = NavigationBarItemDefaults.colors( 
+                            selectedIconColor = Color(0xFF38BDF8), 
+                            selectedTextColor = Color(0xFF38BDF8), 
+                            unselectedIconColor = Color(0xFF64748B), 
+                            unselectedTextColor = Color(0xFF64748B), 
+                            indicatorColor = Color(0xFF1E293B)
+                        )
+                    )
+                    NavigationBarItem( 
+                        selected = currentTab == 1, 
+                        onClick = { 
+                            audioPlayer.stop()
+                            currentTab = 1 
+                        }, 
+                        icon = { Icon(Icons.Default.Headphones, contentDescription = "Listening") }, 
+                        label = { Text("Listening", fontSize = 11.sp) }, 
+                        colors = NavigationBarItemDefaults.colors( 
+                            selectedIconColor = Color(0xFF38BDF8), 
+                            selectedTextColor = Color(0xFF38BDF8), 
+                            unselectedIconColor = Color(0xFF64748B), 
+                            unselectedTextColor = Color(0xFF64748B), 
+                            indicatorColor = Color(0xFF1E293B)
+                        )
+                    )
+                    NavigationBarItem( 
+                        selected = currentTab == 2, 
+                        onClick = { 
+                            audioPlayer.stop()
+                            currentTab = 2 
+                        }, 
+                        icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Stories") }, 
+                        label = { Text("Stories", fontSize = 11.sp) }, 
+                        colors = NavigationBarItemDefaults.colors( 
+                            selectedIconColor = Color(0xFFA855F7), 
+                            selectedTextColor = Color(0xFFA855F7), 
+                            unselectedIconColor = Color(0xFF64748B), 
+                            unselectedTextColor = Color(0xFF64748B), 
+                            indicatorColor = Color(0xFF1E293B)
+                        )
+                    )
+                }
             }
         ) { padding -> 
-            ModernSettingsScreen(padding)
+            Box(modifier = Modifier.padding(padding)) { 
+                when (currentTab) { 
+                    0 -> ModernSettingsScreen(PaddingValues(0.dp))
+                    1 -> ListeningDictationScreen( 
+                        ankiHelper = ankiHelper, 
+                        prefs = prefs, 
+                        audioPlayer = audioPlayer, 
+                        onOpenAiConfig = { showAiConfigDialog = true }
+                    )
+                    2 -> ForgeStoryScreen( 
+                        ankiHelper = ankiHelper, 
+                        prefs = prefs, 
+                        audioPlayer = audioPlayer, 
+                        onOpenAiConfig = { showAiConfigDialog = true }
+                    )
+                }
+            }
+            
+            if (showAiConfigDialog) { 
+                AiKeyConfigDialog( 
+                    prefs = prefs, 
+                    onDismiss = { showAiConfigDialog = false }, 
+                    onSaved = { showAiConfigDialog = false }
+                )
+            }
         }
     }
     
@@ -276,6 +393,7 @@ class MainActivity : ComponentActivity() {
         var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) }
         var isMusicPlayerStyle by remember { mutableStateOf(prefs.isMusicPlayerStyle) }
         var classicRevealedAction by remember { mutableStateOf(prefs.classicRevealedAction) }
+        var isAutoPlayAudio by remember { mutableStateOf(prefs.isAutoPlayAudio) }
         val selectedDeckIds = remember { mutableStateListOf<String>() }
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) }
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) }
@@ -330,15 +448,39 @@ class MainActivity : ComponentActivity() {
                 card = activeCard, 
                 stats = stats, 
                 isRevealed = isRevealed, 
-                onToggleReveal = { CardSessionManager.toggleReveal(this@MainActivity) }, 
-                onRefresh = { CardSessionManager.refresh(this@MainActivity) }, 
-                onAgain = { CardSessionManager.gradeCard(this@MainActivity, 1) }, 
-                onGood = { CardSessionManager.gradeCard(this@MainActivity, 3) }, 
+                isPlayingWord = audioPlayer.currentPlayingTrack == AudioTrackPlaying.WORD, 
+                isPlayingSentence = audioPlayer.currentPlayingTrack == AudioTrackPlaying.SENTENCE, 
+                onPlayWord = { audioPlayer.playWord(activeCard) }, 
+                onPlaySentence = { audioPlayer.playSentence(activeCard) }, 
+                onToggleReveal = { 
+                    val willReveal = !isRevealed
+                    CardSessionManager.toggleReveal(this@MainActivity)
+                    if (willReveal && isAutoPlayAudio) { 
+                        audioPlayer.playSequence(activeCard)
+                    }
+                }, 
+                onRefresh = { 
+                    audioPlayer.stop()
+                    CardSessionManager.refresh(this@MainActivity)
+                }, 
+                onAgain = { 
+                    audioPlayer.stop()
+                    CardSessionManager.gradeCard(this@MainActivity, 1)
+                }, 
+                onGood = { 
+                    audioPlayer.stop()
+                    CardSessionManager.gradeCard(this@MainActivity, 3)
+                }, 
                 onOpenAnki = { 
                     val launchIntent = ankiHelper.getAnkiLaunchIntent()
                     startActivity(launchIntent)
                 }
             )
+            
+            ModernAudioSettingsCard(isAutoPlayAudio) { autoPlay -> 
+                isAutoPlayAudio = autoPlay
+                prefs.isAutoPlayAudio = autoPlay
+            }
             
             ModernStyleCard(isMusicPlayerStyle) { isMusic -> 
                 isMusicPlayerStyle = isMusic
@@ -422,8 +564,7 @@ class MainActivity : ComponentActivity() {
                         selectedDeckIds.remove(deckId)
                     }
                     prefs.selectedDeckIds = selectedDeckIds.toSet()
-                    if (isEnabled) AnkiNotificationService.update(this@MainActivity)
-                    AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity)
+                    CardSessionManager.refresh(this@MainActivity)
                 }
             }
             
@@ -511,6 +652,10 @@ class MainActivity : ComponentActivity() {
         card: CardInfo?, 
         stats: Triple<Int, Int, Int>, 
         isRevealed: Boolean, 
+        isPlayingWord: Boolean, 
+        isPlayingSentence: Boolean, 
+        onPlayWord: () -> Unit, 
+        onPlaySentence: () -> Unit, 
         onToggleReveal: () -> Unit, 
         onRefresh: () -> Unit, 
         onAgain: () -> Unit, 
@@ -589,17 +734,99 @@ class MainActivity : ComponentActivity() {
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                Image( 
-                    bitmap = previewArtwork.asImageBitmap(), 
-                    contentDescription = "Live Card Artwork", 
+                Box( 
                     modifier = Modifier 
                         .fillMaxWidth() 
-                        .aspectRatio(1f) 
-                        .clip(RoundedCornerShape(16.dp)) 
-                        .border(BorderStroke(1.dp, Color(0xFF475569).copy(alpha = 0.5f)), RoundedCornerShape(16.dp)) 
-                        .clickable { onToggleReveal() }, 
-                    contentScale = ContentScale.Fit
-                )
+                        .aspectRatio(1f)
+                ) { 
+                    Image( 
+                        bitmap = previewArtwork.asImageBitmap(), 
+                        contentDescription = "Live Card Artwork", 
+                        modifier = Modifier 
+                            .fillMaxSize() 
+                            .clip(RoundedCornerShape(16.dp)) 
+                            .border(BorderStroke(1.dp, Color(0xFF475569).copy(alpha = 0.5f)), RoundedCornerShape(16.dp)) 
+                            .clickable { onToggleReveal() }, 
+                        contentScale = ContentScale.Fit
+                    )
+                    
+                    val hasWordAudio = card != null && (card.wordAudio.isNotBlank() || card.kanji.isNotBlank() || card.question.isNotBlank())
+                    val hasSentenceAudio = card != null && (card.sentenceAudio.isNotBlank() || card.sentence.isNotBlank() || card.sentenceFurigana.isNotBlank())
+                    
+                    if (hasWordAudio) { 
+                        Surface( 
+                            onClick = onPlayWord, 
+                            modifier = Modifier 
+                                .align(Alignment.BottomStart) 
+                                .padding(start = 10.dp, bottom = 10.dp), 
+                            shape = RoundedCornerShape(16.dp), 
+                            color = if (isPlayingWord) Color(0xFF38BDF8).copy(alpha = 0.95f) 
+                            else Color(0xFF0F172A).copy(alpha = 0.8f), 
+                            border = BorderStroke( 
+                                1.dp, 
+                                if (isPlayingWord) Color(0xFFBAE6FD) 
+                                else Color(0xFF475569).copy(alpha = 0.7f)
+                            ), 
+                            shadowElevation = 4.dp
+                        ) { 
+                            Row( 
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), 
+                                verticalAlignment = Alignment.CenterVertically, 
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) { 
+                                Icon( 
+                                    Icons.AutoMirrored.Filled.VolumeUp, 
+                                    contentDescription = "Play Word Audio", 
+                                    tint = if (isPlayingWord) Color.White else Color(0xFF38BDF8), 
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text( 
+                                    "Word", 
+                                    fontSize = 11.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = if (isPlayingWord) Color.White else Color(0xFFE2E8F0)
+                                )
+                            }
+                        }
+                    }
+                    
+                    if (hasSentenceAudio) { 
+                        Surface( 
+                            onClick = onPlaySentence, 
+                            modifier = Modifier 
+                                .align(Alignment.BottomEnd) 
+                                .padding(end = 10.dp, bottom = 10.dp), 
+                            shape = RoundedCornerShape(16.dp), 
+                            color = if (isPlayingSentence) Color(0xFF38BDF8).copy(alpha = 0.95f) 
+                            else Color(0xFF0F172A).copy(alpha = 0.8f), 
+                            border = BorderStroke( 
+                                1.dp, 
+                                if (isPlayingSentence) Color(0xFFBAE6FD) 
+                                else Color(0xFF475569).copy(alpha = 0.7f)
+                            ), 
+                            shadowElevation = 4.dp
+                        ) { 
+                            Row( 
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), 
+                                verticalAlignment = Alignment.CenterVertically, 
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) { 
+                                Icon( 
+                                    Icons.AutoMirrored.Filled.VolumeUp, 
+                                    contentDescription = "Play Sentence Audio", 
+                                    tint = if (isPlayingSentence) Color.White else Color(0xFF38BDF8), 
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text( 
+                                    "Sentence", 
+                                    fontSize = 11.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = if (isPlayingSentence) Color.White else Color(0xFFE2E8F0)
+                                )
+                            }
+                        }
+                    }
+                }
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -654,6 +881,53 @@ class MainActivity : ComponentActivity() {
                         Text("Anki", fontSize = 12.sp, color = Color(0xFFE2E8F0))
                     }
                 }
+            }
+        }
+    }
+    
+    @Composable
+    fun ModernAudioSettingsCard(isAutoPlay: Boolean, onToggle: (Boolean) -> Unit) { 
+        Card( 
+            modifier = Modifier.fillMaxWidth(), 
+            shape = RoundedCornerShape(20.dp), 
+            colors = CardDefaults.cardColors( 
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+        ) { 
+            Row( 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .padding(18.dp), 
+                verticalAlignment = Alignment.CenterVertically
+            ) { 
+                Icon( 
+                    Icons.AutoMirrored.Filled.VolumeUp, 
+                    contentDescription = null, 
+                    tint = MaterialTheme.colorScheme.primary, 
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) { 
+                    Text( 
+                        "Auto-play Audio", 
+                        fontWeight = FontWeight.SemiBold, 
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text( 
+                        "Play Word then Sentence on reveal", 
+                        fontSize = 12.sp, 
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+                Switch( 
+                    checked = isAutoPlay, 
+                    onCheckedChange = onToggle, 
+                    colors = SwitchDefaults.colors( 
+                        checkedTrackColor = Color(0xFF38BDF8), 
+                        checkedThumbColor = Color.White
+                    )
+                )
             }
         }
     }
