@@ -121,10 +121,11 @@ import com.ankilock.data.ReadingHistoryManager
 import com.ankilock.data.ReadingVocabularySummary
 import com.ankilock.reading.FishAudioService
 import com.ankilock.reading.GeminiStoryService
-import com.ankilock.data.StoryThemes
-import com.ankilock.ui.blossom.AppTheme
-import com.ankilock.ui.blossom.BlossomColors
-import kotlinx.coroutines.delay
+import com.ankilock.data.StoryThemes 
+import com.ankilock.ui.blossom.AppTheme 
+import com.ankilock.ui.blossom.BlossomColors 
+import com.ankilock.ui.blossom.BlossomShapes 
+import kotlinx.coroutines.delay 
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -311,16 +312,11 @@ fun ReadingScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) { 
     
-        LiquidGlassBox( 
+        Card( 
             modifier = Modifier.fillMaxWidth(), 
-            shape = RoundedCornerShape(26.dp), 
-            cornerRadius = 26.dp, 
-            tintColor = Color.White.copy(alpha = 0.12f), 
-            darkBaseAlpha = 0f, 
-            backgroundColor = Color.White.copy(alpha = 0.10f), 
-            specularAlpha = 0.40f, 
-            borderAlpha = 0.30f, 
-            shadowElevation = 6.dp 
+            shape = BlossomShapes.SquircleLarge, 
+            colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+            border = BorderStroke(1.dp, BlossomColors.CardBorder) 
         ) { 
             Column( 
                 modifier = Modifier 
@@ -328,56 +324,31 @@ fun ReadingScreen(
                     .padding(horizontal = 16.dp, vertical = 14.dp), 
                 verticalArrangement = Arrangement.spacedBy(10.dp) 
             ) { 
-                val isLight = BlossomColors.currentTheme == AppTheme.LIGHT 
-                
                 Row( 
                     modifier = Modifier.fillMaxWidth(), 
                     verticalAlignment = Alignment.CenterVertically, 
                     horizontalArrangement = Arrangement.SpaceBetween 
                 ) { 
-                    Surface( 
-                        onClick = { showStoryConfigDialog = true }, 
-                        shape = RoundedCornerShape(12.dp), 
-                        color = if (isLight) BlossomColors.SurfaceCard1.copy(alpha = 0.90f) else Color.White.copy(alpha = 0.14f), 
-                        border = BorderStroke(1.dp, if (isLight) BlossomColors.CardBorder else Color.White.copy(alpha = 0.25f)) 
-                    ) { 
-                        Row( 
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), 
-                            verticalAlignment = Alignment.CenterVertically 
-                        ) { 
-                            Icon( 
-                                Icons.Filled.Tune, 
-                                contentDescription = null, 
-                                tint = BlossomColors.SakuraRose, 
-                                modifier = Modifier.size(17.dp) 
-                            ) 
-                            Spacer(modifier = Modifier.width(8.dp)) 
-                            Text( 
-                                text = "Story Config", 
-                                fontWeight = FontWeight.SemiBold, 
-                                color = BlossomColors.TextPrimary, 
-                                fontSize = 13.sp, 
-                                maxLines = 1, 
-                                softWrap = false 
-                            ) 
-                        } 
-                    } 
+                    Text( 
+                        text = "Story Immersion", 
+                        fontSize = 15.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = BlossomColors.TextPrimary 
+                    ) 
                     
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        IconButton( 
-                            onClick = { 
-                                savedStories = historyManager.getStories() 
-                                showHistorySheet = true 
-                            }, 
-                            modifier = Modifier.size(36.dp) 
-                        ) { 
-                            Icon( 
-                                Icons.Filled.History, 
-                                contentDescription = "Reading History", 
-                                tint = if (savedStories.isNotEmpty()) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(20.dp) 
-                            ) 
-                        } 
+                    IconButton( 
+                        onClick = { 
+                            savedStories = historyManager.getStories() 
+                            showHistorySheet = true 
+                        }, 
+                        modifier = Modifier.size(36.dp) 
+                    ) { 
+                        Icon( 
+                            Icons.Filled.History, 
+                            contentDescription = "Reading History", 
+                            tint = if (savedStories.isNotEmpty()) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(20.dp) 
+                        ) 
                     } 
                 } 
                 
@@ -391,8 +362,8 @@ fun ReadingScreen(
                 Surface( 
                     onClick = { showStoryConfigDialog = true }, 
                     shape = RoundedCornerShape(14.dp), 
-                    color = if (isLight) BlossomColors.SurfaceCard1.copy(alpha = 0.90f) else Color.White.copy(alpha = 0.12f), 
-                    border = BorderStroke(1.dp, if (isLight) BlossomColors.CardBorder else Color.White.copy(alpha = 0.22f)), 
+                    color = BlossomColors.SurfaceElevated, 
+                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
                     modifier = Modifier.fillMaxWidth() 
                 ) { 
                     Row( 
@@ -1395,7 +1366,7 @@ fun ReadingScreen(
     } 
     
     if (showStoryConfigDialog) { 
-        StoryConfigDialog( 
+        StoryConfigBottomSheet( 
             prefs = prefs, 
             onDismiss = { showStoryConfigDialog = false }, 
             onSaved = { 
