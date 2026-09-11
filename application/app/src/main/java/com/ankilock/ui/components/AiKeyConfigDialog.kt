@@ -1,0 +1,594 @@
+package com.ankilock.ui.components
+    
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ankilock.ai.AiServiceHelper
+import com.ankilock.data.PreferencesManager
+import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.reading.FishAudioDialog
+import com.ankilock.ui.reading.GeminiModelDialog
+import kotlinx.coroutines.launch
+    
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AiKeyConfigDialog( 
+    prefs: PreferencesManager, 
+    onDismiss: () -> Unit, 
+    onSaved: () -> Unit
+) { 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    val providers = listOf( 
+        "gemini" to "Google Gemini (Free Tier)", 
+        "openai" to "OpenAI (GPT-4o mini)", 
+        "groq" to "Groq (Llama 3.1)" 
+    ) 
+    
+    var apiKeyText by remember { mutableStateOf(prefs.aiApiKey) } 
+    var selectedProvider by remember { mutableStateOf(prefs.aiProvider) } 
+    var selectedModel by remember { mutableStateOf(prefs.aiModel) } 
+    var isProviderDropdownExpanded by remember { mutableStateOf(false) } 
+    var isKeyVisible by remember { mutableStateOf(false) } 
+    var wallhavenKeyText by remember { mutableStateOf(prefs.wallhavenApiKey) } 
+    var isWallhavenKeyVisible by remember { mutableStateOf(false) } 
+    var isTesting by remember { mutableStateOf(false) } 
+    var testResult by remember { mutableStateOf<String?>(null) } 
+    var isTestSuccess by remember { mutableStateOf(false) } 
+    
+    var showModelDialog by remember { mutableStateOf(false) } 
+    var showFishAudioDialog by remember { mutableStateOf(false) } 
+    var fishAudioApiKey by remember { mutableStateOf(prefs.fishAudioApiKey ?: "") } 
+    var fishAudioVoiceId by remember { mutableStateOf(prefs.fishAudioVoiceId) } 
+    var fishAudioVoiceName by remember { mutableStateOf(prefs.fishAudioVoiceName) } 
+    var fishAudioModel by remember { mutableStateOf(prefs.fishAudioModel) } 
+    
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    ModalBottomSheet( 
+        onDismissRequest = onDismiss, 
+        sheetState = sheetState, 
+        containerColor = BlossomColors.BackgroundDeep 
+    ) { 
+        Column( 
+            modifier = Modifier 
+                .fillMaxWidth() 
+                .padding(horizontal = 22.dp) 
+                .padding(bottom = 36.dp) 
+                .verticalScroll(rememberScrollState()) 
+        ) { 
+            Row( 
+                verticalAlignment = Alignment.CenterVertically, 
+                horizontalArrangement = Arrangement.spacedBy(10.dp) 
+            ) { 
+                Surface( 
+                    shape = RoundedCornerShape(12.dp), 
+                    color = BlossomColors.SakuraRose.copy(alpha = 0.15f), 
+                    modifier = Modifier.size(38.dp) 
+                ) { 
+                    Icon( 
+                        Icons.Default.Key, 
+                        contentDescription = null, 
+                        tint = BlossomColors.SakuraRose, 
+                        modifier = Modifier 
+                            .padding(8.dp) 
+                            .size(22.dp) 
+                    ) 
+                } 
+                Column { 
+                    Text( 
+                        "AI Configuration", 
+                        fontSize = 18.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = BlossomColors.TextPrimary 
+                    ) 
+                    Text( 
+                        "Powers Listening evaluation & Stories", 
+                        fontSize = 12.sp, 
+                        color = BlossomColors.TextSecondary 
+                    ) 
+                } 
+            } 
+            
+            Spacer(modifier = Modifier.height(16.dp)) 
+            
+            Text( 
+                "AI Model Provider", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            
+            ExposedDropdownMenuBox( 
+                expanded = isProviderDropdownExpanded, 
+                onExpandedChange = { isProviderDropdownExpanded = it } 
+            ) { 
+                OutlinedTextField( 
+                    value = providers.find { it.first == selectedProvider }?.second ?: selectedProvider, 
+                    onValueChange = {}, 
+                    readOnly = true, 
+                    trailingIcon = { 
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isProviderDropdownExpanded) 
+                    }, 
+                    colors = OutlinedTextFieldDefaults.colors( 
+                        focusedContainerColor = BlossomColors.SurfaceElevated, 
+                        unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                        focusedTextColor = BlossomColors.TextPrimary, 
+                        unfocusedTextColor = BlossomColors.TextPrimary, 
+                        focusedBorderColor = BlossomColors.SakuraRose, 
+                        unfocusedBorderColor = BlossomColors.CardBorder 
+                    ), 
+                    shape = RoundedCornerShape(12.dp), 
+                    modifier = Modifier 
+                        .menuAnchor() 
+                        .fillMaxWidth() 
+                ) 
+                
+                ExposedDropdownMenu( 
+                    expanded = isProviderDropdownExpanded, 
+                    onDismissRequest = { isProviderDropdownExpanded = false }, 
+                    modifier = Modifier.background(BlossomColors.SurfaceElevated) 
+                ) { 
+                    providers.forEach { (key, label) -> 
+                        DropdownMenuItem( 
+                            text = { Text(label, color = BlossomColors.TextPrimary, fontSize = 14.sp) }, 
+                            onClick = { 
+                                selectedProvider = key 
+                                isProviderDropdownExpanded = false 
+                            } 
+                        ) 
+                    } 
+                } 
+            } 
+            
+            if (selectedProvider == "gemini") { 
+                Spacer(modifier = Modifier.height(14.dp)) 
+                Text( 
+                    "Gemini Model", 
+                    fontSize = 13.sp, 
+                    fontWeight = FontWeight.SemiBold, 
+                    color = BlossomColors.TextPrimary 
+                ) 
+                Spacer(modifier = Modifier.height(6.dp)) 
+                
+                Surface( 
+                    onClick = { showModelDialog = true }, 
+                    shape = RoundedCornerShape(12.dp), 
+                    color = BlossomColors.SurfaceElevated, 
+                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                    modifier = Modifier.fillMaxWidth() 
+                ) { 
+                    Row( 
+                        modifier = Modifier 
+                            .fillMaxWidth() 
+                            .padding(horizontal = 14.dp, vertical = 12.dp), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        Row( 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            modifier = Modifier.weight(1f, fill = false) 
+                        ) { 
+                            Icon( 
+                                Icons.Filled.AutoAwesome, 
+                                contentDescription = null, 
+                                tint = BlossomColors.SakuraRose, 
+                                modifier = Modifier.size(18.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(10.dp)) 
+                            Text( 
+                                text = "Model: ${PreferencesManager.getModelDisplayName(selectedModel)}", 
+                                fontSize = 13.sp, 
+                                fontWeight = FontWeight.Medium, 
+                                color = BlossomColors.TextPrimary, 
+                                maxLines = 1, 
+                                overflow = TextOverflow.Ellipsis 
+                            ) 
+                        } 
+                        Spacer(modifier = Modifier.width(6.dp)) 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Text( 
+                                text = "Switch", 
+                                fontSize = 12.sp, 
+                                fontWeight = FontWeight.Medium, 
+                                color = BlossomColors.TextSecondary, 
+                                maxLines = 1, 
+                                softWrap = false 
+                            ) 
+                            Icon( 
+                                Icons.Filled.ArrowDropDown, 
+                                contentDescription = null, 
+                                tint = BlossomColors.TextSecondary, 
+                                modifier = Modifier.size(18.dp) 
+                            ) 
+                        } 
+                    } 
+                } 
+            } 
+            
+            Spacer(modifier = Modifier.height(14.dp)) 
+            Text( 
+                "Audio Narration (Fish Audio)", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            Surface( 
+                onClick = { showFishAudioDialog = true }, 
+                shape = RoundedCornerShape(12.dp), 
+                color = BlossomColors.SurfaceElevated, 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Row( 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(horizontal = 14.dp, vertical = 12.dp), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.SpaceBetween 
+                ) { 
+                    Row( 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        modifier = Modifier.weight(1f, fill = false) 
+                    ) { 
+                        Icon( 
+                            Icons.Filled.GraphicEq, 
+                            contentDescription = null, 
+                            tint = BlossomColors.SakuraRose, 
+                            modifier = Modifier.size(18.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
+                        val voiceLabel = fishAudioVoiceName?.takeIf { it.isNotBlank() } 
+                            ?: if (fishAudioVoiceId.isNotBlank()) "Voice: ${fishAudioVoiceId.take(12)}..." else "Fish Audio Voice" 
+                        Text( 
+                            text = "Fish Audio: $voiceLabel", 
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = BlossomColors.TextPrimary, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis 
+                        ) 
+                    } 
+                    Spacer(modifier = Modifier.width(6.dp)) 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Text( 
+                            text = if (fishAudioApiKey.isNotBlank()) "Key Active" else "Setup Key", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = if (fishAudioApiKey.isNotBlank()) BlossomColors.SakuraRose else BlossomColors.BlossomRed, 
+                            maxLines = 1, 
+                            softWrap = false 
+                        ) 
+                        Icon( 
+                            Icons.Filled.ArrowDropDown, 
+                            contentDescription = null, 
+                            tint = BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(18.dp) 
+                        ) 
+                    } 
+                } 
+            } 
+            
+            Spacer(modifier = Modifier.height(14.dp)) 
+            
+            Text( 
+                "API Key", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            
+            OutlinedTextField( 
+                value = apiKeyText, 
+                onValueChange = { apiKeyText = it }, 
+                placeholder = { Text("Paste your API key here", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
+                trailingIcon = { 
+                    IconButton(onClick = { isKeyVisible = !isKeyVisible }) { 
+                        Icon( 
+                            if (isKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, 
+                            contentDescription = "Toggle Visibility", 
+                            tint = BlossomColors.TextSecondary 
+                        ) 
+                    } 
+                }, 
+                colors = OutlinedTextFieldDefaults.colors( 
+                    focusedContainerColor = BlossomColors.SurfaceElevated, 
+                    unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                    focusedTextColor = BlossomColors.TextPrimary, 
+                    unfocusedTextColor = BlossomColors.TextPrimary, 
+                    focusedBorderColor = BlossomColors.SakuraRose, 
+                    unfocusedBorderColor = BlossomColors.CardBorder 
+                ), 
+                shape = RoundedCornerShape(12.dp), 
+                modifier = Modifier.fillMaxWidth() 
+            ) 
+            
+            if (selectedProvider == "gemini") { 
+                Spacer(modifier = Modifier.height(8.dp)) 
+                Surface( 
+                    shape = RoundedCornerShape(8.dp), 
+                    color = BlossomColors.SurfaceElevated, 
+                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(top = 6.dp) 
+                        .clickable { 
+                            try { 
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey")) 
+                                context.startActivity(intent) 
+                            } catch (_: Exception) { 
+                            } 
+                        } 
+                ) { 
+                    Row( 
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), 
+                        verticalAlignment = Alignment.CenterVertically 
+                    ) { 
+                        Text( 
+                            "Get Free Gemini Key (aistudio.google.com)", 
+                            fontSize = 11.sp, 
+                            color = BlossomColors.SakuraRose, 
+                            fontWeight = FontWeight.Medium, 
+                            modifier = Modifier.weight(1f) 
+                        ) 
+                        Icon( 
+                            Icons.AutoMirrored.Filled.OpenInNew, 
+                            contentDescription = null, 
+                            tint = BlossomColors.SakuraRose, 
+                            modifier = Modifier.size(13.dp) 
+                        ) 
+                    } 
+                } 
+            } 
+            
+            Spacer(modifier = Modifier.height(14.dp)) 
+            
+            Text( 
+                "Wallhaven API Key (Optional Artwork Key)", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            
+            OutlinedTextField( 
+                value = wallhavenKeyText, 
+                onValueChange = { wallhavenKeyText = it }, 
+                placeholder = { Text("Optional - works free without key", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                singleLine = true, 
+                visualTransformation = if (isWallhavenKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
+                trailingIcon = { 
+                    IconButton(onClick = { isWallhavenKeyVisible = !isWallhavenKeyVisible }) { 
+                        Icon( 
+                            if (isWallhavenKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                            contentDescription = null, 
+                            tint = BlossomColors.TextSecondary 
+                        ) 
+                    } 
+                }, 
+                colors = OutlinedTextFieldDefaults.colors( 
+                    focusedContainerColor = BlossomColors.SurfaceElevated, 
+                    unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                    focusedTextColor = BlossomColors.TextPrimary, 
+                    unfocusedTextColor = BlossomColors.TextPrimary, 
+                    focusedBorderColor = BlossomColors.SakuraRose, 
+                    unfocusedBorderColor = BlossomColors.CardBorder 
+                ), 
+                shape = RoundedCornerShape(12.dp), 
+                modifier = Modifier.fillMaxWidth() 
+            ) 
+            
+            Surface( 
+                shape = RoundedCornerShape(8.dp), 
+                color = BlossomColors.SurfaceElevated, 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .padding(top = 6.dp) 
+                    .clickable { 
+                        try { 
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wallhaven.cc/settings/account")) 
+                            context.startActivity(intent) 
+                        } catch (_: Exception) { 
+                        } 
+                    } 
+            ) { 
+                Row( 
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), 
+                    verticalAlignment = Alignment.CenterVertically 
+                ) { 
+                    Text( 
+                        "Get Wallhaven Key (wallhaven.cc/settings/account)", 
+                        fontSize = 11.sp, 
+                        color = BlossomColors.SakuraRose, 
+                        fontWeight = FontWeight.Medium, 
+                        modifier = Modifier.weight(1f) 
+                    ) 
+                    Icon( 
+                        Icons.AutoMirrored.Filled.OpenInNew, 
+                        contentDescription = null, 
+                        tint = BlossomColors.SakuraRose, 
+                        modifier = Modifier.size(13.dp) 
+                    ) 
+                } 
+            } 
+            
+            if (testResult != null) { 
+                Spacer(modifier = Modifier.height(10.dp)) 
+                Surface( 
+                    shape = RoundedCornerShape(8.dp), 
+                    color = if (isTestSuccess) BlossomColors.MatchaSageContainer else BlossomColors.SakuraRoseContainer, 
+                    border = BorderStroke(1.dp, if (isTestSuccess) BlossomColors.MatchaSage else BlossomColors.BlossomRed), 
+                    modifier = Modifier.fillMaxWidth() 
+                ) { 
+                    Row( 
+                        modifier = Modifier.padding(8.dp), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.spacedBy(6.dp) 
+                    ) { 
+                        Icon( 
+                            if (isTestSuccess) Icons.Default.CheckCircle else Icons.Default.ErrorOutline, 
+                            contentDescription = null, 
+                            tint = if (isTestSuccess) BlossomColors.MatchaSage else BlossomColors.BlossomRed, 
+                            modifier = Modifier.size(16.dp) 
+                        ) 
+                        Text( 
+                            testResult ?: "", 
+                            fontSize = 12.sp, 
+                            color = if (isTestSuccess) BlossomColors.MatchaSage else BlossomColors.BlossomRed 
+                        ) 
+                    } 
+                } 
+            } 
+            
+            Spacer(modifier = Modifier.height(18.dp)) 
+            
+            Row( 
+                modifier = Modifier.fillMaxWidth(), 
+                horizontalArrangement = Arrangement.spacedBy(8.dp) 
+            ) { 
+                OutlinedButton( 
+                    onClick = { 
+                        if (apiKeyText.isNotBlank()) { 
+                            isTesting = true 
+                            testResult = null 
+                            scope.launch { 
+                                val res = AiServiceHelper.testConnection( 
+                                    apiKey = apiKeyText, 
+                                    provider = selectedProvider, 
+                                    model = selectedModel 
+                                ) 
+                                isTesting = false 
+                                if (res.isSuccess) { 
+                                    isTestSuccess = true 
+                                    testResult = res.getOrNull() ?: "Connection Successful!" 
+                                } else { 
+                                    isTestSuccess = false 
+                                    testResult = res.exceptionOrNull()?.message ?: "Failed to connect" 
+                                } 
+                            } 
+                        } 
+                    }, 
+                    enabled = apiKeyText.isNotBlank() && !isTesting, 
+                    shape = RoundedCornerShape(12.dp), 
+                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                    modifier = Modifier.weight(1f) 
+                ) { 
+                    if (isTesting) { 
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = BlossomColors.SakuraRose, strokeWidth = 2.dp) 
+                    } else { 
+                        Text("Test Key", color = BlossomColors.TextPrimary, fontSize = 13.sp) 
+                    } 
+                } 
+                
+                Button( 
+                    onClick = { 
+                        prefs.aiApiKey = apiKeyText.trim() 
+                        prefs.aiProvider = selectedProvider 
+                        prefs.aiModel = selectedModel 
+                        prefs.wallhavenApiKey = wallhavenKeyText.trim() 
+                        onSaved() 
+                    }, 
+                    shape = RoundedCornerShape(12.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = BlossomColors.SakuraRose), 
+                    modifier = Modifier.weight(1f) 
+                ) { 
+                    Text("Save Key", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) 
+                } 
+            } 
+        } 
+    } 
+    
+    if (showModelDialog) { 
+        GeminiModelDialog( 
+            currentModel = selectedModel, 
+            onSave = { model -> 
+                selectedModel = model 
+                prefs.aiModel = model 
+                showModelDialog = false 
+            }, 
+            onDismiss = { showModelDialog = false } 
+        ) 
+    } 
+    
+    if (showFishAudioDialog) { 
+        FishAudioDialog( 
+            currentApiKey = fishAudioApiKey, 
+            currentVoiceId = fishAudioVoiceId, 
+            currentVoiceName = fishAudioVoiceName, 
+            currentModel = fishAudioModel, 
+            onSave = { key, voice, voiceName, model -> 
+                prefs.fishAudioApiKey = key 
+                prefs.fishAudioVoiceId = voice 
+                prefs.fishAudioVoiceName = voiceName 
+                prefs.fishAudioModel = model 
+                fishAudioApiKey = key 
+                fishAudioVoiceId = voice 
+                fishAudioVoiceName = voiceName 
+                fishAudioModel = model 
+                showFishAudioDialog = false 
+            }, 
+            onDismiss = { showFishAudioDialog = false } 
+        ) 
+    } 
+} 

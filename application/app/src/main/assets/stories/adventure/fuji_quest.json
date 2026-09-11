@@ -1,0 +1,86 @@
+{
+  "id": "adventure_fuji_quest",
+  "category": "Adventure",
+  "levelId": "starter",
+  "subLevel": 1,
+  "storyIndex": 1,
+  "titleJapanese": "富士山の夜明け",
+  "titleEnglish": "Dawn on Mount Fuji",
+  "summary": "Ren climbs through the night mist to witness the breathtaking sunrise from the summit of Mount Fuji.",
+  "author": "Ren",
+  "estimatedMinutes": 5,
+  "xp": 100,
+  "isEndingCard": false,
+  "coverImage": "1.png",
+  "artworkType": "fantasy",
+  "storyJapanese": "夜の暗い道を、レンは一歩ずつ登ります。冷たい風が吹き、星が空に輝いています。五合目から頂上を目指して歩き続けます。東の空がゆっくりと黄金色に染まり始めました。頂上に立った瞬間、太陽が雲海を照らし出しました。",
+  "storyEnglish": "Along the dark night path, Ren climbs one step at a time. The cold wind blows, and stars shine in the sky. He continues walking aiming for the summit from the 5th station. The eastern sky slowly began to dye in gold. The moment he stood on the summit, the sun illuminated the sea of clouds.",
+  "sentences": [
+    {
+      "id": 1,
+      "japanese": "夜の暗い道を、レンは一歩ずつ登ります。",
+      "english": "Along the dark night path, Ren climbs one step at a time.",
+      "image": "1.png",
+      "targetWords": ["夜", "道", "登る"]
+    },
+    {
+      "id": 2,
+      "japanese": "冷たい風が吹き、星が空に輝いています。",
+      "english": "The cold wind blows, and stars shine in the sky.",
+      "image": "2.png",
+      "targetWords": ["風", "星", "空"]
+    },
+    {
+      "id": 3,
+      "japanese": "五合目から頂上を目指して歩き続けます。",
+      "english": "He continues walking aiming for the summit from the 5th station.",
+      "image": "3.png",
+      "targetWords": ["頂上", "歩く"]
+    },
+    {
+      "id": 4,
+      "japanese": "東の空がゆっくりと黄金色に染まり始めました。",
+      "english": "The eastern sky slowly began to dye in gold.",
+      "image": "4.png",
+      "targetWords": ["東", "始まる"]
+    },
+    {
+      "id": 5,
+      "japanese": "頂上に立った瞬間、太陽が雲海を照らし出しました。",
+      "english": "The moment he stood on the summit, the sun illuminated the sea of clouds.",
+      "image": "5.png",
+      "targetWords": ["太陽", "立つ"]
+    }
+  ],
+  "targetWords": [
+    {
+      "kanji": "登る",
+      "reading": "のぼる",
+      "meaning": "to climb"
+    },
+    {
+      "kanji": "星",
+      "reading": "ほし",
+      "meaning": "star"
+    },
+    {
+      "kanji": "頂上",
+      "reading": "ちょうじょう",
+      "meaning": "summit, peak"
+    },
+    {
+      "kanji": "太陽",
+      "reading": "たいよう",
+      "meaning": "sun"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "questionText": "レンはどこを目指して歩きましたか？",
+      "options": ["頂上", "海の底", "学校", "駅"],
+      "correctOptionIndex": 0,
+      "explanation": "『五合目から頂上を目指して歩き続けます』と書かれています。"
+    }
+  ]
+}

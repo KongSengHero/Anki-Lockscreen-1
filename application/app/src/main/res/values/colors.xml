@@ -1,0 +1,15 @@
+<resources>
+    <color name="primary">#FF6C63FF</color>
+    <color name="primary_variant">#FF5A52D5</color>
+    <color name="secondary">#FF03DAC5</color>
+    <color name="background_dark">#FF121212</color>
+    <color name="surface_dark">#FF1E1E2E</color>
+    <color name="card_surface">#FF2A2A3D</color>
+    <color name="on_surface">#FFFFFFFF</color>
+    <color name="on_surface_variant">#FFB0B0C0</color>
+    <color name="again_color">#FFEF5350</color>
+    <color name="hard_color">#FFFFB74D</color>
+    <color name="good_color">#FF66BB6A</color>
+    <color name="easy_color">#FF42A5F5</color>
+    <color name="notification_accent">#FF6C63FF</color>
+</resources>

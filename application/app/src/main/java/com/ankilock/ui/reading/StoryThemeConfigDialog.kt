@@ -1,0 +1,718 @@
+package com.ankilock.ui.reading
+
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.ankilock.data.PreferencesManager
+import com.ankilock.data.StoryThemes
+import com.ankilock.ui.blossom.BlossomColors
+
+@Composable
+fun StoryThemeConfigDialog( 
+    prefs: PreferencesManager, 
+    onDismiss: () -> Unit, 
+    onConfigurationChanged: () -> Unit 
+) { 
+    val context = LocalContext.current 
+    var selectedTab by remember { mutableIntStateOf(if (prefs.isCustomThemeModeActive) 1 else 0) } 
+
+    var disabledThemes by remember { mutableStateOf(prefs.disabledStoryThemes.toMutableSet()) } 
+    var disabledTopics by remember { mutableStateOf(prefs.disabledStoryTopics.toMutableSet()) } 
+    val expandedThemes = remember { mutableStateOf(mutableSetOf<String>()) } 
+
+    var isCustomActive by remember { mutableStateOf(prefs.isCustomThemeModeActive) } 
+    var selectedCustomTheme by remember { 
+        mutableStateOf(prefs.customStoryTheme ?: StoryThemes.ALL_THEMES.first()) 
+    } 
+    var selectedCustomTopic by remember { 
+        mutableStateOf(prefs.customStoryTopic) 
+    } 
+
+    Dialog(onDismissRequest = onDismiss) { 
+        Card( 
+            shape = RoundedCornerShape(24.dp), 
+            colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+            border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+            modifier = Modifier 
+                .fillMaxWidth() 
+                .padding(vertical = 12.dp) 
+        ) { 
+            Column( 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .padding(20.dp) 
+            ) { 
+                Row( 
+                    modifier = Modifier.fillMaxWidth(), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.SpaceBetween 
+                ) { 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Surface( 
+                            shape = CircleShape, 
+                            color = BlossomColors.SakuraRoseContainer, 
+                            modifier = Modifier.size(36.dp) 
+                        ) { 
+                            Box(contentAlignment = Alignment.Center) { 
+                                Icon( 
+                                    Icons.Filled.AutoAwesome, 
+                                    contentDescription = null, 
+                                    tint = BlossomColors.SakuraRose, 
+                                    modifier = Modifier.size(20.dp) 
+                                ) 
+                            } 
+                        } 
+                        Spacer(modifier = Modifier.width(12.dp)) 
+                        Column { 
+                            Text( 
+                                text = "Theme & Topic Settings", 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 17.sp, 
+                                color = BlossomColors.TextPrimary 
+                            ) 
+                            Text( 
+                                text = if (isCustomActive) "Custom Mode Active" else "Randomizer Active", 
+                                fontSize = 12.sp, 
+                                color = if (isCustomActive) BlossomColors.WisteriaViolet else BlossomColors.SakuraRose, 
+                                fontWeight = FontWeight.Medium 
+                            ) 
+                        } 
+                    } 
+
+                    IconButton( 
+                        onClick = onDismiss, 
+                        modifier = Modifier.size(32.dp) 
+                    ) { 
+                        Icon( 
+                            Icons.Filled.Close, 
+                            contentDescription = "Close", 
+                            tint = BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(18.dp) 
+                        ) 
+                    } 
+                } 
+
+                Spacer(modifier = Modifier.height(14.dp)) 
+
+                TabRow( 
+                    selectedTabIndex = selectedTab, 
+                    containerColor = BlossomColors.SurfaceElevated, 
+                    contentColor = BlossomColors.TextPrimary, 
+                    indicator = { tabPositions -> 
+                        TabRowDefaults.SecondaryIndicator( 
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]), 
+                            color = BlossomColors.SakuraRose, 
+                            height = 3.dp 
+                        ) 
+                    }, 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(bottom = 12.dp) 
+                ) { 
+                    Tab( 
+                        selected = selectedTab == 0, 
+                        onClick = { selectedTab = 0 }, 
+                        text = { 
+                            Text( 
+                                text = "Randomizer", 
+                                fontSize = 13.sp, 
+                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal, 
+                                color = if (selectedTab == 0) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
+                            ) 
+                        } 
+                    ) 
+                    Tab( 
+                        selected = selectedTab == 1, 
+                        onClick = { selectedTab = 1 }, 
+                        text = { 
+                            Text( 
+                                text = "Custom Story", 
+                                fontSize = 13.sp, 
+                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal, 
+                                color = if (selectedTab == 1) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
+                            ) 
+                        } 
+                    ) 
+                } 
+
+                Column( 
+                    modifier = Modifier 
+                        .weight(1f, fill = false) 
+                        .heightIn(max = 420.dp) 
+                        .verticalScroll(rememberScrollState()) 
+                ) { 
+                    if (selectedTab == 0) { 
+                        RandomizerSettingsContent( 
+                            disabledThemes = disabledThemes, 
+                            disabledTopics = disabledTopics, 
+                            expandedThemes = expandedThemes.value, 
+                            onToggleTheme = { themeKey -> 
+                                val updated = disabledThemes.toMutableSet() 
+                                if (themeKey in updated) { 
+                                    updated.remove(themeKey) 
+                                } else { 
+                                    val enabledCount = StoryThemes.ALL_THEMES.count { it !in updated } 
+                                    if (enabledCount <= 1) { 
+                                        Toast.makeText(context, "At least one theme must remain enabled", Toast.LENGTH_SHORT).show() 
+                                        return@RandomizerSettingsContent 
+                                    } 
+                                    updated.add(themeKey) 
+                                } 
+                                disabledThemes = updated 
+                                prefs.disabledStoryThemes = updated 
+                                onConfigurationChanged() 
+                            }, 
+                            onToggleTopic = { topic -> 
+                                val updated = disabledTopics.toMutableSet() 
+                                if (topic in updated) { 
+                                    updated.remove(topic) 
+                                } else { 
+                                    updated.add(topic) 
+                                } 
+                                disabledTopics = updated 
+                                prefs.disabledStoryTopics = updated 
+                                onConfigurationChanged() 
+                            }, 
+                            onToggleExpand = { themeKey -> 
+                                val updated = expandedThemes.value.toMutableSet() 
+                                if (themeKey in updated) { 
+                                    updated.remove(themeKey) 
+                                } else { 
+                                    updated.add(themeKey) 
+                                } 
+                                expandedThemes.value = updated 
+                            }, 
+                            onEnableAll = { 
+                                disabledThemes = mutableSetOf() 
+                                disabledTopics = mutableSetOf() 
+                                prefs.disabledStoryThemes = emptySet() 
+                                prefs.disabledStoryTopics = emptySet() 
+                                onConfigurationChanged() 
+                                Toast.makeText(context, "All themes and topics enabled", Toast.LENGTH_SHORT).show() 
+                            }, 
+                            onDisableOthers = { themeToKeep -> 
+                                val updatedThemes = StoryThemes.ALL_THEMES.filter { it != themeToKeep }.toMutableSet() 
+                                disabledThemes = updatedThemes 
+                                prefs.disabledStoryThemes = updatedThemes 
+                                onConfigurationChanged() 
+                            } 
+                        ) 
+                    } else { 
+                        CustomStoryContent( 
+                            isCustomActive = isCustomActive, 
+                            selectedTheme = selectedCustomTheme, 
+                            selectedTopic = selectedCustomTopic, 
+                            onThemeSelected = { newTheme -> 
+                                selectedCustomTheme = newTheme 
+                                selectedCustomTopic = null 
+                            }, 
+                            onTopicSelected = { newTopic -> 
+                                selectedCustomTopic = newTopic 
+                            }, 
+                            onApplyCustom = { 
+                                isCustomActive = true 
+                                prefs.isCustomThemeModeActive = true 
+                                prefs.customStoryTheme = selectedCustomTheme 
+                                prefs.customStoryTopic = selectedCustomTopic 
+                                onConfigurationChanged() 
+                                Toast.makeText(context, "Custom story configured and locked!", Toast.LENGTH_SHORT).show() 
+                                onDismiss() 
+                            }, 
+                            onResetToRandom = { 
+                                isCustomActive = false 
+                                prefs.isCustomThemeModeActive = false 
+                                prefs.customStoryTheme = null 
+                                prefs.customStoryTopic = null 
+                                onConfigurationChanged() 
+                                Toast.makeText(context, "Switched back to Random mode", Toast.LENGTH_SHORT).show() 
+                            } 
+                        ) 
+                    } 
+                } 
+
+                Spacer(modifier = Modifier.height(14.dp)) 
+
+                Button( 
+                    onClick = onDismiss, 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .height(46.dp), 
+                    shape = RoundedCornerShape(14.dp), 
+                    colors = ButtonDefaults.buttonColors( 
+                        containerColor = BlossomColors.SakuraRose, 
+                        contentColor = BlossomColors.BlossomWhite 
+                    ) 
+                ) { 
+                    Text( 
+                        text = "Done", 
+                        fontWeight = FontWeight.SemiBold, 
+                        fontSize = 15.sp 
+                    ) 
+                } 
+            } 
+        } 
+    } 
+} 
+
+@Composable
+private fun RandomizerSettingsContent( 
+    disabledThemes: Set<String>, 
+    disabledTopics: Set<String>, 
+    expandedThemes: Set<String>, 
+    onToggleTheme: (String) -> Unit, 
+    onToggleTopic: (String) -> Unit, 
+    onToggleExpand: (String) -> Unit, 
+    onEnableAll: () -> Unit, 
+    onDisableOthers: (String) -> Unit 
+) { 
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { 
+        Row( 
+            modifier = Modifier.fillMaxWidth(), 
+            verticalAlignment = Alignment.CenterVertically, 
+            horizontalArrangement = Arrangement.SpaceBetween 
+        ) { 
+            Text( 
+                text = "Themes & Topics Pool", 
+                fontSize = 12.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextSecondary 
+            ) 
+
+            Surface( 
+                shape = RoundedCornerShape(8.dp), 
+                color = BlossomColors.SurfaceElevated, 
+                border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
+                modifier = Modifier.clickable { onEnableAll() } 
+            ) { 
+                Row( 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                ) { 
+                    Icon( 
+                        Icons.Filled.Refresh, 
+                        contentDescription = null, 
+                        tint = BlossomColors.SakuraRose, 
+                        modifier = Modifier.size(13.dp) 
+                    ) 
+                    Spacer(modifier = Modifier.width(4.dp)) 
+                    Text( 
+                        text = "Enable All", 
+                        fontSize = 11.sp, 
+                        fontWeight = FontWeight.Medium, 
+                        color = BlossomColors.SakuraRose 
+                    ) 
+                } 
+            } 
+        } 
+
+        Text( 
+            text = "Checked themes and topics will be randomly picked during story generation. Expand any theme to toggle specific topics.", 
+            fontSize = 12.sp, 
+            color = BlossomColors.TextMuted, 
+            lineHeight = 16.sp 
+        ) 
+
+        Spacer(modifier = Modifier.height(2.dp)) 
+
+        StoryThemes.ALL_THEMES.forEach { themeKey -> 
+            val isThemeEnabled = themeKey !in disabledThemes 
+            val isExpanded = themeKey in expandedThemes 
+            val topics = StoryThemes.CATEGORIES[themeKey] ?: emptyList() 
+            val badgeColors = StoryThemes.getThemeBadgeColors(themeKey) 
+
+            Card( 
+                shape = RoundedCornerShape(14.dp), 
+                colors = CardDefaults.cardColors( 
+                    containerColor = if (isThemeEnabled) BlossomColors.SurfaceElevated else BlossomColors.SurfaceCard3.copy(alpha = 0.5f) 
+                ), 
+                border = BorderStroke( 
+                    1.dp, 
+                    if (isThemeEnabled) badgeColors.borderColor.copy(alpha = 0.35f) else BlossomColors.CardBorderSubtle 
+                ), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) { 
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        Row( 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            modifier = Modifier.weight(1f) 
+                        ) { 
+                            Checkbox( 
+                                checked = isThemeEnabled, 
+                                onCheckedChange = { onToggleTheme(themeKey) }, 
+                                colors = CheckboxDefaults.colors( 
+                                    checkedColor = badgeColors.contentColor, 
+                                    checkmarkColor = Color.Black, 
+                                    uncheckedColor = BlossomColors.TextMuted 
+                                ), 
+                                modifier = Modifier.size(32.dp) 
+                            ) 
+
+                            Spacer(modifier = Modifier.width(6.dp)) 
+
+                            Surface( 
+                                shape = RoundedCornerShape(6.dp), 
+                                color = badgeColors.backgroundColor, 
+                                border = BorderStroke(1.dp, badgeColors.borderColor) 
+                            ) { 
+                                Text( 
+                                    text = StoryThemes.formatThemeName(themeKey), 
+                                    fontSize = 12.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = badgeColors.contentColor, 
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp) 
+                                ) 
+                            } 
+
+                            Spacer(modifier = Modifier.width(8.dp)) 
+
+                            Text( 
+                                text = "(${topics.size} topics)", 
+                                fontSize = 11.sp, 
+                                color = BlossomColors.TextMuted 
+                            ) 
+                        } 
+
+                        IconButton( 
+                            onClick = { onToggleExpand(themeKey) }, 
+                            modifier = Modifier.size(32.dp) 
+                        ) { 
+                            Icon( 
+                                if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, 
+                                contentDescription = "Expand topics", 
+                                tint = BlossomColors.TextSecondary, 
+                                modifier = Modifier.size(20.dp) 
+                            ) 
+                        } 
+                    } 
+
+                    if (isExpanded) { 
+                        Spacer(modifier = Modifier.height(4.dp)) 
+                        Column( 
+                            modifier = Modifier 
+                                .fillMaxWidth() 
+                                .padding(start = 28.dp, end = 4.dp, bottom = 6.dp), 
+                            verticalArrangement = Arrangement.spacedBy(4.dp) 
+                        ) { 
+                            topics.forEach { topic -> 
+                                val isTopicEnabled = isThemeEnabled && topic !in disabledTopics 
+                                Row( 
+                                    modifier = Modifier 
+                                        .fillMaxWidth() 
+                                        .clickable(enabled = isThemeEnabled) { onToggleTopic(topic) } 
+                                        .padding(vertical = 2.dp), 
+                                    verticalAlignment = Alignment.CenterVertically 
+                                ) { 
+                                    Checkbox( 
+                                        checked = isTopicEnabled, 
+                                        onCheckedChange = { onToggleTopic(topic) }, 
+                                        enabled = isThemeEnabled, 
+                                        colors = CheckboxDefaults.colors( 
+                                            checkedColor = badgeColors.contentColor, 
+                                            checkmarkColor = Color.Black, 
+                                            uncheckedColor = BlossomColors.TextMuted 
+                                        ), 
+                                        modifier = Modifier.size(24.dp) 
+                                    ) 
+                                    Spacer(modifier = Modifier.width(8.dp)) 
+                                    Text( 
+                                        text = topic, 
+                                        fontSize = 12.sp, 
+                                        color = if (isTopicEnabled) BlossomColors.TextPrimary else BlossomColors.TextMuted, 
+                                        maxLines = 1, 
+                                        overflow = TextOverflow.Ellipsis 
+                                    ) 
+                                } 
+                            } 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+    } 
+} 
+
+@Composable
+private fun CustomStoryContent( 
+    isCustomActive: Boolean, 
+    selectedTheme: String, 
+    selectedTopic: String?, 
+    onThemeSelected: (String) -> Unit, 
+    onTopicSelected: (String?) -> Unit, 
+    onApplyCustom: () -> Unit, 
+    onResetToRandom: () -> Unit 
+) { 
+    val topics = StoryThemes.CATEGORIES[selectedTheme] ?: emptyList() 
+    val badgeColors = StoryThemes.getThemeBadgeColors(selectedTheme) 
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
+        if (isCustomActive) { 
+            Surface( 
+                shape = RoundedCornerShape(12.dp), 
+                color = BlossomColors.WisteriaVioletContainer.copy(alpha = 0.5f), 
+                border = BorderStroke(1.dp, BlossomColors.WisteriaViolet.copy(alpha = 0.4f)), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Row( 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(12.dp), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.SpaceBetween 
+                ) { 
+                    Column(modifier = Modifier.weight(1f)) { 
+                        Text( 
+                            text = "LOCKED CUSTOM STORY", 
+                            fontSize = 10.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = BlossomColors.WisteriaViolet, 
+                            letterSpacing = 1.sp 
+                        ) 
+                        Spacer(modifier = Modifier.height(2.dp)) 
+                        Text( 
+                            text = "${StoryThemes.formatThemeName(selectedTheme)}: ${selectedTopic ?: "Any Topic"}", 
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = BlossomColors.TextPrimary, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis 
+                        ) 
+                    } 
+
+                    OutlinedButton( 
+                        onClick = onResetToRandom, 
+                        shape = RoundedCornerShape(8.dp), 
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BlossomColors.BlossomRed), 
+                        border = BorderStroke(1.dp, BlossomColors.BlossomRed.copy(alpha = 0.5f)), 
+                        modifier = Modifier.height(32.dp) 
+                    ) { 
+                        Text(text = "Clear", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) 
+                    } 
+                } 
+            } 
+        } 
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { 
+            Text( 
+                text = "1. Select Theme", 
+                fontSize = 12.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextSecondary 
+            ) 
+
+            Row( 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .horizontalScroll(rememberScrollState()), 
+                horizontalArrangement = Arrangement.spacedBy(8.dp) 
+            ) { 
+                StoryThemes.ALL_THEMES.forEach { themeKey -> 
+                    val isSelected = themeKey == selectedTheme 
+                    val style = StoryThemes.getThemeBadgeColors(themeKey) 
+
+                    Surface( 
+                        shape = RoundedCornerShape(10.dp), 
+                        color = if (isSelected) style.backgroundColor else BlossomColors.SurfaceElevated, 
+                        border = BorderStroke( 
+                            if (isSelected) 2.dp else 1.dp, 
+                            if (isSelected) style.contentColor else BlossomColors.CardBorderSubtle 
+                        ), 
+                        modifier = Modifier.clickable { onThemeSelected(themeKey) } 
+                    ) { 
+                        Row( 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp) 
+                        ) { 
+                            if (isSelected) { 
+                                Icon( 
+                                    Icons.Filled.Check, 
+                                    contentDescription = null, 
+                                    tint = style.contentColor, 
+                                    modifier = Modifier.size(14.dp) 
+                                ) 
+                                Spacer(modifier = Modifier.width(6.dp)) 
+                            } 
+                            Text( 
+                                text = StoryThemes.formatThemeName(themeKey), 
+                                fontSize = 13.sp, 
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+                                color = if (isSelected) style.contentColor else BlossomColors.TextPrimary 
+                            ) 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { 
+            Text( 
+                text = "2. Select Topic for ${StoryThemes.formatThemeName(selectedTheme)}", 
+                fontSize = 12.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextSecondary 
+            ) 
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { 
+                Surface( 
+                    shape = RoundedCornerShape(10.dp), 
+                    color = if (selectedTopic == null) badgeColors.backgroundColor.copy(alpha = 0.6f) else BlossomColors.SurfaceElevated, 
+                    border = BorderStroke( 
+                        1.dp, 
+                        if (selectedTopic == null) badgeColors.borderColor else BlossomColors.CardBorderSubtle 
+                    ), 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .clickable { onTopicSelected(null) } 
+                ) { 
+                    Row( 
+                        modifier = Modifier 
+                            .fillMaxWidth() 
+                            .padding(horizontal = 12.dp, vertical = 10.dp), 
+                        verticalAlignment = Alignment.CenterVertically 
+                    ) { 
+                        RadioButton( 
+                            selected = selectedTopic == null, 
+                            onClick = { onTopicSelected(null) }, 
+                            colors = RadioButtonDefaults.colors( 
+                                selectedColor = badgeColors.contentColor, 
+                                unselectedColor = BlossomColors.TextMuted 
+                            ), 
+                            modifier = Modifier.size(20.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
+                        Text( 
+                            text = "✨ Any topic in ${StoryThemes.formatThemeName(selectedTheme)} (Random)", 
+                            fontSize = 13.sp, 
+                            fontWeight = if (selectedTopic == null) FontWeight.Bold else FontWeight.Medium, 
+                            color = if (selectedTopic == null) badgeColors.contentColor else BlossomColors.TextPrimary 
+                        ) 
+                    } 
+                } 
+
+                topics.forEach { topic -> 
+                    val isSelected = selectedTopic == topic 
+                    Surface( 
+                        shape = RoundedCornerShape(10.dp), 
+                        color = if (isSelected) badgeColors.backgroundColor.copy(alpha = 0.6f) else BlossomColors.SurfaceElevated, 
+                        border = BorderStroke( 
+                            1.dp, 
+                            if (isSelected) badgeColors.borderColor else BlossomColors.CardBorderSubtle 
+                        ), 
+                        modifier = Modifier 
+                            .fillMaxWidth() 
+                            .clickable { onTopicSelected(topic) } 
+                    ) { 
+                        Row( 
+                            modifier = Modifier 
+                                .fillMaxWidth() 
+                                .padding(horizontal = 12.dp, vertical = 10.dp), 
+                            verticalAlignment = Alignment.CenterVertically 
+                        ) { 
+                            RadioButton( 
+                                selected = isSelected, 
+                                onClick = { onTopicSelected(topic) }, 
+                                colors = RadioButtonDefaults.colors( 
+                                    selectedColor = badgeColors.contentColor, 
+                                    unselectedColor = BlossomColors.TextMuted 
+                                ), 
+                                modifier = Modifier.size(20.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(10.dp)) 
+                            Text( 
+                                text = topic, 
+                                fontSize = 13.sp, 
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, 
+                                color = if (isSelected) BlossomColors.TextPrimary else BlossomColors.TextSecondary 
+                            ) 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+
+        Spacer(modifier = Modifier.height(6.dp)) 
+
+        Button( 
+            onClick = onApplyCustom, 
+            modifier = Modifier 
+                .fillMaxWidth() 
+                .height(48.dp), 
+            shape = RoundedCornerShape(14.dp), 
+            colors = ButtonDefaults.buttonColors( 
+                containerColor = badgeColors.contentColor, 
+                contentColor = Color.Black 
+            ) 
+        ) { 
+            Icon( 
+                Icons.Filled.AutoAwesome, 
+                contentDescription = null, 
+                modifier = Modifier.size(16.dp) 
+            ) 
+            Spacer(modifier = Modifier.width(8.dp)) 
+            Text( 
+                text = "Apply & Lock for Next Stories", 
+                fontWeight = FontWeight.Bold, 
+                fontSize = 14.sp 
+            ) 
+        } 
+    } 
+} 
