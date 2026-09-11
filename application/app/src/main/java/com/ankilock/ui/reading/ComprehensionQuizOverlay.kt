@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -262,38 +265,43 @@ fun ComprehensionQuizOverlay(
                                 modifier = Modifier.fillMaxWidth(), 
                                 horizontalArrangement = Arrangement.spacedBy(12.dp) 
                             ) { 
-                                Button( 
-                                    onClick = { 
-                                        userAnswers.clear() 
-                                        currentIndex = 0 
-                                        isQuizCompleted = false 
-                                    }, 
-                                    colors = ButtonDefaults.buttonColors( 
-                                        containerColor = BlossomColors.SurfaceElevated 
-                                    ), 
-                                    shape = RoundedCornerShape(12.dp), 
-                                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                    modifier = Modifier.weight(1f) 
+                                Box( 
+                                    modifier = Modifier 
+                                        .weight(1f) 
+                                        .height(52.dp) 
+                                        .clip(RoundedCornerShape(20.dp)) 
+                                        .background(BlossomColors.SurfaceElevated) 
+                                        .border(BorderStroke(1.dp, BlossomColors.CardBorder), shape = RoundedCornerShape(20.dp)) 
+                                        .clickable { 
+                                            userAnswers.clear() 
+                                            currentIndex = 0 
+                                            isQuizCompleted = false 
+                                        }, 
+                                    contentAlignment = Alignment.Center 
                                 ) { 
                                     Text( 
                                         text = "Retake", 
                                         color = BlossomColors.TextPrimary, 
-                                        fontWeight = FontWeight.SemiBold 
+                                        fontWeight = FontWeight.Bold, 
+                                        fontSize = 15.sp 
                                     ) 
                                 } 
                                 
-                                Button( 
-                                    onClick = onDismiss, 
-                                    colors = ButtonDefaults.buttonColors( 
-                                        containerColor = BlossomColors.SakuraRose 
-                                    ), 
-                                    shape = RoundedCornerShape(12.dp), 
-                                    modifier = Modifier.weight(1f) 
+                                Box( 
+                                    modifier = Modifier 
+                                        .weight(1f) 
+                                        .height(52.dp) 
+                                        .clip(RoundedCornerShape(20.dp)) 
+                                        .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
+                                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
+                                        .clickable { onDismiss() }, 
+                                    contentAlignment = Alignment.Center 
                                 ) { 
                                     Text( 
                                         text = "Done", 
                                         color = BlossomColors.BlossomWhite, 
-                                        fontWeight = FontWeight.Bold 
+                                        fontWeight = FontWeight.Bold, 
+                                        fontSize = 15.sp 
                                     ) 
                                 } 
                             } 
@@ -357,25 +365,26 @@ fun ComprehensionQuizOverlay(
                                                     userAnswers[currentQuestion.id] = optIdx 
                                                 } 
                                             }, 
-                                            shape = RoundedCornerShape(12.dp), 
+                                            shape = RoundedCornerShape(16.dp), 
                                             color = bgColor, 
-                                            border = BorderStroke(1.dp, borderColor), 
+                                            border = BorderStroke(if (isSelected || (isAnswered && isCorrect)) 1.5.dp else 1.dp, borderColor), 
                                             modifier = Modifier.fillMaxWidth() 
                                         ) { 
                                             Row( 
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), 
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp), 
                                                 verticalAlignment = Alignment.CenterVertically 
                                             ) { 
                                                 Surface( 
                                                     shape = CircleShape, 
                                                     color = if (isAnswered && isCorrect) BlossomColors.BlossomGreen.copy(alpha = 0.2f) 
+                                                    else if (isSelected) BlossomColors.SakuraRoseContainer 
                                                     else BlossomColors.SurfaceCard2, 
-                                                    modifier = Modifier.size(28.dp) 
+                                                    modifier = Modifier.size(32.dp) 
                                                 ) { 
                                                     Box(contentAlignment = Alignment.Center) { 
                                                         Text( 
                                                             text = optionLabels.getOrElse(optIdx) { "${optIdx + 1}" }, 
-                                                            fontSize = 12.sp, 
+                                                            fontSize = 13.sp, 
                                                             fontWeight = FontWeight.Bold, 
                                                             color = textColor 
                                                         ) 
@@ -384,7 +393,8 @@ fun ComprehensionQuizOverlay(
                                                 Spacer(modifier = Modifier.width(12.dp)) 
                                                 Text( 
                                                     text = optText, 
-                                                    fontSize = 14.sp, 
+                                                    fontSize = 15.sp, 
+                                                    fontWeight = FontWeight.Medium, 
                                                     color = textColor, 
                                                     modifier = Modifier.weight(1f) 
                                                 ) 
@@ -410,41 +420,61 @@ fun ComprehensionQuizOverlay(
                                 
                                 if (isAnswered && currentQuestion.explanation.isNotBlank()) { 
                                     Surface( 
-                                        shape = RoundedCornerShape(10.dp), 
+                                        shape = RoundedCornerShape(14.dp), 
                                         color = BlossomColors.SurfaceCard2, 
                                         border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
                                         modifier = Modifier.fillMaxWidth() 
                                     ) { 
-                                        Text( 
-                                            text = "💡 ${currentQuestion.explanation}", 
-                                            fontSize = 12.sp, 
-                                            color = BlossomColors.TextSecondary, 
-                                            lineHeight = 18.sp, 
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp) 
-                                        ) 
+                                        Row( 
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), 
+                                            verticalAlignment = Alignment.Top 
+                                        ) { 
+                                            Icon( 
+                                                Icons.Filled.AutoAwesome, 
+                                                contentDescription = null, 
+                                                tint = BlossomColors.SakuraRose, 
+                                                modifier = Modifier.size(16.dp).padding(top = 2.dp) 
+                                            ) 
+                                            Spacer(modifier = Modifier.width(8.dp)) 
+                                            Text( 
+                                                text = currentQuestion.explanation, 
+                                                fontSize = 13.sp, 
+                                                color = BlossomColors.TextSecondary, 
+                                                lineHeight = 19.sp, 
+                                                modifier = Modifier.weight(1f) 
+                                            ) 
+                                        } 
                                     } 
                                 } 
                             } 
                             
                             Column { 
                                 Spacer(modifier = Modifier.height(20.dp)) 
-                                Button( 
-                                    onClick = { 
-                                        if (currentIndex < questions.size - 1) { 
-                                            currentIndex++ 
-                                        } else { 
-                                            isQuizCompleted = true 
-                                        } 
-                                    }, 
-                                    enabled = isAnswered, 
-                                    colors = ButtonDefaults.buttonColors( 
-                                        containerColor = BlossomColors.SakuraRose, 
-                                        disabledContainerColor = BlossomColors.SurfaceElevated 
-                                    ), 
-                                    shape = RoundedCornerShape(14.dp), 
+                                Box( 
                                     modifier = Modifier 
                                         .fillMaxWidth() 
-                                        .height(50.dp) 
+                                        .height(52.dp) 
+                                        .clip(RoundedCornerShape(20.dp)) 
+                                        .background( 
+                                            if (isAnswered) BlossomColors.SakuraRose.copy(alpha = 0.85f) 
+                                            else BlossomColors.SurfaceElevated 
+                                        ) 
+                                        .border( 
+                                            BorderStroke( 
+                                                1.dp, 
+                                                if (isAnswered) Color.White.copy(alpha = 0.25f) 
+                                                else BlossomColors.CardBorder 
+                                            ), 
+                                            shape = RoundedCornerShape(20.dp) 
+                                        ) 
+                                        .clickable(enabled = isAnswered) { 
+                                            if (currentIndex < questions.size - 1) { 
+                                                currentIndex++ 
+                                            } else { 
+                                                isQuizCompleted = true 
+                                            } 
+                                        }, 
+                                    contentAlignment = Alignment.Center 
                                 ) { 
                                     Row( 
                                         verticalAlignment = Alignment.CenterVertically, 

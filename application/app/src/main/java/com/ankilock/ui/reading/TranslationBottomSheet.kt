@@ -174,63 +174,6 @@ fun TranslationBottomSheet(
                     .verticalScroll(rememberScrollState()) 
                     .padding(vertical = 8.dp) 
             ) { 
-                Row( 
-                    modifier = Modifier.fillMaxWidth(), 
-                    verticalAlignment = Alignment.Top, 
-                    horizontalArrangement = Arrangement.SpaceBetween 
-                ) { 
-                    Column(modifier = Modifier.weight(1f)) { 
-                        Text( 
-                            text = sourceText, 
-                            fontSize = if (sourceText.length > 20) 22.sp else 28.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = BlossomColors.TextPrimary, 
-                            lineHeight = if (sourceText.length > 20) 30.sp else 36.sp 
-                        ) 
-
-                        val romaji = result?.romaji ?: "" 
-                        if (romaji.isNotBlank()) { 
-                            Spacer(modifier = Modifier.height(4.dp)) 
-                            Text( 
-                                text = romaji, 
-                                fontSize = 16.sp, 
-                                fontWeight = FontWeight.SemiBold, 
-                                color = BlossomColors.SakuraRose 
-                            ) 
-                        } 
-                    } 
-
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        IconButton( 
-                            onClick = { ttsHelper.speak(sourceText) }, 
-                            modifier = Modifier.size(36.dp) 
-                        ) { 
-                            Icon( 
-                                imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
-                                contentDescription = "Pronounce", 
-                                tint = BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(20.dp) 
-                            ) 
-                        } 
-                        IconButton( 
-                            onClick = { 
-                                clipboardManager.setText(AnnotatedString(sourceText)) 
-                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show() 
-                            }, 
-                            modifier = Modifier.size(36.dp) 
-                        ) { 
-                            Icon( 
-                                imageVector = Icons.Default.ContentCopy, 
-                                contentDescription = "Copy text", 
-                                tint = BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(18.dp) 
-                            ) 
-                        } 
-                    } 
-                } 
-
-                Spacer(modifier = Modifier.height(16.dp)) 
-
                 Surface( 
                     shape = RoundedCornerShape(14.dp), 
                     color = BlossomColors.SurfaceElevated, 

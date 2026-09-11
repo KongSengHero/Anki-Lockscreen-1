@@ -63,11 +63,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ankilock.data.PreferencesManager
-import com.ankilock.data.StoryThemes
-import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.data.PreferencesManager 
+import com.ankilock.data.StoryThemes 
+import com.ankilock.ui.blossom.BlossomColors 
+import com.ankilock.ui.components.GlobalSeekerContainer 
+import com.ankilock.ui.components.GlobalSeekerRow 
+import androidx.compose.runtime.mutableFloatStateOf 
+import kotlin.math.roundToInt 
     
-@OptIn(ExperimentalMaterial3Api::class) 
+@OptIn(ExperimentalMaterial3Api::class)  
 @Composable
 fun StoryConfigBottomSheet( 
     prefs: PreferencesManager, 
@@ -91,7 +95,7 @@ fun StoryConfigBottomSheet(
         "Long" to "~500w" 
     ) 
     
-    val connectingWordsOptions = listOf(0, 3, 4, 5) 
+    val connectingWordsSteps = listOf(0, 5, 7, 9, 11) 
     
     var selectedLevel by remember { 
         mutableStateOf(if (prefs.readingJlptLevel.isNotBlank()) prefs.readingJlptLevel else "N5") 
@@ -100,7 +104,12 @@ fun StoryConfigBottomSheet(
         mutableStateOf(if (prefs.storyLength.isNotBlank()) prefs.storyLength else "Medium") 
     } 
     var selectedWordsCount by remember { 
-        mutableIntStateOf(prefs.storyConnectingWordsCount) 
+        val count = prefs.storyConnectingWordsCount 
+        mutableIntStateOf(if (count in connectingWordsSteps) count else 5) 
+    } 
+    var sliderIndex by remember { 
+        val idx = connectingWordsSteps.indexOf(selectedWordsCount).let { if (it >= 0) it.toFloat() else 1f } 
+        mutableFloatStateOf(idx) 
     } 
     
     var selectedTab by remember { mutableIntStateOf(if (prefs.isCustomThemeModeActive) 1 else 0) } 
@@ -277,48 +286,23 @@ fun StoryConfigBottomSheet(
                     } 
                 } 
                 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
-                    Text( 
-                        text = "Connecting Studied Words", 
-                        fontSize = 12.5.sp, 
-                        fontWeight = FontWeight.SemiBold, 
-                        color = BlossomColors.TextSecondary 
+                GlobalSeekerContainer { 
+                    GlobalSeekerRow( 
+                        icon = Icons.Filled.Tune, 
+                        label = "Connecting Studied Words", 
+                        valueDisplay = if (selectedWordsCount == 0) "Free (0 words)" else "$selectedWordsCount words", 
+                        value = sliderIndex, 
+                        valueRange = 0f..4f, 
+                        onValueChange = { newIdx -> 
+                            sliderIndex = newIdx 
+                            val nearest = newIdx.roundToInt().coerceIn(0, connectingWordsSteps.lastIndex) 
+                            selectedWordsCount = connectingWordsSteps[nearest] 
+                        }, 
+                        onValueChangeFinished = { 
+                            sliderIndex = connectingWordsSteps.indexOf(selectedWordsCount).toFloat() 
+                        }, 
+                        accentColor = BlossomColors.SakuraRose 
                     ) 
-                    Row( 
-                        modifier = Modifier.fillMaxWidth(), 
-                        horizontalArrangement = Arrangement.spacedBy(8.dp) 
-                    ) { 
-                        connectingWordsOptions.forEach { count -> 
-                            val isSelected = selectedWordsCount == count 
-                            Surface( 
-                                onClick = { selectedWordsCount = count }, 
-                                shape = RoundedCornerShape(10.dp), 
-                                color = if (isSelected) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceElevated, 
-                                border = BorderStroke( 
-                                    1.dp, 
-                                    if (isSelected) BlossomColors.SakuraRose else BlossomColors.CardBorder 
-                                ), 
-                                modifier = Modifier.weight(1f) 
-                            ) { 
-                                Column( 
-                                    modifier = Modifier.padding(vertical = 8.dp), 
-                                    horizontalAlignment = Alignment.CenterHorizontally 
-                                ) { 
-                                    Text( 
-                                        text = "$count", 
-                                        fontSize = 14.sp, 
-                                        fontWeight = FontWeight.Bold, 
-                                        color = if (isSelected) BlossomColors.SakuraRose else BlossomColors.TextPrimary 
-                                    ) 
-                                    Text( 
-                                        text = if (count == 0) "Free" else "Words", 
-                                        fontSize = 10.sp, 
-                                        color = if (isSelected) BlossomColors.SakuraRose else BlossomColors.TextMuted 
-                                    ) 
-                                } 
-                            } 
-                        } 
-                    } 
                 } 
                 
                 TabRow( 

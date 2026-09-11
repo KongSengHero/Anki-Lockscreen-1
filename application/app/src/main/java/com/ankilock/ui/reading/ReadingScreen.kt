@@ -100,9 +100,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -926,38 +929,41 @@ fun ReadingScreen(
                                             } 
                                         } 
                                     } 
-                                } else if (targetVocabWords.isNotEmpty()) { 
-                                    val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
-                                        buildHighlightedStoryText( 
-                                            content = story.content, 
-                                            vocabWords = targetVocabWords 
-                                        ) 
-                                    } 
-                                    ClickableText( 
-                                        text = annotatedContent, 
-                                        style = TextStyle( 
-                                            fontSize = 17.sp, 
-                                            color = BlossomColors.TextPrimary, 
-                                            lineHeight = 34.sp, 
-                                            letterSpacing = 0.5.sp 
-                                        ), 
-                                        onClick = { offset -> 
-                                            annotatedContent.getStringAnnotations(tag = "WORD", start = offset, end = offset) 
-                                                .firstOrNull()?.let { annotation -> 
-                                                    val word = targetVocabWords.find { it.displayWord == annotation.item } 
-                                                    if (word != null) { 
-                                                        selectedWordDetail = word 
-                                                    } 
-                                                } 
-                                        } 
-                                    ) 
                                 } else { 
+                                    val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
+                                        if (targetVocabWords.isNotEmpty()) { 
+                                            buildHighlightedStoryText( 
+                                                content = story.content, 
+                                                vocabWords = targetVocabWords 
+                                            ) 
+                                        } else { 
+                                            AnnotatedString(story.content) 
+                                        } 
+                                    } 
+                                    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
                                     Text( 
-                                        text = story.content, 
+                                        text = annotatedContent, 
                                         fontSize = 17.sp, 
                                         color = BlossomColors.TextPrimary, 
                                         lineHeight = 34.sp, 
-                                        letterSpacing = 0.5.sp 
+                                        letterSpacing = 0.5.sp, 
+                                        onTextLayout = { textLayoutResult = it }, 
+                                        modifier = Modifier.pointerInput(targetVocabWords) { 
+                                            if (targetVocabWords.isNotEmpty()) { 
+                                                detectTapGestures { offset -> 
+                                                    textLayoutResult?.let { layout -> 
+                                                        val position = layout.getOffsetForPosition(offset) 
+                                                        annotatedContent.getStringAnnotations(tag = "WORD", start = position, end = position) 
+                                                            .firstOrNull()?.let { annotation -> 
+                                                                val word = targetVocabWords.find { it.displayWord == annotation.item } 
+                                                                if (word != null) { 
+                                                                    selectedWordDetail = word 
+                                                                } 
+                                                            } 
+                                                    } 
+                                                } 
+                                            } 
+                                        } 
                                     ) 
                                 } 
                                 
@@ -1037,66 +1043,33 @@ fun ReadingScreen(
                                 
                                 if (story.questions.isNotEmpty()) { 
                                     Spacer(modifier = Modifier.height(20.dp)) 
-                                    Surface( 
-                                        onClick = { showQuizOverlay = true }, 
-                                        shape = RoundedCornerShape(16.dp), 
-                                        color = BlossomColors.SurfaceElevated, 
-                                        border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)), 
-                                        modifier = Modifier.fillMaxWidth() 
+                                    Box( 
+                                        modifier = Modifier 
+                                            .fillMaxWidth() 
+                                            .height(52.dp) 
+                                            .clip(RoundedCornerShape(20.dp)) 
+                                            .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
+                                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
+                                            .clickable { showQuizOverlay = true }, 
+                                        contentAlignment = Alignment.Center 
                                     ) { 
                                         Row( 
-                                            modifier = Modifier 
-                                                .fillMaxWidth() 
-                                                .padding(horizontal = 16.dp, vertical = 14.dp), 
                                             verticalAlignment = Alignment.CenterVertically, 
-                                            horizontalArrangement = Arrangement.SpaceBetween 
+                                            horizontalArrangement = Arrangement.Center 
                                         ) { 
-                                            Row( 
-                                                verticalAlignment = Alignment.CenterVertically, 
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp) 
-                                            ) { 
-                                                Surface( 
-                                                    shape = CircleShape, 
-                                                    color = BlossomColors.SakuraRoseContainer, 
-                                                    modifier = Modifier.size(40.dp) 
-                                                ) { 
-                                                    Box(contentAlignment = Alignment.Center) { 
-                                                        Icon( 
-                                                            Icons.Filled.AutoAwesome, 
-                                                            contentDescription = null, 
-                                                            tint = BlossomColors.SakuraRose, 
-                                                            modifier = Modifier.size(20.dp) 
-                                                        ) 
-                                                    } 
-                                                } 
-                                                Column { 
-                                                    Text( 
-                                                        text = "Comprehension Quiz", 
-                                                        fontSize = 15.sp, 
-                                                        fontWeight = FontWeight.Bold, 
-                                                        color = BlossomColors.TextPrimary 
-                                                    ) 
-                                                    Text( 
-                                                        text = "${story.questions.size} Questions • Tap to test understanding", 
-                                                        fontSize = 12.sp, 
-                                                        color = BlossomColors.TextSecondary 
-                                                    ) 
-                                                } 
-                                            } 
-                                            
-                                            Surface( 
-                                                shape = RoundedCornerShape(10.dp), 
-                                                color = BlossomColors.SakuraRose, 
-                                                modifier = Modifier.padding(start = 8.dp) 
-                                            ) { 
-                                                Text( 
-                                                    text = "Take Quiz", 
-                                                    fontSize = 13.sp, 
-                                                    fontWeight = FontWeight.Bold, 
-                                                    color = BlossomColors.BlossomWhite, 
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp) 
-                                                ) 
-                                            } 
+                                            Icon( 
+                                                Icons.Filled.AutoAwesome, 
+                                                contentDescription = null, 
+                                                tint = BlossomColors.BlossomWhite, 
+                                                modifier = Modifier.size(18.dp) 
+                                            ) 
+                                            Spacer(modifier = Modifier.width(8.dp)) 
+                                            Text( 
+                                                text = "Take Comprehension Quiz (${story.questions.size})", 
+                                                fontSize = 15.sp, 
+                                                fontWeight = FontWeight.Bold, 
+                                                color = BlossomColors.BlossomWhite 
+                                            ) 
                                         } 
                                     } 
                                 } 
@@ -1440,9 +1413,8 @@ private fun buildHighlightedStoryText(
             addStyle( 
                 style = SpanStyle( 
                     background = BlossomColors.SakuraRoseContainer, 
-                    textDecoration = TextDecoration.Underline, 
                     color = BlossomColors.SakuraRose, 
-                    fontWeight = FontWeight.SemiBold 
+                    fontWeight = FontWeight.Bold 
                 ), 
                 start = match.start, 
                 end = match.end 

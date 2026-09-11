@@ -703,8 +703,11 @@ class MainActivity : ComponentActivity() {
                 activeCard = CardSessionManager.currentCard 
                 isRevealed = CardSessionManager.isRevealed 
                 stats = CardSessionManager.currentStats 
-                decksState = ankiHelper.getDeckList() 
-                deckStatsCache.clear() 
+                val updatedDecks = ankiHelper.getDeckList() 
+                decksState = updatedDecks 
+                for (d in updatedDecks) { 
+                    deckStatsCache[d.id] = Triple(d.newCount, d.learnCount, d.reviewCount) 
+                } 
             } 
             CardSessionManager.addListener(listener) 
             onDispose { 
@@ -746,9 +749,8 @@ class MainActivity : ComponentActivity() {
                         } 
                     } 
                     if (!deckStatsCache.containsKey(deck.id)) { 
-                        val deckStats = ankiHelper.getDeckStatsForDeck(deck.name) 
                         withContext(Dispatchers.Main) { 
-                            deckStatsCache[deck.id] = deckStats 
+                            deckStatsCache[deck.id] = Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                         } 
                     } 
                 } 
@@ -815,12 +817,13 @@ class MainActivity : ComponentActivity() {
                     isRevealed = false 
                     CardSessionManager.refresh(this@MainActivity) 
                     coroutineScope.launch(Dispatchers.IO) { 
-                        val decksToLoad = decksState.filter { it.id.toString() in selectedDeckIds } 
+                        val freshDecks = ankiHelper.getDeckList() 
+                        val decksToLoad = freshDecks.filter { it.id.toString() in selectedDeckIds } 
                         for (deck in decksToLoad) { 
                             val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
                             val firstCard = batch.firstOrNull() 
                             val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
-                            val deckStats = ankiHelper.getDeckStatsForDeck(deck.name) 
+                            val deckStats = Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                             withContext(Dispatchers.Main) { 
                                 deckCardsCache[deck.id] = firstCard 
                                 deckCardQueues[deck.id] = remaining 
@@ -857,7 +860,9 @@ class MainActivity : ComponentActivity() {
                                 } 
                             } 
                         } 
-                        val freshStats = ankiHelper.getDeckStatsForDeck(deck.name) 
+                        val freshDecks = ankiHelper.getDeckList() 
+                        val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                            ?: ankiHelper.getDeckStatsForDeck(deck.name) 
                         withContext(Dispatchers.Main) { 
                             deckStatsCache[deck.id] = freshStats 
                         } 
@@ -894,7 +899,9 @@ class MainActivity : ComponentActivity() {
                                 } 
                             } 
                         } 
-                        val freshStats = ankiHelper.getDeckStatsForDeck(deck.name) 
+                        val freshDecks = ankiHelper.getDeckList() 
+                        val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                            ?: ankiHelper.getDeckStatsForDeck(deck.name) 
                         withContext(Dispatchers.Main) { 
                             deckStatsCache[deck.id] = freshStats 
                         } 
@@ -928,9 +935,8 @@ class MainActivity : ComponentActivity() {
                             } 
                         } 
                         if (targetDeck != null && !deckStatsCache.containsKey(deckId)) { 
-                            val deckStats = ankiHelper.getDeckStatsForDeck(targetDeck.name) 
                             withContext(Dispatchers.Main) { 
-                                deckStatsCache[deckId] = deckStats 
+                                deckStatsCache[deckId] = Triple(targetDeck.newCount, targetDeck.learnCount, targetDeck.reviewCount) 
                             } 
                         } 
                     } 

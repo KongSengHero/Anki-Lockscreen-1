@@ -39,43 +39,26 @@ fun BlossomStoryTokenView(
     onClick: () -> Unit, 
     modifier: Modifier = Modifier 
 ) { 
-    val baseFontSize = if (enlargeTextFont) 25.sp else 21.sp 
-    val rubyFontSize = if (enlargeTextFont) 12.sp else 11.sp 
-    val rubySlotHeight = if (enlargeTextFont) 16.dp else 14.dp 
-    val underlineHeight = if (enlargeTextFont) 3.dp else 2.5.dp 
-    val underlineColor = Color(0xFF3B82F6) 
-    
-    val hasKanji = token.surface.any { it in '\u4E00'..'\u9FAF' || it in '\u3400'..'\u4DBF' } 
-    val shouldUnderline = hasKanji && !token.isPunctuation && !token.isName 
+    val baseFontSize = if (enlargeTextFont) 22.sp else 17.sp 
+    val rubyFontSize = if (enlargeTextFont) 11.sp else 9.5.sp 
+    val rubySlotHeight = if (enlargeTextFont) 14.dp else 12.dp 
     
     val bgModifier = when { 
-        isSelected -> Modifier.background(Color(0xFF2563EB).copy(alpha = 0.35f)) 
-        isAudioHighlighted -> Modifier.background(Color(0xFF1E3A8A).copy(alpha = 0.25f)) 
+        isSelected -> Modifier.background(BlossomColors.SakuraRoseContainer) 
+        isAudioHighlighted -> Modifier.background(BlossomColors.SakuraRose.copy(alpha = 0.25f)) 
         else -> Modifier 
     } 
-    
-    val tokenPaddingBottom = underlineHeight + 4.dp 
     
     Box( 
         modifier = modifier 
             .clip(RoundedCornerShape(4.dp)) 
             .then(bgModifier) 
-            .clickable(enabled = !token.isPunctuation) { onClick() } 
-            .drawBehind { 
-                if (shouldUnderline) { 
-                    val strokeH = underlineHeight.toPx() 
-                    drawRect( 
-                        color = underlineColor, 
-                        topLeft = Offset(0f, size.height - strokeH), 
-                        size = Size(size.width, strokeH) 
-                    ) 
-                } 
-            } 
+            .clickable(enabled = isSelected) { onClick() } 
             .padding( 
-                start = if (token.isPunctuation) 0.dp else 1.5.dp, 
-                end = if (token.isPunctuation) 0.dp else 1.5.dp, 
-                top = 1.dp, 
-                bottom = tokenPaddingBottom 
+                start = if (token.isPunctuation) 0.dp else 1.dp, 
+                end = if (token.isPunctuation) 0.dp else 1.dp, 
+                top = 0.dp, 
+                bottom = 2.dp 
             ) 
     ) { 
         Column( 
@@ -105,7 +88,7 @@ fun BlossomStoryTokenView(
                                 Text( 
                                     text = displayRuby, 
                                     fontSize = rubyFontSize, 
-                                    color = Color(0xFFCBD5E1), 
+                                    color = BlossomColors.TextSecondary, 
                                     fontWeight = FontWeight.Normal, 
                                     lineHeight = rubyFontSize, 
                                     maxLines = 1 
@@ -120,9 +103,10 @@ fun BlossomStoryTokenView(
                             fontSize = baseFontSize, 
                             fontWeight = if (token.isName) FontWeight.Bold else FontWeight.Medium, 
                             color = when { 
+                                isSelected -> BlossomColors.SakuraRose 
                                 token.isName -> Color(0xFFA855F7) 
                                 isAudioHighlighted -> Color(0xFF60A5FA) 
-                                else -> Color.White 
+                                else -> BlossomColors.TextPrimary 
                             }, 
                             lineHeight = baseFontSize 
                         ) 
