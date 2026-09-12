@@ -1,6 +1,18 @@
 package com.ankilock.ui.components
     
-import android.view.HapticFeedbackConstants
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.view.HapticFeedbackConstants 
+import androidx.compose.foundation.layout.fillMaxWidth 
+import androidx.compose.material3.Icon 
+import androidx.compose.runtime.mutableStateOf 
+import androidx.compose.runtime.rememberCoroutineScope 
+import androidx.compose.runtime.setValue 
+import androidx.compose.ui.platform.LocalContext 
+import kotlinx.coroutines.delay 
+import kotlinx.coroutines.launch 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -158,14 +170,23 @@ fun Squircle3DButton(
     containerColor: Color = BlossomColors.SlateBlue, 
     bevelColor: Color? = null, 
     contentColor: Color = Color.White, 
+    containerBrush: Brush? = null, 
+    bevelBrush: Brush? = null, 
+    borderBrush: Brush? = null, 
+    progressFraction: Float? = null, 
+    progressColor: Color? = null, 
     shape: Shape = BlossomShapes.SquircleMedium, 
     depth: Dp = 3.dp, 
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 8.dp), 
+    overlayContent: (@Composable BoxScope.() -> Unit)? = null, 
     content: @Composable BoxScope.() -> Unit 
 ) { 
+    val context = LocalContext.current 
     val view = LocalView.current 
+    val coroutineScope = rememberCoroutineScope() 
     val interactionSource = remember { MutableInteractionSource() } 
     val isPressed by interactionSource.collectIsPressedAsState() 
+    var isManuallyPressed by remember { mutableStateOf(false) } 
     
     val actualBevelColor = bevelColor ?: containerColor.copy( 
         red = (containerColor.red * 0.65f).coerceIn(0f, 1f), 
@@ -173,8 +194,9 @@ fun Squircle3DButton(
         blue = (containerColor.blue * 0.65f).coerceIn(0f, 1f) 
     ) 
     
+    val isVisualPressed = (isPressed || isManuallyPressed) && enabled 
     val currentOffset by animateDpAsState( 
-        targetValue = if (isPressed && enabled) depth else 0.dp, 
+        targetValue = if (isVisualPressed) depth else 0.dp, 
         animationSpec = spring( 
             dampingRatio = Spring.DampingRatioMediumBouncy, 
             stiffness = Spring.StiffnessMedium 
@@ -187,10 +209,31 @@ fun Squircle3DButton(
             .clickable( 
                 interactionSource = interactionSource, 
                 indication = null, 
-                enabled = enabled 
+                enabled = enabled && !isManuallyPressed 
             ) { 
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) 
-                onClick() 
+                coroutineScope.launch { 
+                    isManuallyPressed = true 
+                    try { 
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM) 
+                    } catch (_: Exception) { 
+                    } 
+                    try { 
+                        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator 
+                        if (vibrator != null && vibrator.hasVibrator()) { 
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                                vibrator.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)) 
+                            } else { 
+                                @Suppress("DEPRECATION") 
+                                vibrator.vibrate(35) 
+                            } 
+                        } 
+                    } catch (_: Exception) { 
+                    } 
+                    delay(120) 
+                    isManuallyPressed = false 
+                    delay(50) 
+                    onClick() 
+                } 
             } 
     ) { 
         Box( 
@@ -198,44 +241,163 @@ fun Squircle3DButton(
                 .matchParentSize() 
                 .offset(y = depth) 
                 .clip(shape) 
-                .background(if (enabled) actualBevelColor else actualBevelColor.copy(alpha = 0.35f)) 
+                .then( 
+                    if (bevelBrush != null) { 
+                        Modifier.background(bevelBrush) 
+                    } else { 
+                        Modifier.background(if (enabled) actualBevelColor else actualBevelColor.copy(alpha = 0.35f)) 
+                    } 
+                ) 
         ) 
+        
+        val faceBrush = containerBrush ?: if (enabled) { 
+            Brush.verticalGradient( 
+                colors = listOf( 
+                    containerColor.copy(alpha = 1f), 
+                    containerColor.copy( 
+                        red = (containerColor.red * 0.90f).coerceIn(0f, 1f), 
+                        green = (containerColor.green * 0.90f).coerceIn(0f, 1f), 
+                        blue = (containerColor.blue * 0.90f).coerceIn(0f, 1f) 
+                    ) 
+                ) 
+            ) 
+        } else { 
+            Brush.verticalGradient( 
+                listOf(containerColor.copy(alpha = 0.35f), containerColor.copy(alpha = 0.35f)) 
+            ) 
+        } 
         
         Box( 
             modifier = Modifier 
+                .matchParentSize() 
                 .offset(y = currentOffset) 
                 .clip(shape) 
-                .background( 
-                    if (enabled) { 
-                        Brush.verticalGradient( 
-                            colors = listOf( 
-                                containerColor.copy(alpha = 1f), 
-                                containerColor.copy( 
-                                    red = (containerColor.red * 0.90f).coerceIn(0f, 1f), 
-                                    green = (containerColor.green * 0.90f).coerceIn(0f, 1f), 
-                                    blue = (containerColor.blue * 0.90f).coerceIn(0f, 1f) 
-                                ) 
-                            ) 
-                        ) 
+                .background(faceBrush) 
+                .then( 
+                    if (borderBrush != null) { 
+                        Modifier.border(width = 1.dp, brush = borderBrush, shape = shape) 
                     } else { 
-                        Brush.verticalGradient( 
-                            listOf(containerColor.copy(alpha = 0.35f), containerColor.copy(alpha = 0.35f)) 
+                        Modifier.border( 
+                            width = 1.dp, 
+                            color = Color.White.copy(alpha = if (enabled) 0.25f else 0.08f), 
+                            shape = shape 
                         ) 
                     } 
                 ) 
-                .border( 
-                    width = 1.dp, 
-                    color = Color.White.copy(alpha = if (enabled) 0.25f else 0.08f), 
-                    shape = shape 
-                ) 
-                .padding(contentPadding), 
-            contentAlignment = Alignment.Center 
         ) { 
-            androidx.compose.runtime.CompositionLocalProvider( 
-                androidx.compose.material3.LocalContentColor provides contentColor 
+            if (progressFraction != null && progressFraction > 0f) { 
+                Box( 
+                    modifier = Modifier 
+                        .matchParentSize() 
+                        .fillMaxWidth(progressFraction.coerceIn(0f, 1f)) 
+                        .clip(shape) 
+                        .background(progressColor ?: BlossomColors.SakuraRose.copy(alpha = 0.30f)) 
+                ) 
+            } 
+            
+            overlayContent?.invoke(this) 
+            
+            Box( 
+                modifier = Modifier 
+                    .matchParentSize() 
+                    .padding(contentPadding), 
+                contentAlignment = Alignment.Center 
             ) { 
-                content() 
+                androidx.compose.runtime.CompositionLocalProvider( 
+                    androidx.compose.material3.LocalContentColor provides contentColor 
+                ) { 
+                    content() 
+                } 
             } 
         } 
     } 
+} 
+    
+@Composable 
+fun Squircle3DButton( 
+    text: String, 
+    onClick: () -> Unit, 
+    modifier: Modifier = Modifier, 
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null, 
+    enabled: Boolean = true, 
+    containerColor: Color = BlossomColors.SlateBlue, 
+    bevelColor: Color? = null, 
+    contentColor: Color = Color.White, 
+    containerBrush: Brush? = null, 
+    bevelBrush: Brush? = null, 
+    borderBrush: Brush? = null, 
+    progressFraction: Float? = null, 
+    progressColor: Color? = null, 
+    shape: Shape = BlossomShapes.SquircleMedium, 
+    depth: Dp = 3.dp, 
+    contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 8.dp), 
+    overlayContent: (@Composable BoxScope.() -> Unit)? = null 
+) { 
+    Squircle3DButton( 
+        onClick = onClick, 
+        modifier = modifier, 
+        enabled = enabled, 
+        containerColor = containerColor, 
+        bevelColor = bevelColor, 
+        contentColor = contentColor, 
+        containerBrush = containerBrush, 
+        bevelBrush = bevelBrush, 
+        borderBrush = borderBrush, 
+        progressFraction = progressFraction, 
+        progressColor = progressColor, 
+        shape = shape, 
+        depth = depth, 
+        contentPadding = contentPadding, 
+        overlayContent = overlayContent 
+    ) { 
+        androidx.compose.foundation.layout.Row( 
+            verticalAlignment = Alignment.CenterVertically, 
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center 
+        ) { 
+            if (icon != null) { 
+                Icon( 
+                    imageVector = icon, 
+                    contentDescription = null, 
+                    modifier = Modifier.padding(end = 8.dp) 
+                ) 
+            } 
+            Text( 
+                text = text, 
+                fontSize = 15.sp, 
+                fontWeight = FontWeight.Bold, 
+                color = contentColor 
+            ) 
+        } 
+    } 
+} 
+    
+@Composable 
+fun Squircle3DCard( 
+    onClick: () -> Unit, 
+    modifier: Modifier = Modifier, 
+    enabled: Boolean = true, 
+    containerColor: Color = BlossomColors.SurfaceElevated, 
+    bevelColor: Color? = null, 
+    borderBrush: Brush? = null, 
+    shape: Shape = RoundedCornerShape(18.dp), 
+    depth: Dp = 3.dp, 
+    contentPadding: PaddingValues = PaddingValues(0.dp), 
+    content: @Composable BoxScope.() -> Unit 
+) { 
+    Squircle3DButton( 
+        onClick = onClick, 
+        modifier = modifier, 
+        enabled = enabled, 
+        containerColor = containerColor, 
+        bevelColor = bevelColor ?: containerColor.copy( 
+            red = (containerColor.red * 0.70f).coerceIn(0f, 1f), 
+            green = (containerColor.green * 0.70f).coerceIn(0f, 1f), 
+            blue = (containerColor.blue * 0.70f).coerceIn(0f, 1f) 
+        ), 
+        borderBrush = borderBrush, 
+        shape = shape, 
+        depth = depth, 
+        contentPadding = contentPadding, 
+        content = content 
+    ) 
 } 

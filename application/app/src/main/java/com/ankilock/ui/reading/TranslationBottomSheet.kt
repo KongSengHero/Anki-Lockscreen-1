@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import com.ankilock.translation.TranslationResult
 import com.ankilock.translation.TranslatorService
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.components.Squircle3DButton
 import com.ankilock.util.JapaneseTtsHelper
 import kotlinx.coroutines.launch
 
@@ -290,7 +291,7 @@ fun TranslationBottomSheet(
 
             Spacer(modifier = Modifier.height(12.dp)) 
 
-            Button( 
+            Squircle3DButton( 
                 onClick = { 
                     scope.launch { 
                         try { 
@@ -302,25 +303,30 @@ fun TranslationBottomSheet(
                     } 
                 }, 
                 shape = RoundedCornerShape(12.dp), 
-                colors = ButtonDefaults.buttonColors( 
-                    containerColor = BlossomColors.SakuraRose, 
-                    contentColor = BlossomColors.BlossomWhite 
-                ), 
+                containerColor = BlossomColors.SakuraRose, 
+                depth = 3.dp, 
                 modifier = Modifier 
                     .fillMaxWidth() 
                     .height(48.dp) 
             ) { 
-                Icon( 
-                    imageVector = Icons.Default.Search, 
-                    contentDescription = null, 
-                    modifier = Modifier.size(18.dp) 
-                ) 
-                Spacer(modifier = Modifier.width(8.dp)) 
-                Text( 
-                    text = "Look up in Jisho", 
-                    fontSize = 14.sp, 
-                    fontWeight = FontWeight.SemiBold 
-                ) 
+                Row( 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.Center 
+                ) { 
+                    Icon( 
+                        imageVector = Icons.Default.Search, 
+                        contentDescription = null, 
+                        tint = BlossomColors.BlossomWhite, 
+                        modifier = Modifier.size(18.dp) 
+                    ) 
+                    Spacer(modifier = Modifier.width(8.dp)) 
+                    Text( 
+                        text = "Look up in Jisho", 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.SemiBold, 
+                        color = BlossomColors.BlossomWhite 
+                    ) 
+                } 
             } 
 
             Spacer(modifier = Modifier.height(16.dp)) 

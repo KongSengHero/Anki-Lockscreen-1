@@ -142,6 +142,8 @@ import com.ankilock.data.StoryThemes
 import com.ankilock.ui.blossom.AppTheme 
 import com.ankilock.ui.blossom.BlossomColors 
 import com.ankilock.ui.blossom.BlossomShapes 
+import com.ankilock.ui.components.Squircle3DButton 
+import com.ankilock.ui.components.Squircle3DCard 
 import kotlinx.coroutines.delay 
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -190,6 +192,7 @@ fun ReadingScreen(
     var isNarrating by remember { mutableStateOf(false) } 
     var isSynthesizingAudio by remember { mutableStateOf(false) } 
     var currentlyPlayingStoryId by remember { mutableStateOf<String?>(null) } 
+    var activeSentenceIndex by remember { mutableIntStateOf(-1) } 
     var showQuizOverlay by remember { mutableStateOf(false) } 
     var showFurigana by remember { mutableStateOf(prefs.showFuriganaInReader) } 
     var highlightWords by remember { mutableStateOf(prefs.highlightVocabularyWords) } 
@@ -199,6 +202,7 @@ fun ReadingScreen(
             audioService.stopAudio() 
             ttsHelper.stop() 
             ttsHelper.shutdown() 
+            activeSentenceIndex = -1 
         } 
     } 
     
@@ -215,6 +219,7 @@ fun ReadingScreen(
     LaunchedEffect(currentStory?.id) { 
         userAnswers.clear() 
         showQuizOverlay = false 
+        activeSentenceIndex = -1 
         if (currentlyPlayingStoryId != null && currentlyPlayingStoryId != currentStory?.id) { 
             audioService.stopAudio() 
             ttsHelper.stop() 
@@ -653,16 +658,19 @@ fun ReadingScreen(
 
                                 IconButton( 
                                     onClick = { 
-                                        if (isCurrentStoryPlaying) { 
+                                        if (isCurrentStoryPlaying || isCurrentStorySynthesizing) { 
                                             audioService.stopAudio() 
                                             ttsHelper.stop() 
                                             isNarrating = false 
+                                            isSynthesizingAudio = false 
                                             currentlyPlayingStoryId = null 
+                                            activeSentenceIndex = -1 
                                         } else { 
                                             audioService.stopAudio() 
                                             ttsHelper.stop() 
                                             isNarrating = false 
                                             currentlyPlayingStoryId = story.id 
+                                            activeSentenceIndex = -1 
 
                                             val currentApiKey = prefs.fishAudioApiKey ?: fishAudioApiKey 
                                             val currentVoiceId = prefs.fishAudioVoiceId 
@@ -681,42 +689,72 @@ fun ReadingScreen(
                                                     isSynthesizingAudio = false 
                                                     result.onSuccess { audioFile -> 
                                                         isNarrating = true 
+                                                        currentlyPlayingStoryId = story.id 
                                                         audioService.playAudio( 
                                                             file = audioFile, 
                                                             onPlaybackStateChanged = { playing -> 
                                                                 isNarrating = playing 
-                                                                if (!playing && currentlyPlayingStoryId == story.id) { 
+                                                                if (playing) { 
+                                                                    currentlyPlayingStoryId = story.id 
+                                                                } else if (currentlyPlayingStoryId == story.id) { 
                                                                     currentlyPlayingStoryId = null 
+                                                                    activeSentenceIndex = -1 
                                                                 } 
                                                             }, 
                                                             onCompletion = { 
                                                                 isNarrating = false 
-                                                                currentlyPlayingStoryId = null 
+                                                                if (currentlyPlayingStoryId == story.id) { 
+                                                                    currentlyPlayingStoryId = null 
+                                                                    activeSentenceIndex = -1 
+                                                                } 
                                                             } 
                                                         ) 
                                                     }.onFailure { error -> 
                                                         isNarrating = false 
                                                         currentlyPlayingStoryId = null 
+                                                        activeSentenceIndex = -1 
                                                         Toast.makeText(context, "Narration error: ${error.message ?: "Failed to generate audio"}", Toast.LENGTH_LONG).show() 
                                                     } 
                                                 } 
                                             } else { 
                                                 val narrationText = "${story.title}。\n\n${story.content}" 
                                                 isNarrating = true 
+                                                currentlyPlayingStoryId = story.id 
                                                 ttsHelper.speak( 
                                                     text = narrationText, 
+                                                    onRangeStart = { start, _ -> 
+                                                        val titleLen = story.title.length + 1 
+                                                        val storySentences = story.content.split(Regex("(?<=[。！？\n])")).filter { it.isNotBlank() } 
+                                                        if (start < titleLen) { 
+                                                            activeSentenceIndex = -1 
+                                                        } else { 
+                                                            var cum = titleLen 
+                                                            var found = 0 
+                                                            for (i in storySentences.indices) { 
+                                                                cum += storySentences[i].length 
+                                                                if (start <= cum) { 
+                                                                    found = i 
+                                                                    break 
+                                                                } 
+                                                                found = i 
+                                                            } 
+                                                            activeSentenceIndex = found 
+                                                        } 
+                                                    }, 
                                                     onStart = { 
                                                         isNarrating = true 
                                                         currentlyPlayingStoryId = story.id 
                                                     }, 
                                                     onDone = { 
                                                         isNarrating = false 
+                                                        activeSentenceIndex = -1 
                                                         if (currentlyPlayingStoryId == story.id) { 
                                                             currentlyPlayingStoryId = null 
                                                         } 
                                                     }, 
                                                     onError = { 
                                                         isNarrating = false 
+                                                        activeSentenceIndex = -1 
                                                         if (currentlyPlayingStoryId == story.id) { 
                                                             currentlyPlayingStoryId = null 
                                                         } 
@@ -769,24 +807,12 @@ fun ReadingScreen(
                                         prefs.showFuriganaInReader = showFurigana 
                                     } 
                                 ) { 
-                                    Surface( 
-                                        shape = RoundedCornerShape(6.dp), 
-                                        color = if (showFurigana) BlossomColors.SakuraRoseContainer else Color.Transparent, 
-                                        border = BorderStroke( 
-                                            1.dp, 
-                                            if (showFurigana) BlossomColors.SakuraRose.copy(alpha = 0.6f) else BlossomColors.CardBorder 
-                                        ), 
-                                        modifier = Modifier.size(26.dp) 
-                                    ) { 
-                                        Box(contentAlignment = Alignment.Center) { 
-                                            Text( 
-                                                text = "ふ", 
-                                                fontSize = 12.sp, 
-                                                fontWeight = FontWeight.Bold, 
-                                                color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
-                                            ) 
-                                        } 
-                                    } 
+                                    Text( 
+                                        text = "ふ", 
+                                        fontSize = 17.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
+                                    ) 
                                 } 
 
                                 IconButton( 
@@ -832,6 +858,44 @@ fun ReadingScreen(
                             } 
                         } 
 
+                        val storySentences = remember(story.content) { 
+                            story.content.split(Regex("(?<=[。！？\n])")).filter { it.isNotBlank() } 
+                        } 
+
+                        LaunchedEffect(isNarrating, currentlyPlayingStoryId, story.id) { 
+                            if (isNarrating && currentlyPlayingStoryId == story.id) { 
+                                val titleLen = story.title.length + 1 
+                                val sentenceLens = storySentences.map { it.length } 
+                                val totalChars = titleLen + sentenceLens.sum() 
+                                while (isNarrating && currentlyPlayingStoryId == story.id) { 
+                                    val dur = audioService.getDurationMs() 
+                                    val pos = audioService.getCurrentPositionMs() 
+                                    if (dur > 0 && pos >= 0) { 
+                                        val frac = (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) 
+                                        val targetChar = (frac * totalChars).toInt() 
+                                        if (targetChar < titleLen) { 
+                                            activeSentenceIndex = -1 
+                                        } else { 
+                                            var cum = titleLen 
+                                            var found = 0 
+                                            for (i in sentenceLens.indices) { 
+                                                cum += sentenceLens[i] 
+                                                if (targetChar <= cum) { 
+                                                    found = i 
+                                                    break 
+                                                } 
+                                                found = i 
+                                            } 
+                                            activeSentenceIndex = found 
+                                        } 
+                                    } 
+                                    delay(60) 
+                                } 
+                            } else { 
+                                activeSentenceIndex = -1 
+                            } 
+                        } 
+
                         Spacer(modifier = Modifier.height(16.dp)) 
 
                         CustomSelectionContainer( 
@@ -845,12 +909,18 @@ fun ReadingScreen(
                         ) { 
                             SelectionContainer { 
                                 Column { 
+                                    val isTitleActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == -1 
                                     Text( 
                                         text = story.title, 
                                         fontSize = 22.sp, 
                                         fontWeight = FontWeight.Bold, 
                                         color = BlossomColors.TextPrimary, 
-                                        lineHeight = 30.sp 
+                                        lineHeight = 30.sp, 
+                                        modifier = Modifier 
+                                            .fillMaxWidth() 
+                                            .clip(RoundedCornerShape(8.dp)) 
+                                            .background(if (isTitleActive) BlossomColors.SakuraRose.copy(alpha = 0.20f) else Color.Transparent) 
+                                            .padding(horizontal = 6.dp, vertical = 4.dp) 
                                     ) 
                                     
                                     Spacer(modifier = Modifier.height(16.dp)) 
@@ -880,9 +950,6 @@ fun ReadingScreen(
                                     } 
                                     
                                     if (showFurigana) { 
-                                        val paragraphs = remember(story.content) { 
-                                            story.content.split("\n\n", "\n").filter { it.isNotBlank() } 
-                                        } 
                                         val targetWordItems = remember(story.targetWords, story.targetWordsData, vocabSummary?.words) { 
                                             if (story.targetWordsData.isNotEmpty()) { 
                                                 story.targetWordsData 
@@ -901,135 +968,24 @@ fun ReadingScreen(
                                                 } 
                                             } 
                                         } 
-                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
-                                            paragraphs.forEach { para -> 
-                                                val tokens = remember(para, targetWordItems) { 
-                                                    StoryTokenizer.tokenizeToStoryTokens(para, targetWordItems) 
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
+                                            storySentences.forEachIndexed { sIdx, sentence -> 
+                                                val isSentenceActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == sIdx 
+                                                val tokens = remember(sentence, targetWordItems) { 
+                                                    StoryTokenizer.tokenizeToStoryTokens(sentence, targetWordItems) 
                                                 } 
-                                                FlowRow( 
-                                                    modifier = Modifier.fillMaxWidth(), 
-                                                    horizontalArrangement = Arrangement.Start, 
-                                                    verticalArrangement = Arrangement.Center 
+                                                Box( 
+                                                    modifier = Modifier 
+                                                        .fillMaxWidth() 
+                                                        .clip(RoundedCornerShape(8.dp)) 
+                                                        .background(if (isSentenceActive) BlossomColors.SakuraRose.copy(alpha = 0.20f) else Color.Transparent) 
+                                                        .border( 
+                                                            if (isSentenceActive) BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)) 
+                                                            else BorderStroke(0.dp, Color.Transparent), 
+                                                            shape = RoundedCornerShape(8.dp) 
+                                                        ) 
+                                                        .padding(horizontal = 6.dp, vertical = 4.dp) 
                                                 ) { 
-                                                    tokens.forEach { token -> 
-                                                        val isTarget = highlightWords && ( 
-                                                            token.isTarget || 
-                                                            story.targetWords.any { tw -> 
-                                                                token.surface.isNotBlank() && ( 
-                                                                    tw.equals(token.surface, ignoreCase = true) || 
-                                                                    (tw.length >= 2 && token.surface.contains(tw)) || 
-                                                                    (token.surface.length >= 2 && tw.contains(token.surface)) || 
-                                                                    (token.surface.any { StoryTokenizer.isKanji(it) } && tw.any { StoryTokenizer.isKanji(it) } && 
-                                                                        token.surface.filter { StoryTokenizer.isKanji(it) } == tw.filter { StoryTokenizer.isKanji(it) }) 
-                                                                ) 
-                                                            } || 
-                                                            story.targetWordsData.any { td -> 
-                                                                token.surface.isNotBlank() && ( 
-                                                                    td.kanji.equals(token.surface, ignoreCase = true) || 
-                                                                    (td.kanji.any { StoryTokenizer.isKanji(it) } && token.surface.any { StoryTokenizer.isKanji(it) } && 
-                                                                        td.kanji.filter { StoryTokenizer.isKanji(it) } == token.surface.filter { StoryTokenizer.isKanji(it) }) 
-                                                                ) 
-                                                            } 
-                                                        ) 
-                                                        BlossomStoryTokenView( 
-                                                            token = token, 
-                                                            showPronunciation = true, 
-                                                            pronunciationType = "japanese", 
-                                                            isSelected = isTarget, 
-                                                            onClick = { 
-                                                                if (token.surface.isNotBlank()) { 
-                                                                    val item = story.targetWordsData.find { 
-                                                                        it.kanji == token.surface || it.surface == token.surface || 
-                                                                        (it.kanji.any { c -> StoryTokenizer.isKanji(c) } && 
-                                                                            it.kanji.filter { c -> StoryTokenizer.isKanji(c) } == token.surface.filter { c -> StoryTokenizer.isKanji(c) }) 
-                                                                    }?.let { 
-                                                                        AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
-                                                                    } ?: vocabSummary?.words?.find { it.displayWord == token.surface || it.kanji == token.surface } 
-                                                                      ?: AnkiVocabularyItem( 
-                                                                          kanji = token.surface, 
-                                                                          reading = token.segments.joinToString("") { it.ruby ?: it.text }, 
-                                                                          meaning = token.meaning 
-                                                                      ) 
-                                                                    selectedWordDetail = item 
-                                                                } 
-                                                            } 
-                                                        ) 
-                                                    } 
-                                                } 
-                                            } 
-                                        } 
-                                    } else { 
-                                        val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
-                                            if (targetVocabWords.isNotEmpty()) { 
-                                                buildHighlightedStoryText( 
-                                                    content = story.content, 
-                                                    vocabWords = targetVocabWords 
-                                                ) 
-                                            } else { 
-                                                AnnotatedString(story.content) 
-                                            } 
-                                        } 
-                                        var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
-                                        Text( 
-                                            text = annotatedContent, 
-                                            fontSize = 17.sp, 
-                                            color = BlossomColors.TextPrimary, 
-                                            lineHeight = 30.sp 
-                                        ) 
-                                        
-                                        Spacer(modifier = Modifier.height(16.dp)) 
-                                        
-                                        val targetVocabWords = remember(story.targetWords, story.targetWordsData, vocabSummary?.words, highlightWords) { 
-                                            if (!highlightWords || (story.targetWords.isEmpty() && story.targetWordsData.isEmpty())) { 
-                                                emptyList() 
-                                            } else if (story.targetWordsData.isNotEmpty()) { 
-                                                story.targetWordsData.map { 
-                                                    AnkiVocabularyItem( 
-                                                        kanji = it.kanji, 
-                                                        reading = it.reading, 
-                                                        meaning = it.meaning 
-                                                    ) 
-                                                } 
-                                            } else { 
-                                                val found = vocabSummary?.words?.filter { wordItem -> 
-                                                    story.targetWords.any { tw -> 
-                                                        wordItem.displayWord.equals(tw, ignoreCase = true) || 
-                                                        wordItem.kanji.equals(tw, ignoreCase = true) || 
-                                                        wordItem.reading.equals(tw, ignoreCase = true) 
-                                                    } 
-                                                } ?: emptyList() 
-                                                if (found.isNotEmpty()) found 
-                                                else story.targetWords.map { AnkiVocabularyItem(kanji = it) } 
-                                            } 
-                                        } 
-                                        
-                                        if (showFurigana) { 
-                                            val paragraphs = remember(story.content) { 
-                                                story.content.split("\n\n", "\n").filter { it.isNotBlank() } 
-                                            } 
-                                            val targetWordItems = remember(story.targetWords, story.targetWordsData, vocabSummary?.words) { 
-                                                if (story.targetWordsData.isNotEmpty()) { 
-                                                    story.targetWordsData 
-                                                } else { 
-                                                    story.targetWords.map { tw -> 
-                                                        val v = vocabSummary?.words?.find { 
-                                                            it.displayWord.equals(tw, ignoreCase = true) || 
-                                                            it.kanji.equals(tw, ignoreCase = true) || 
-                                                            it.reading.equals(tw, ignoreCase = true) 
-                                                        } 
-                                                        StoryWordItem( 
-                                                            kanji = v?.kanji?.ifBlank { tw } ?: tw, 
-                                                            reading = v?.reading ?: "", 
-                                                            meaning = v?.meaning ?: "" 
-                                                        ) 
-                                                    } 
-                                                } 
-                                            } 
-                                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
-                                                paragraphs.forEach { para -> 
-                                                    val tokens = remember(para, targetWordItems) { 
-                                                        StoryTokenizer.tokenizeToStoryTokens(para, targetWordItems) 
-                                                    } 
                                                     FlowRow( 
                                                         modifier = Modifier.fillMaxWidth(), 
                                                         horizontalArrangement = Arrangement.Start, 
@@ -1082,52 +1038,71 @@ fun ReadingScreen(
                                                     } 
                                                 } 
                                             } 
-                                        } else { 
-                                            val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
-                                                if (targetVocabWords.isNotEmpty()) { 
-                                                    buildHighlightedStoryText( 
-                                                        content = story.content, 
-                                                        vocabWords = targetVocabWords 
-                                                    ) 
-                                                } else { 
-                                                    AnnotatedString(story.content) 
-                                                } 
-                                            } 
-                                            var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
-                                            Text( 
-                                                text = annotatedContent, 
-                                                fontSize = 17.sp, 
-                                                color = BlossomColors.TextPrimary, 
-                                                lineHeight = 34.sp, 
-                                                letterSpacing = 0.5.sp, 
-                                                onTextLayout = { textLayoutResult = it }, 
-                                                modifier = Modifier.pointerInput(targetVocabWords) { 
+                                        } 
+                                    } else { 
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
+                                            storySentences.forEachIndexed { sIdx, sentence -> 
+                                                val isSentenceActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == sIdx 
+                                                val annotatedSentence = remember(sentence, targetVocabWords, BlossomColors.currentTheme) { 
                                                     if (targetVocabWords.isNotEmpty()) { 
-                                                        detectTapGestures { offset -> 
-                                                            textLayoutResult?.let { layout -> 
-                                                                val position = layout.getOffsetForPosition(offset) 
-                                                                annotatedContent.getStringAnnotations(tag = "WORD", start = position, end = position) 
-                                                                    .firstOrNull()?.let { annotation -> 
-                                                                        val word = targetVocabWords.find { it.displayWord == annotation.item } 
-                                                                        if (word != null) { 
-                                                                            selectedWordDetail = word 
-                                                                        } 
-                                                                    } 
-                                                            } 
-                                                        } 
+                                                        buildHighlightedStoryText( 
+                                                            content = sentence, 
+                                                            vocabWords = targetVocabWords 
+                                                        ) 
+                                                    } else { 
+                                                        AnnotatedString(sentence) 
                                                     } 
                                                 } 
-                                            ) 
+                                                var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
+                                                Box( 
+                                                    modifier = Modifier 
+                                                        .fillMaxWidth() 
+                                                        .clip(RoundedCornerShape(8.dp)) 
+                                                        .background(if (isSentenceActive) BlossomColors.SakuraRose.copy(alpha = 0.20f) else Color.Transparent) 
+                                                        .border( 
+                                                            if (isSentenceActive) BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)) 
+                                                            else BorderStroke(0.dp, Color.Transparent), 
+                                                            shape = RoundedCornerShape(8.dp) 
+                                                        ) 
+                                                        .padding(horizontal = 6.dp, vertical = 4.dp) 
+                                                ) { 
+                                                    Text( 
+                                                        text = annotatedSentence, 
+                                                        fontSize = 17.sp, 
+                                                        color = BlossomColors.TextPrimary, 
+                                                        lineHeight = 30.sp, 
+                                                        letterSpacing = 0.5.sp, 
+                                                        onTextLayout = { textLayoutResult = it }, 
+                                                        modifier = Modifier.pointerInput(targetVocabWords) { 
+                                                            if (targetVocabWords.isNotEmpty()) { 
+                                                                detectTapGestures { offset -> 
+                                                                    textLayoutResult?.let { layout -> 
+                                                                        val position = layout.getOffsetForPosition(offset) 
+                                                                        annotatedSentence.getStringAnnotations(tag = "WORD", start = position, end = position) 
+                                                                            .firstOrNull()?.let { annotation -> 
+                                                                                val word = targetVocabWords.find { it.displayWord == annotation.item } 
+                                                                                if (word != null) { 
+                                                                                    selectedWordDetail = word 
+                                                                                } 
+                                                                            } 
+                                                                    } 
+                                                                } 
+                                                            } 
+                                                        } 
+                                                    ) 
+                                                } 
+                                            } 
                                         } 
-                                        
-                                        if (story.targetWords.isNotEmpty()) { 
-                                            Spacer(modifier = Modifier.height(20.dp)) 
-                                            Surface( 
-                                                shape = RoundedCornerShape(14.dp), 
-                                                color = BlossomColors.SurfaceElevated, 
-                                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                                modifier = Modifier.fillMaxWidth() 
-                                            ) { 
+                                    } 
+                                     
+                                    if (story.targetWords.isNotEmpty()) { 
+                                        Spacer(modifier = Modifier.height(20.dp)) 
+                                        Surface( 
+                                            shape = RoundedCornerShape(14.dp), 
+                                            color = BlossomColors.SurfaceElevated, 
+                                            border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                            modifier = Modifier.fillMaxWidth() 
+                                        ) { 
                                                 Column(modifier = Modifier.padding(14.dp)) { 
                                                     Row(verticalAlignment = Alignment.CenterVertically) { 
                                                         Icon( 
@@ -1198,15 +1173,14 @@ fun ReadingScreen(
                                         
                                         if (story.questions.isNotEmpty()) { 
                                             Spacer(modifier = Modifier.height(20.dp)) 
-                                            Box( 
+                                            Squircle3DButton( 
+                                                onClick = { showQuizOverlay = true }, 
                                                 modifier = Modifier 
                                                     .fillMaxWidth() 
-                                                    .height(52.dp) 
-                                                    .clip(RoundedCornerShape(20.dp)) 
-                                                    .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
-                                                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
-                                                    .clickable { showQuizOverlay = true }, 
-                                                contentAlignment = Alignment.Center 
+                                                    .height(52.dp), 
+                                                containerColor = BlossomColors.SakuraRose.copy(alpha = 0.85f), 
+                                                shape = RoundedCornerShape(20.dp), 
+                                                depth = 3.dp 
                                             ) { 
                                                 Row( 
                                                     verticalAlignment = Alignment.CenterVertically, 
@@ -1234,7 +1208,6 @@ fun ReadingScreen(
                         } 
                     } 
             } 
-        } 
         
         if (generationError != null) { 
             Card( 
@@ -1263,28 +1236,29 @@ fun ReadingScreen(
             isLockedWithoutKey -> BlossomColors.SurfaceElevated 
             else -> BlossomColors.SakuraRose.copy(alpha = 0.85f) 
         } 
-        val buttonBorder = when { 
-            isLockedWithoutKey -> BorderStroke(1.dp, BlossomColors.BlossomRed.copy(alpha = 0.45f)) 
-            else -> BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) 
+        val buttonBorderBrush = when { 
+            isLockedWithoutKey -> androidx.compose.ui.graphics.SolidColor(BlossomColors.BlossomRed.copy(alpha = 0.45f)) 
+            else -> null 
         } 
         
-        Box( 
+        Squircle3DButton( 
+            onClick = { 
+                if (apiKey.isBlank()) { 
+                    showApiKeyDialog = true 
+                } else if (!prefs.hasAcceptedInternetDisclosure) { 
+                    showInternetConsentDialog = true 
+                } else { 
+                    executeGeneration() 
+                } 
+            }, 
+            enabled = !isGeneratingStory, 
             modifier = Modifier 
                 .fillMaxWidth() 
-                .height(52.dp) 
-                .clip(RoundedCornerShape(20.dp)) 
-                .background(buttonBackground) 
-                .border(buttonBorder, shape = RoundedCornerShape(20.dp)) 
-                .clickable(enabled = !isGeneratingStory) { 
-                    if (apiKey.isBlank()) { 
-                        showApiKeyDialog = true 
-                    } else if (!prefs.hasAcceptedInternetDisclosure) { 
-                        showInternetConsentDialog = true 
-                    } else { 
-                        executeGeneration() 
-                    } 
-                }, 
-            contentAlignment = Alignment.Center 
+                .height(52.dp), 
+            containerColor = buttonBackground, 
+            borderBrush = buttonBorderBrush, 
+            shape = RoundedCornerShape(20.dp), 
+            depth = 3.dp 
         ) { 
             AnimatedContent( 
                 targetState = when { 
@@ -1470,20 +1444,24 @@ fun ReadingScreen(
                                 } 
                             } 
 
-                            Card( 
-                                shape = RoundedCornerShape(16.dp), 
-                                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceElevated), 
-                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                            val itemStorage = remember(item.id) { historyManager.getStoryStorageBytes(item) } 
+                            val itemStorageFormatted = remember(itemStorage) { historyManager.formatStorageSize(itemStorage) } 
+
+                            Squircle3DCard( 
+                                onClick = { 
+                                    currentStory = item 
+                                    coroutineScope.launch { 
+                                        historySheetState.hide() 
+                                        showHistorySheet = false 
+                                    } 
+                                }, 
                                 modifier = Modifier 
                                     .fillMaxWidth() 
-                                    .height(115.dp) 
-                                    .clickable { 
-                                        currentStory = item 
-                                        coroutineScope.launch { 
-                                            historySheetState.hide() 
-                                            showHistorySheet = false 
-                                        } 
-                                    } 
+                                    .height(115.dp), 
+                                shape = RoundedCornerShape(16.dp), 
+                                containerColor = BlossomColors.SurfaceElevated, 
+                                borderBrush = androidx.compose.ui.graphics.SolidColor(BlossomColors.CardBorder), 
+                                depth = 3.dp 
                             ) { 
                                 Box(modifier = Modifier.fillMaxSize()) { 
                                     if (itemBitmap != null) { 
@@ -1584,8 +1562,11 @@ fun ReadingScreen(
                                                     } 
                                                 } 
                                                 Spacer(modifier = Modifier.width(8.dp)) 
+                                                val dateFormatted = remember(item.createdAt) { 
+                                                    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(item.createdAt)) 
+                                                } 
                                                 Text( 
-                                                    text = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(item.createdAt)), 
+                                                    text = "$dateFormatted • $itemStorageFormatted", 
                                                     fontSize = 11.sp, 
                                                     color = if (itemBitmap != null) Color.White.copy(alpha = 0.75f) else BlossomColors.TextSecondary, 
                                                     maxLines = 1, 
@@ -2091,31 +2072,37 @@ private fun WordDetailBottomSheet(
             
             Spacer(modifier = Modifier.height(20.dp))
             
-            Button( 
+            Squircle3DButton( 
                 onClick = { 
-                    onDismiss()
-                    onNavigateToJisho(item.displayWord)
+                    onDismiss() 
+                    onNavigateToJisho(item.displayWord) 
                 }, 
-                shape = RoundedCornerShape(12.dp), 
-                colors = ButtonDefaults.buttonColors( 
-                    containerColor = BlossomColors.SakuraRose, 
-                    contentColor = Color.White 
-                ), 
                 modifier = Modifier 
-                    .fillMaxWidth()
-                    .height(48.dp)
+                    .fillMaxWidth() 
+                    .height(48.dp), 
+                containerColor = BlossomColors.SakuraRose, 
+                contentColor = Color.White, 
+                shape = RoundedCornerShape(14.dp), 
+                depth = 3.dp 
             ) { 
-                Icon( 
-                    imageVector = Icons.Default.Search, 
-                    contentDescription = null, 
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text( 
-                    text = "Look up in Jisho", 
-                    fontSize = 14.sp, 
-                    fontWeight = FontWeight.SemiBold 
-                )
+                Row( 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.Center 
+                ) { 
+                    Icon( 
+                        imageVector = Icons.Default.Search, 
+                        contentDescription = null, 
+                        tint = Color.White, 
+                        modifier = Modifier.size(18.dp) 
+                    ) 
+                    Spacer(modifier = Modifier.width(8.dp)) 
+                    Text( 
+                        text = "Look up in Jisho", 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.SemiBold, 
+                        color = Color.White 
+                    ) 
+                } 
             } 
             
             Spacer(modifier = Modifier.height(28.dp))

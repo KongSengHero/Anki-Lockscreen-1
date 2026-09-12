@@ -76,6 +76,7 @@ import com.ankilock.data.StoryThemes
 import com.ankilock.ui.blossom.BlossomColors 
 import com.ankilock.ui.components.GlobalSeekerContainer 
 import com.ankilock.ui.components.GlobalSeekerRow 
+import com.ankilock.ui.components.Squircle3DButton 
 import androidx.compose.runtime.mutableFloatStateOf 
 import kotlin.math.roundToInt 
     
@@ -848,7 +849,7 @@ fun StoryConfigBottomSheet(
             
             Spacer(modifier = Modifier.height(12.dp)) 
             
-            Button( 
+            Squircle3DButton( 
                 onClick = { 
                     prefs.readingJlptLevel = selectedLevel 
                     prefs.storyLength = selectedLength 
@@ -869,17 +870,16 @@ fun StoryConfigBottomSheet(
                 }, 
                 modifier = Modifier 
                     .fillMaxWidth() 
-                    .height(48.dp), 
+                    .height(50.dp), 
                 shape = RoundedCornerShape(14.dp), 
-                colors = ButtonDefaults.buttonColors( 
-                    containerColor = BlossomColors.SakuraRose, 
-                    contentColor = Color.White 
-                ) 
+                containerColor = BlossomColors.SakuraRose, 
+                depth = 3.dp 
             ) { 
                 Text( 
                     text = "Apply & Save Settings", 
                     fontWeight = FontWeight.Bold, 
-                    fontSize = 14.5.sp 
+                    fontSize = 14.5.sp, 
+                    color = Color.White 
                 ) 
             } 
             

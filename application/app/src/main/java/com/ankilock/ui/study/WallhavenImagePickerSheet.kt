@@ -39,11 +39,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline 
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Star 
+import android.widget.Toast
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -126,6 +128,9 @@ fun WallhavenImagePickerSheet(
     
     var apiKeyText by remember { mutableStateOf(prefs.wallhavenApiKey) } 
     var isApiKeyEditing by remember { mutableStateOf(false) } 
+    val hasExistingCover = remember(storyId) { 
+        File(context.filesDir, "stories/images/$storyId/cover.png").exists() 
+    } 
     val allSearchCategories = remember { 
         listOf( 
             "Landscape", "School", "Forest", "City", "Sunset", "Cherry Blossom", 
@@ -239,6 +244,27 @@ fun WallhavenImagePickerSheet(
                     verticalAlignment = Alignment.CenterVertically, 
                     horizontalArrangement = Arrangement.spacedBy(6.dp) 
                 ) { 
+                    if (hasExistingCover) { 
+                        IconButton( 
+                            onClick = { 
+                                val coverFile = File(context.filesDir, "stories/images/$storyId/cover.png") 
+                                if (coverFile.exists()) { 
+                                    coverFile.delete() 
+                                } 
+                                Toast.makeText(context, "Wallpaper removed", Toast.LENGTH_SHORT).show() 
+                                onImageSelected(coverFile) 
+                                onDismiss() 
+                            }, 
+                            modifier = Modifier.size(36.dp) 
+                        ) { 
+                            Icon( 
+                                imageVector = Icons.Default.DeleteOutline, 
+                                contentDescription = "Remove Wallpaper", 
+                                tint = BlossomColors.BlossomRed, 
+                                modifier = Modifier.size(20.dp) 
+                            ) 
+                        } 
+                    } 
                     IconButton( 
                         onClick = { isApiKeyEditing = !isApiKeyEditing }, 
                         modifier = Modifier.size(36.dp) 

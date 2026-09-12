@@ -92,6 +92,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import com.ankilock.ui.components.SlidingPillSwitcher 
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -1440,26 +1441,13 @@ class MainActivity : ComponentActivity() {
                     ) 
                 } 
                 Spacer(modifier = Modifier.height(14.dp)) 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                    options.forEachIndexed { index, isMusic -> 
-                        SegmentedButton( 
-                            selected = index == selectedIndex, 
-                            onClick = { onSelect(isMusic) }, 
-                            shape = SegmentedButtonDefaults.itemShape( 
-                                index = index, 
-                                count = options.size 
-                            ), 
-                            colors = SegmentedButtonDefaults.colors( 
-                                activeContainerColor = BlossomColors.SlateBlue, 
-                                activeContentColor = Color.White, 
-                                inactiveContainerColor = BlossomColors.SurfaceCard2, 
-                                inactiveContentColor = BlossomColors.TextSecondary 
-                            ) 
-                        ) { 
-                            Text(labels[index], fontSize = 12.sp, fontWeight = if (index == selectedIndex) FontWeight.Bold else FontWeight.Normal) 
-                        } 
-                    } 
-                } 
+                SlidingPillSwitcher( 
+                    options = options, 
+                    selectedOption = isMusicStyle, 
+                    onOptionSelected = onSelect, 
+                    labelProvider = { if (it) "Music Layout" else "Classic Layout" }, 
+                    activeColor = BlossomColors.SlateBlue 
+                ) 
             } 
         } 
     } 
@@ -1504,26 +1492,13 @@ class MainActivity : ComponentActivity() {
                     ) 
                 } 
                 Spacer(modifier = Modifier.height(14.dp)) 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                    options.forEachIndexed { index, action -> 
-                        SegmentedButton( 
-                            selected = index == selectedIndex, 
-                            onClick = { onSelect(action) }, 
-                            shape = SegmentedButtonDefaults.itemShape( 
-                                index = index, 
-                                count = options.size 
-                            ), 
-                            colors = SegmentedButtonDefaults.colors( 
-                                activeContainerColor = BlossomColors.WarmOchre, 
-                                activeContentColor = Color.White, 
-                                inactiveContainerColor = BlossomColors.SurfaceCard2, 
-                                inactiveContentColor = BlossomColors.TextSecondary 
-                            ) 
-                        ) { 
-                            Text(labels[index], fontSize = 12.sp, fontWeight = if (index == selectedIndex) FontWeight.Bold else FontWeight.Normal) 
-                        } 
-                    } 
-                } 
+                SlidingPillSwitcher( 
+                    options = options, 
+                    selectedOption = currentAction, 
+                    onOptionSelected = onSelect, 
+                    labelProvider = { labels.getOrNull(options.indexOf(it)) ?: it }, 
+                    activeColor = BlossomColors.WarmOchre 
+                ) 
             } 
         } 
     } 
@@ -2264,23 +2239,13 @@ class MainActivity : ComponentActivity() {
                     color = BlossomColors.TextSecondary 
                 ) 
                 Spacer(modifier = Modifier.height(6.dp)) 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                    options.forEachIndexed { index, min -> 
-                        SegmentedButton( 
-                            selected = index == updateIdx, 
-                            onClick = { onUpdateSelect(min) }, 
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size), 
-                            colors = SegmentedButtonDefaults.colors( 
-                                activeContainerColor = BlossomColors.SlateBlue, 
-                                activeContentColor = Color.White, 
-                                inactiveContainerColor = BlossomColors.SurfaceCard2, 
-                                inactiveContentColor = BlossomColors.TextSecondary 
-                            ) 
-                        ) { 
-                            Text(labels[index], fontSize = 12.sp, fontWeight = if (index == updateIdx) FontWeight.Bold else FontWeight.Normal) 
-                        } 
-                    } 
-                } 
+                SlidingPillSwitcher( 
+                    options = options, 
+                    selectedOption = options.getOrElse(updateIdx) { options[0] }, 
+                    onOptionSelected = onUpdateSelect, 
+                    labelProvider = { min -> labels.getOrElse(options.indexOf(min)) { "${min}m" } }, 
+                    activeColor = BlossomColors.SlateBlue 
+                ) 
                 Spacer(modifier = Modifier.height(14.dp)) 
                 Text( 
                     "Snooze Duration", 
@@ -2288,23 +2253,13 @@ class MainActivity : ComponentActivity() {
                     color = BlossomColors.TextSecondary 
                 ) 
                 Spacer(modifier = Modifier.height(6.dp)) 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) { 
-                    options.forEachIndexed { index, min -> 
-                        SegmentedButton( 
-                            selected = index == snoozeIdx, 
-                            onClick = { onSnoozeSelect(min) }, 
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size), 
-                            colors = SegmentedButtonDefaults.colors( 
-                                activeContainerColor = BlossomColors.SlateBlue, 
-                                activeContentColor = Color.White, 
-                                inactiveContainerColor = BlossomColors.SurfaceCard2, 
-                                inactiveContentColor = BlossomColors.TextSecondary 
-                            ) 
-                        ) { 
-                            Text(labels[index], fontSize = 12.sp, fontWeight = if (index == snoozeIdx) FontWeight.Bold else FontWeight.Normal) 
-                        } 
-                    } 
-                } 
+                SlidingPillSwitcher( 
+                    options = options, 
+                    selectedOption = options.getOrElse(snoozeIdx) { options[0] }, 
+                    onOptionSelected = onSnoozeSelect, 
+                    labelProvider = { min -> labels.getOrElse(options.indexOf(min)) { "${min}m" } }, 
+                    activeColor = BlossomColors.SlateBlue 
+                ) 
             } 
         } 
     } 

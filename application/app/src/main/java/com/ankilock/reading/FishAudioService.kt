@@ -3,6 +3,8 @@ package com.ankilock.reading
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer 
+import android.os.Handler 
+import android.os.Looper 
 import com.ankilock.data.FishAudioVoiceOption 
 import com.ankilock.data.PreferencesManager 
 import kotlinx.coroutines.Dispatchers 
@@ -31,6 +33,7 @@ class FishAudioService(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null 
     private var onPlaybackStateCallback: ((Boolean) -> Unit)? = null 
     private var onCompletionCallback: (() -> Unit)? = null 
+    private val mainHandler = Handler(Looper.getMainLooper()) 
     
     suspend fun fetchVoiceName(apiKey: String, voiceId: String): Result<String> = withContext(Dispatchers.IO) { 
         if (apiKey.isBlank()) { 
@@ -271,6 +274,7 @@ class FishAudioService(private val context: Context) {
     
     fun playAudio( 
         file: File, 
+        speed: Float = 1.0f, 
         onPlaybackStateChanged: (isPlaying: Boolean) -> Unit, 
         onCompletion: () -> Unit 
     ) { 
@@ -289,16 +293,30 @@ class FishAudioService(private val context: Context) {
                 ) 
                 setDataSource(file.absolutePath) 
                 setOnPreparedListener { mp -> 
+                    try { 
+                        if (speed != 1.0f) { 
+                            mp.playbackParams = mp.playbackParams.setSpeed(speed) 
+                        } 
+                    } catch (_: Exception) { 
+                    } 
                     mp.start() 
-                    onPlaybackStateCallback?.invoke(true) 
+                    mainHandler.post { 
+                        onPlaybackStateCallback?.invoke(true) 
+                    } 
                 } 
                 setOnCompletionListener { 
+                    val comp = onCompletionCallback 
                     stopAudio() 
-                    onCompletionCallback?.invoke() 
+                    mainHandler.post { 
+                        comp?.invoke() 
+                    } 
                 } 
                 setOnErrorListener { _, _, _ -> 
+                    val comp = onCompletionCallback 
                     stopAudio() 
-                    onCompletionCallback?.invoke() 
+                    mainHandler.post { 
+                        comp?.invoke() 
+                    } 
                     true 
                 } 
                 prepareAsync() 
@@ -310,7 +328,19 @@ class FishAudioService(private val context: Context) {
         } 
     } 
     
+    fun setPlaybackSpeed(speed: Float) { 
+        try { 
+            mediaPlayer?.let { mp -> 
+                if (mp.isPlaying) { 
+                    mp.playbackParams = mp.playbackParams.setSpeed(speed) 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+    } 
+    
     fun stopAudio() { 
+        val cb = onPlaybackStateCallback 
         try { 
             mediaPlayer?.let { mp -> 
                 if (mp.isPlaying) { 
@@ -322,9 +352,27 @@ class FishAudioService(private val context: Context) {
         } catch (ignored: Exception) { 
         } finally { 
             mediaPlayer = null 
-            onPlaybackStateCallback?.invoke(false) 
             onPlaybackStateCallback = null 
             onCompletionCallback = null 
+            mainHandler.post { 
+                cb?.invoke(false) 
+            } 
+        } 
+    } 
+    
+    fun getCurrentPositionMs(): Int { 
+        return try { 
+            mediaPlayer?.currentPosition ?: 0 
+        } catch (_: Exception) { 
+            0 
+        } 
+    } 
+    
+    fun getDurationMs(): Int { 
+        return try { 
+            mediaPlayer?.duration ?: 0 
+        } catch (_: Exception) { 
+            0 
         } 
     } 
     

@@ -576,7 +576,7 @@ fun AiKeyConfigDialog(
                 modifier = Modifier.fillMaxWidth(), 
                 horizontalArrangement = Arrangement.spacedBy(8.dp) 
             ) { 
-                OutlinedButton( 
+                Squircle3DButton( 
                     onClick = { 
                         if (apiKeyText.isNotBlank()) { 
                             isTesting = true 
@@ -599,18 +599,21 @@ fun AiKeyConfigDialog(
                         } 
                     }, 
                     enabled = apiKeyText.isNotBlank() && !isTesting, 
+                    modifier = Modifier 
+                        .weight(1f) 
+                        .height(44.dp), 
+                    containerColor = BlossomColors.SurfaceElevated, 
                     shape = RoundedCornerShape(12.dp), 
-                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                    modifier = Modifier.weight(1f) 
+                    depth = 3.dp 
                 ) { 
                     if (isTesting) { 
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = BlossomColors.SakuraRose, strokeWidth = 2.dp) 
                     } else { 
-                        Text("Test Key", color = BlossomColors.TextPrimary, fontSize = 13.sp) 
+                        Text("Test Key", color = BlossomColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) 
                     } 
                 } 
                 
-                Button( 
+                Squircle3DButton( 
                     onClick = { 
                         prefs.aiApiKey = apiKeyText.trim() 
                         prefs.aiProvider = selectedProvider 
@@ -623,9 +626,12 @@ fun AiKeyConfigDialog(
                         } 
                         onSaved() 
                     }, 
+                    modifier = Modifier 
+                        .weight(1f) 
+                        .height(44.dp), 
+                    containerColor = BlossomColors.SakuraRose, 
                     shape = RoundedCornerShape(12.dp), 
-                    colors = ButtonDefaults.buttonColors(containerColor = BlossomColors.SakuraRose), 
-                    modifier = Modifier.weight(1f) 
+                    depth = 3.dp 
                 ) { 
                     Text("Save Key", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) 
                 } 

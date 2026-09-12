@@ -165,3 +165,109 @@ fun ThemeSwitcher(
         } 
     } 
 } 
+    
+@Composable 
+fun <T> SlidingPillSwitcher( 
+    options: List<T>, 
+    selectedOption: T, 
+    onOptionSelected: (T) -> Unit, 
+    modifier: Modifier = Modifier, 
+    labelProvider: (T) -> String = { it.toString() }, 
+    iconProvider: ((T) -> ImageVector?)? = null, 
+    activeColor: Color = BlossomColors.SakuraRose, 
+    height: androidx.compose.ui.unit.Dp = 44.dp 
+) { 
+    val selectedIndex = options.indexOf(selectedOption).coerceAtLeast(0) 
+    
+    Box( 
+        modifier = modifier 
+            .fillMaxWidth() 
+            .height(height) 
+            .clip(RoundedCornerShape(14.dp)) 
+            .background(BlossomColors.SurfaceCard2) 
+            .border(1.dp, BlossomColors.CardBorder, RoundedCornerShape(14.dp)) 
+            .padding(3.dp) 
+    ) { 
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) { 
+            val segmentWidth = maxWidth / options.size 
+            val indicatorOffset by animateDpAsState( 
+                targetValue = segmentWidth * selectedIndex, 
+                animationSpec = spring( 
+                    dampingRatio = Spring.DampingRatioMediumBouncy, 
+                    stiffness = Spring.StiffnessMediumLow 
+                ), 
+                label = "SlidingPillOffset" 
+            ) 
+    
+            Box( 
+                modifier = Modifier 
+                    .offset(x = indicatorOffset) 
+                    .width(segmentWidth) 
+                    .fillMaxHeight() 
+                    .clip(RoundedCornerShape(11.dp)) 
+                    .background(BlossomColors.SurfaceCard1) 
+                    .border( 
+                        width = 1.dp, 
+                        color = activeColor.copy(alpha = 0.6f), 
+                        shape = RoundedCornerShape(11.dp) 
+                    ) 
+            ) 
+    
+            Row(modifier = Modifier.fillMaxSize()) { 
+                options.forEachIndexed { index, option -> 
+                    val isSelected = selectedIndex == index 
+                    val interactionSource = remember { MutableInteractionSource() } 
+                    val isPressed by interactionSource.collectIsPressedAsState() 
+    
+                    val scale by animateFloatAsState( 
+                        targetValue = if (isPressed) 0.93f else 1.0f, 
+                        animationSpec = spring( 
+                            dampingRatio = Spring.DampingRatioMediumBouncy, 
+                            stiffness = Spring.StiffnessMedium 
+                        ), 
+                        label = "SlidingPillOptionScale" 
+                    ) 
+    
+                    Box( 
+                        modifier = Modifier 
+                            .weight(1f) 
+                            .fillMaxHeight() 
+                            .clip(RoundedCornerShape(11.dp)) 
+                            .clickable( 
+                                interactionSource = interactionSource, 
+                                indication = null 
+                            ) { 
+                                onOptionSelected(option) 
+                            } 
+                            .scale(scale), 
+                        contentAlignment = Alignment.Center 
+                    ) { 
+                        Row( 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            horizontalArrangement = Arrangement.Center 
+                        ) { 
+                            val icon = iconProvider?.invoke(option) 
+                            if (icon != null) { 
+                                Icon( 
+                                    imageVector = icon, 
+                                    contentDescription = null, 
+                                    tint = if (isSelected) activeColor else BlossomColors.TextMuted, 
+                                    modifier = Modifier.size(15.dp) 
+                                ) 
+                                Spacer(modifier = Modifier.width(6.dp)) 
+                            } 
+                            Text( 
+                                text = labelProvider(option), 
+                                fontSize = 12.sp, 
+                                fontFamily = BlossomNunito, 
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+                                color = if (isSelected) activeColor else BlossomColors.TextSecondary, 
+                                maxLines = 1 
+                            ) 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+    } 
+} 

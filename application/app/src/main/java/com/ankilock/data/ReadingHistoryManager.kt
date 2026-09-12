@@ -160,6 +160,33 @@ class ReadingHistoryManager(private val context: Context) {
         return total 
     } 
     
+    fun getStoryStorageBytes(story: GeneratedStory): Long { 
+        var total = 0L 
+        try { 
+            val storyJsonApprox = (story.title.length + story.content.length + (story.theme?.length ?: 0) + 200).toLong() 
+            total += storyJsonApprox 
+            
+            val imageDir = File(context.filesDir, "stories/images/${story.id}") 
+            if (imageDir.exists()) { 
+                imageDir.walkTopDown().forEach { file -> 
+                    if (file.isFile) total += file.length() 
+                } 
+            } 
+            
+            val audioDir = FishAudioService.getAudioDir(context) 
+            if (audioDir.exists()) { 
+                val safeId = story.id.replace(Regex("[^a-zA-Z0-9_-]"), "_") 
+                audioDir.walkTopDown().forEach { file -> 
+                    if (file.isFile && (file.name.contains(story.id) || file.name.contains(safeId))) { 
+                        total += file.length() 
+                    } 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+        return total 
+    } 
+    
     fun getAudioStorageBytes(): Long { 
         var total = 0L 
         try { 
