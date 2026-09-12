@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -20,6 +21,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +56,7 @@ fun BlossomStoryTokenView(
         modifier = modifier 
             .clip(RoundedCornerShape(4.dp)) 
             .then(bgModifier) 
-            .clickable(enabled = isSelected) { onClick() } 
+            .clickable(enabled = true) { onClick() } 
             .padding( 
                 start = if (token.isPunctuation) 0.dp else 1.dp, 
                 end = if (token.isPunctuation) 0.dp else 1.dp, 
@@ -91,7 +94,13 @@ fun BlossomStoryTokenView(
                                     color = BlossomColors.TextSecondary, 
                                     fontWeight = FontWeight.Normal, 
                                     lineHeight = rubyFontSize, 
-                                    maxLines = 1 
+                                    maxLines = 1, 
+                                    style = TextStyle( 
+                                        platformStyle = PlatformTextStyle( 
+                                            includeFontPadding = false 
+                                        ) 
+                                    ), 
+                                    modifier = Modifier.offset(y = 2.dp) 
                                 ) 
                             } else { 
                                 Spacer(modifier = Modifier.height(rubySlotHeight)) 
@@ -108,7 +117,12 @@ fun BlossomStoryTokenView(
                                 isAudioHighlighted -> Color(0xFF60A5FA) 
                                 else -> BlossomColors.TextPrimary 
                             }, 
-                            lineHeight = baseFontSize 
+                            lineHeight = baseFontSize, 
+                            style = TextStyle( 
+                                platformStyle = PlatformTextStyle( 
+                                    includeFontPadding = false 
+                                ) 
+                            ) 
                         ) 
                     } 
                 } 

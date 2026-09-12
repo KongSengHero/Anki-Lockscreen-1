@@ -87,6 +87,7 @@ fun FishAudioDialog(
     var isFetchingVoice by remember { mutableStateOf(false) } 
     var fetchStatusMessage by remember { mutableStateOf<String?>(null) } 
     var fetchStatusIsError by remember { mutableStateOf(false) } 
+    var showVoicePickerDialog by remember { mutableStateOf(false) } 
 
     fun cleanExtractedVoiceId(): String { 
         return PreferencesManager.extractVoiceId(voiceInput) 
@@ -281,15 +282,14 @@ fun FishAudioDialog(
                 ) { 
                     TextButton( 
                         onClick = { 
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://fish.audio")) 
-                            context.startActivity(intent) 
+                            showVoicePickerDialog = true 
                         }, 
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp) 
                     ) { 
                         Row(verticalAlignment = Alignment.CenterVertically) { 
-                            Text("Browse Voices", fontSize = 12.sp, color = BlossomColors.SakuraRose, maxLines = 1, softWrap = false) 
+                            Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = BlossomColors.SakuraRose, modifier = Modifier.size(13.dp)) 
                             Spacer(modifier = Modifier.width(4.dp)) 
-                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = BlossomColors.SakuraRose, modifier = Modifier.size(13.dp)) 
+                            Text("Presets & Search", fontSize = 12.sp, color = BlossomColors.SakuraRose, maxLines = 1, softWrap = false) 
                         } 
                     } 
 
@@ -442,5 +442,21 @@ fun FishAudioDialog(
                 } 
             } 
         } 
+    } 
+    
+    if (showVoicePickerDialog) { 
+        FishAudioVoiceDialog( 
+            currentVoiceId = cleanExtractedVoiceId(), 
+            currentVoiceName = fetchedVoiceName ?: "", 
+            apiKey = apiKeyInput, 
+            onSelectVoice = { newId, newName -> 
+                voiceInput = newId 
+                fetchedVoiceName = newName 
+                fetchStatusMessage = "Selected: $newName" 
+                fetchStatusIsError = false 
+                showVoicePickerDialog = false 
+            }, 
+            onDismiss = { showVoicePickerDialog = false } 
+        ) 
     } 
 } 

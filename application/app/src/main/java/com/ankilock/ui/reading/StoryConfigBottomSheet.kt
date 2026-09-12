@@ -342,7 +342,8 @@ fun StoryConfigBottomSheet(
                         onValueChangeFinished = { 
                             sliderIndex = connectingWordsSteps.indexOf(selectedWordsCount).toFloat() 
                         }, 
-                        accentColor = BlossomColors.SakuraRose 
+                        accentColor = BlossomColors.SakuraRose, 
+                        snapValues = listOf(0f, 1f, 2f, 3f, 4f) 
                     ) 
                 } 
                 

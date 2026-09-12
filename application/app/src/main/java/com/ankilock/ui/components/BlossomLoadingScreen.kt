@@ -131,7 +131,7 @@ fun BlossomLoadingScreen(
     LaunchedEffect(Unit) { 
         progress.animateTo( 
             targetValue = 1f, 
-            animationSpec = tween(durationMillis = 3400, easing = FastOutSlowInEasing) 
+            animationSpec = tween(durationMillis = 2400, easing = FastOutSlowInEasing) 
         ) 
     } 
     

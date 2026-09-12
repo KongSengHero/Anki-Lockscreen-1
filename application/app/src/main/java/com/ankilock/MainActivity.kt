@@ -302,7 +302,7 @@ class MainActivity : ComponentActivity() {
                 var showLoadingOverlay by remember { mutableStateOf(true) } 
                 var isAppLoading by remember { mutableStateOf(true) } 
                 LaunchedEffect(Unit) { 
-                    kotlinx.coroutines.delay(3400) 
+                    kotlinx.coroutines.delay(2400) 
                     isAppLoading = false 
                 } 
                 Box(modifier = Modifier.fillMaxSize()) { 
@@ -907,6 +907,71 @@ class MainActivity : ComponentActivity() {
                         } 
                         if (selectedDecksList.firstOrNull()?.id == deck.id) { 
                             CardSessionManager.refresh(this@MainActivity) 
+                        } 
+                    } 
+                }, 
+                classicAction = classicRevealedAction, 
+                onClassicAction = { deck, card -> 
+                    when (classicRevealedAction) { 
+                        "suspend" -> { 
+                            audioPlayer.stop() 
+                            isRevealed = false 
+                            val queue = deckCardQueues[deck.id] 
+                            val nextCard = if (queue != null && queue.isNotEmpty()) queue.removeAt(0) else null 
+                            deckCardsCache[deck.id] = nextCard 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                ankiHelper.suspendCard(card.noteId, card.cardOrd) 
+                                val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
+                                if (remainingCount < 3) { 
+                                    val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = nextCard?.noteId, deckName = deck.name) 
+                                    withContext(Dispatchers.Main) { 
+                                        val currentQ = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
+                                        for (freshCard in freshBatch) { 
+                                            if (freshCard.noteId != nextCard?.noteId && currentQ.none { it.noteId == freshCard.noteId }) { 
+                                                currentQ.add(freshCard) 
+                                            } 
+                                        } 
+                                        if (deckCardsCache[deck.id] == null && currentQ.isNotEmpty()) { 
+                                            deckCardsCache[deck.id] = currentQ.removeAt(0) 
+                                        } 
+                                    } 
+                                } 
+                                val freshDecks = ankiHelper.getDeckList() 
+                                val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                                    ?: ankiHelper.getDeckStatsForDeck(deck.name) 
+                                withContext(Dispatchers.Main) { 
+                                    deckStatsCache[deck.id] = freshStats 
+                                } 
+                                if (selectedDecksList.firstOrNull()?.id == deck.id) { 
+                                    CardSessionManager.refresh(this@MainActivity) 
+                                } 
+                            } 
+                        } 
+                        "undo" -> { 
+                            CardSessionManager.undoLastReview(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                val freshDecks = ankiHelper.getDeckList() 
+                                val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                                    ?: ankiHelper.getDeckStatsForDeck(deck.name) 
+                                val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
+                                val firstCard = batch.firstOrNull() 
+                                val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
+                                withContext(Dispatchers.Main) { 
+                                    deckCardsCache[deck.id] = firstCard 
+                                    deckCardQueues[deck.id] = remaining 
+                                    deckStatsCache[deck.id] = freshStats 
+                                } 
+                            } 
+                        } 
+                        "open_app" -> { 
+                            val intent = Intent(this@MainActivity, MainActivity::class.java).apply { 
+                                flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT 
+                            } 
+                            startActivity(intent) 
+                        } 
+                        else -> { 
+                            val launchIntent = ankiHelper.getAnkiLaunchIntent() 
+                            startActivity(launchIntent) 
                         } 
                     } 
                 }, 
@@ -1576,7 +1641,8 @@ class MainActivity : ComponentActivity() {
                                 onBlurChange(((newRadius / 5f).roundToInt() * 5f).coerceIn(0f, 60f)) 
                             }, 
                             onValueChangeFinished = onBlurCommit, 
-                            accentColor = BlossomColors.WisteriaViolet 
+                            accentColor = BlossomColors.WisteriaViolet, 
+                            snapValues = listOf(0f, 5f, 10f, 15f, 20f, 25f, 30f, 35f, 40f, 45f, 50f, 55f, 60f) 
                         ) 
                         GlobalSeekerRow( 
                             icon = Icons.Filled.Opacity, 
@@ -1588,7 +1654,8 @@ class MainActivity : ComponentActivity() {
                                 onOpacityChange(((newOpacity * 20f).roundToInt() / 20f).coerceIn(0f, 0.9f)) 
                             }, 
                             onValueChangeFinished = onOpacityCommit, 
-                            accentColor = BlossomColors.WisteriaViolet 
+                            accentColor = BlossomColors.WisteriaViolet, 
+                            snapValues = listOf(0f, 0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f) 
                         ) 
                         GlobalSeekerRow( 
                             icon = Icons.Filled.AutoAwesome, 
@@ -1600,7 +1667,8 @@ class MainActivity : ComponentActivity() {
                                 onArtworkOpacityChange(((newArtOpacity * 20f).roundToInt() / 20f).coerceIn(0.1f, 1.0f)) 
                             }, 
                             onValueChangeFinished = onArtworkOpacityCommit, 
-                            accentColor = BlossomColors.WisteriaViolet 
+                            accentColor = BlossomColors.WisteriaViolet, 
+                            snapValues = listOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f, 0.95f, 1.0f) 
                         ) 
                     } 
                 } 
@@ -1816,7 +1884,8 @@ class MainActivity : ComponentActivity() {
                                 onBlurChange(((newRadius / 5f).roundToInt() * 5f).coerceIn(5f, 60f)) 
                             }, 
                             onValueChangeFinished = onBlurCommit, 
-                            accentColor = BlossomColors.SlateBlue 
+                            accentColor = BlossomColors.SlateBlue, 
+                            snapValues = listOf(5f, 10f, 15f, 20f, 25f, 30f, 35f, 40f, 45f, 50f, 55f, 60f) 
                         ) 
                         GlobalSeekerRow( 
                             icon = Icons.Filled.Opacity, 
@@ -1828,7 +1897,8 @@ class MainActivity : ComponentActivity() {
                                 onOpacityChange(((newOpacity * 20f).roundToInt() / 20f).coerceIn(0f, 0.9f)) 
                             }, 
                             onValueChangeFinished = onOpacityCommit, 
-                            accentColor = BlossomColors.SlateBlue 
+                            accentColor = BlossomColors.SlateBlue, 
+                            snapValues = listOf(0f, 0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f) 
                         ) 
                         GlobalSeekerRow( 
                             icon = Icons.Filled.AutoAwesome, 
@@ -1840,7 +1910,8 @@ class MainActivity : ComponentActivity() {
                                 onArtworkOpacityChange(((newArtOpacity * 20f).roundToInt() / 20f).coerceIn(0.1f, 1.0f)) 
                             }, 
                             onValueChangeFinished = onArtworkOpacityCommit, 
-                            accentColor = BlossomColors.SlateBlue 
+                            accentColor = BlossomColors.SlateBlue, 
+                            snapValues = listOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f, 0.95f, 1.0f) 
                         ) 
                     } 
                 } 

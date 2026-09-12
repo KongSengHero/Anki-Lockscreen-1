@@ -547,23 +547,49 @@ object StoryTokenizer {
                 continue 
             } 
             
-            val matchedTarget = targetWords 
+            val exactTarget = targetWords 
                 .filter { it.kanji.isNotBlank() && remaining.startsWith(it.kanji) } 
                 .maxByOrNull { it.kanji.length } 
                 
-            if (matchedTarget != null) { 
-                val reading = matchedTarget.reading.ifBlank { commonFuriganaMap[matchedTarget.kanji] ?: "" } 
-                val segments = buildSegments(matchedTarget.kanji, reading) 
-                val meaning = matchedTarget.meaning.ifBlank { commonWordMeanings[matchedTarget.kanji] ?: "" } 
+            if (exactTarget != null) { 
+                val reading = exactTarget.reading.ifBlank { commonFuriganaMap[exactTarget.kanji] ?: "" } 
+                val segments = buildSegments(exactTarget.kanji, reading) 
+                val meaning = exactTarget.meaning.ifBlank { commonWordMeanings[exactTarget.kanji] ?: "" } 
                 result.add( 
                     StoryToken( 
-                        surface = matchedTarget.kanji, 
+                        surface = exactTarget.kanji, 
                         segments = segments, 
                         isTarget = true, 
                         meaning = meaning 
                     ) 
                 ) 
-                remaining = remaining.substring(matchedTarget.kanji.length) 
+                remaining = remaining.substring(exactTarget.kanji.length) 
+                continue 
+            } 
+            
+            val stemTarget = targetWords 
+                .filter { tw -> 
+                    tw.kanji.length > 1 && tw.kanji.any { isKanji(it) } && 
+                    remaining.startsWith(tw.kanji.dropLast(1)) 
+                } 
+                .maxByOrNull { it.kanji.length } 
+                
+            if (stemTarget != null) { 
+                val stem = stemTarget.kanji.dropLast(1) 
+                val lastChar = stemTarget.kanji.takeLast(1) 
+                val rawReading = stemTarget.reading.ifBlank { commonFuriganaMap[stemTarget.kanji] ?: "" } 
+                val stemReading = if (rawReading.endsWith(lastChar)) rawReading.removeSuffix(lastChar) else rawReading 
+                val segments = buildSegments(stem, stemReading) 
+                val meaning = stemTarget.meaning.ifBlank { commonWordMeanings[stemTarget.kanji] ?: "" } 
+                result.add( 
+                    StoryToken( 
+                        surface = stem, 
+                        segments = segments, 
+                        isTarget = true, 
+                        meaning = meaning 
+                    ) 
+                ) 
+                remaining = remaining.substring(stem.length) 
                 continue 
             } 
             

@@ -55,13 +55,25 @@ import com.ankilock.ui.components.squircleLiquidGlass
     
 enum class BlossomTab( 
     val title: String, 
-    val icon: ImageVector, 
-    val activeColor: Color, 
-    val containerColor: Color 
+    val icon: ImageVector 
 ) { 
-    CARDS("Cards", Icons.Default.Style, BlossomColors.SlateBlue, BlossomColors.SlateBlueContainer), 
-    STORIES("Stories", Icons.AutoMirrored.Filled.MenuBook, BlossomColors.MatchaSage, BlossomColors.MatchaSageContainer), 
-    JISHO("Jisho", Icons.Default.Search, BlossomColors.WarmOchre, BlossomColors.WarmOchreContainer); 
+    CARDS("Cards", Icons.Default.Style), 
+    STORIES("Stories", Icons.AutoMirrored.Filled.MenuBook), 
+    JISHO("Jisho", Icons.Default.Search); 
+    
+    val activeColor: Color 
+        get() = when (this) { 
+            CARDS -> BlossomColors.SlateBlue 
+            STORIES -> BlossomColors.MatchaSage 
+            JISHO -> BlossomColors.WarmOchre 
+        } 
+        
+    val containerColor: Color 
+        get() = when (this) { 
+            CARDS -> BlossomColors.SlateBlueContainer 
+            STORIES -> BlossomColors.MatchaSageContainer 
+            JISHO -> BlossomColors.WarmOchreContainer 
+        } 
     
     companion object { 
         val STUDY get() = CARDS 
@@ -79,6 +91,11 @@ fun BlossomBottomNav(
     val context = LocalContext.current 
     val view = LocalView.current 
     val tabs = BlossomTab.values() 
+    val isLight = BlossomColors.currentTheme == AppTheme.LIGHT 
+    val navBg = if (isLight) Color(0xFFFFFFFF).copy(alpha = 0.98f) else BlossomColors.SurfaceOverlay.copy(alpha = 0.95f) 
+    val navElevation = if (isLight) 8.dp else 12.dp 
+    val navSpecular = if (isLight) 0.15f else 0.35f 
+    val navBorder = if (isLight) 0.12f else 0.35f 
     
     Box( 
         modifier = modifier 
@@ -94,11 +111,12 @@ fun BlossomBottomNav(
                 .squircleLiquidGlass( 
                     shape = RoundedCornerShape(16.dp), 
                     cornerRadius = 16.dp, 
-                    tintColor = Color.Transparent, 
+                    tintColor = if (isLight) Color.White else Color.Transparent, 
                     darkBaseAlpha = 0f, 
-                    backgroundColor = BlossomColors.SurfaceOverlay.copy(alpha = 0.95f), 
-                    specularAlpha = 0.35f, 
-                    shadowElevation = 12.dp 
+                    backgroundColor = navBg, 
+                    borderAlpha = navBorder, 
+                    specularAlpha = navSpecular, 
+                    shadowElevation = navElevation 
                 ) 
         ) { 
             BoxWithConstraints( 
@@ -125,11 +143,12 @@ fun BlossomBottomNav(
                         .squircleLiquidGlass( 
                             shape = RoundedCornerShape(12.dp), 
                             cornerRadius = 12.dp, 
-                            tintColor = selectedTab.activeColor.copy(alpha = 0.25f), 
+                            tintColor = selectedTab.activeColor.copy(alpha = if (isLight) 0.12f else 0.25f), 
                             darkBaseAlpha = 0f, 
-                            backgroundColor = selectedTab.containerColor.copy(alpha = 0.92f), 
-                            specularAlpha = 0.55f, 
-                            shadowElevation = 4.dp 
+                            backgroundColor = selectedTab.containerColor.copy(alpha = if (isLight) 0.98f else 0.92f), 
+                            borderAlpha = if (isLight) 0.15f else 0.35f, 
+                            specularAlpha = if (isLight) 0.20f else 0.55f, 
+                            shadowElevation = if (isLight) 2.dp else 4.dp 
                         ) 
                 ) 
 

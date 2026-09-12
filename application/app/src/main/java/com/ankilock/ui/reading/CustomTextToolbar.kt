@@ -120,6 +120,7 @@ private class SelectionMenuPositionProvider(
 @Composable
 fun CustomSelectionContainer( 
     onTranslate: (String) -> Unit, 
+    onJisho: ((String) -> Unit)? = null, 
     content: @Composable () -> Unit 
 ) { 
     var menuRect by remember { mutableStateOf<Rect?>(null) } 
@@ -177,7 +178,24 @@ fun CustomSelectionContainer(
                             } else { 
                                 Toast.makeText(context, "No text selected", Toast.LENGTH_SHORT).show() 
                             } 
-                        } 
+                        }, 
+                        onJisho = if (onJisho != null) { 
+                            { 
+                                interceptingClipboard.capturedText = "" 
+                                interceptingClipboard.captureOnly = true 
+                                onCopyAction?.invoke() 
+                                interceptingClipboard.captureOnly = false 
+                                val selected = interceptingClipboard.capturedText.ifBlank { 
+                                    systemClipboard.getText()?.text ?: "" 
+                                } 
+                                customToolbar.hide() 
+                                if (selected.isNotBlank()) { 
+                                    onJisho(selected) 
+                                } else { 
+                                    Toast.makeText(context, "No text selected", Toast.LENGTH_SHORT).show() 
+                                } 
+                            } 
+                        } else null 
                     ) 
                 } 
             } 
@@ -188,7 +206,8 @@ fun CustomSelectionContainer(
 @Composable
 private fun OledSelectionPill( 
     onCopy: () -> Unit, 
-    onTranslate: () -> Unit 
+    onTranslate: () -> Unit, 
+    onJisho: (() -> Unit)? = null 
 ) { 
     Surface( 
         shape = RoundedCornerShape(20.dp), 
@@ -213,6 +232,15 @@ private fun OledSelectionPill(
                 label = "Translate", 
                 onClick = onTranslate 
             ) 
+
+            if (onJisho != null) { 
+                ToolbarDivider() 
+
+                TextToolbarButton( 
+                    label = "Jisho", 
+                    onClick = onJisho 
+                ) 
+            } 
         } 
     } 
 } 

@@ -270,7 +270,11 @@ class AnkiDroidHelper(private val context: Context) {
                             else -> 0 
                         } 
                     } else { 
-                        0 
+                        when { 
+                            getNotesDueCount("nid:$noteId is:learn") > 0 -> 1 
+                            getNotesDueCount("nid:$noteId is:new") > 0 -> 0 
+                            else -> 2 
+                        } 
                     } 
                     
                     val parsed = getCardContent(noteId) 
@@ -336,11 +340,17 @@ class AnkiDroidHelper(private val context: Context) {
                         val cardOrd = cur.getInt(cur.getColumnIndexOrThrow(COL_CARD_ORD))
                         val parsed = getCardContent(noteId)
                         val actualDeckName = decks.find { it.id == deckId }?.name ?: decks.firstOrNull()?.name ?: ""
+                        val cardType = when { 
+                            getNotesDueCount("nid:$noteId is:learn") > 0 -> 1 
+                            getNotesDueCount("nid:$noteId is:new") > 0 -> 0 
+                            else -> 2 
+                        } 
                         val card = parsed.copy( 
                             noteId = noteId, 
                             cardOrd = cardOrd, 
-                            deckName = actualDeckName
-                        )
+                            deckName = actualDeckName, 
+                            cardType = cardType 
+                        ) 
                         if (card.kanji.isNotBlank() || card.question.isNotBlank()) { 
                             result.add(card)
                         }

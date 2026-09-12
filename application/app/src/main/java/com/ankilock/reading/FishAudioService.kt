@@ -2,19 +2,21 @@ package com.ankilock.reading
     
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.MediaPlayer
-import com.ankilock.data.PreferencesManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.util.concurrent.TimeUnit
+import android.media.MediaPlayer 
+import com.ankilock.data.FishAudioVoiceOption 
+import com.ankilock.data.PreferencesManager 
+import kotlinx.coroutines.Dispatchers 
+import kotlinx.coroutines.withContext 
+import okhttp3.MediaType.Companion.toMediaType 
+import okhttp3.OkHttpClient 
+import okhttp3.Request 
+import okhttp3.RequestBody.Companion.toRequestBody 
+import org.json.JSONObject 
+import java.io.File 
+import java.io.FileOutputStream 
+import java.io.IOException 
+import java.net.URLEncoder 
+import java.util.concurrent.TimeUnit 
 
 class FishAudioService(private val context: Context) { 
     
@@ -64,6 +66,72 @@ class FishAudioService(private val context: Context) {
         } catch (e: Exception) { 
             Result.failure(e) 
         } 
+    } 
+    
+    suspend fun searchVoices(apiKey: String, query: String): Result<List<FishAudioVoiceOption>> = withContext(Dispatchers.IO) { 
+        if (apiKey.isBlank()) { 
+            return@withContext Result.failure(IllegalArgumentException("Fish Audio API key is required to search")) 
+        } 
+        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8") 
+        val url = "https://api.fish.audio/model?title=$encodedQuery&page_size=15" 
+        val request = Request.Builder() 
+            .url(url) 
+            .header("Authorization", "Bearer ${apiKey.trim()}") 
+            .get() 
+            .build() 
+        
+        try { 
+            client.newCall(request).execute().use { response -> 
+                val bodyStr = response.body?.string() ?: "" 
+                if (!response.isSuccessful) { 
+                    val errorMsg = parseErrorMessage(bodyStr, response.code) 
+                    return@withContext Result.failure(IOException(errorMsg)) 
+                } 
+                
+                val list = mutableListOf<FishAudioVoiceOption>() 
+                val itemsArray = if (bodyStr.trim().startsWith("[")) { 
+                    org.json.JSONArray(bodyStr) 
+                } else { 
+                    val json = JSONObject(bodyStr) 
+                    json.optJSONArray("items") ?: org.json.JSONArray() 
+                } 
+                
+                for (i in 0 until itemsArray.length()) { 
+                    val item = itemsArray.optJSONObject(i) ?: continue 
+                    val id = item.optString("_id", "").ifBlank { item.optString("id", "") } 
+                    if (id.isBlank()) continue 
+                    val title = item.optString("title", "").ifBlank { item.optString("name", "Voice Model") } 
+                    val author = item.optJSONObject("author")?.optString("nickname", "") ?: "" 
+                    val desc = item.optString("description", "") 
+                    list.add( 
+                        FishAudioVoiceOption( 
+                            id = id, 
+                            name = title, 
+                            author = author, 
+                            description = desc, 
+                            tag = "Community" 
+                        ) 
+                    ) 
+                } 
+                Result.success(list) 
+            } 
+        } catch (e: Exception) { 
+            Result.failure(e) 
+        } 
+    } 
+    
+    suspend fun synthesizePreviewSample( 
+        apiKey: String, 
+        voiceId: String, 
+        model: String = PreferencesManager.DEFAULT_FISH_AUDIO_MODEL 
+    ): Result<File> = withContext(Dispatchers.IO) { 
+        synthesizeStoryAudio( 
+            apiKey = apiKey, 
+            voiceId = voiceId, 
+            model = model, 
+            storyId = "preview_${PreferencesManager.extractVoiceId(voiceId)}", 
+            text = "こんにちは、日本語の練習をしましょう。" 
+        ) 
     } 
     
     suspend fun synthesizeStoryAudio( 

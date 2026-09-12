@@ -62,8 +62,9 @@ import androidx.compose.ui.unit.sp
 import com.ankilock.ai.AiServiceHelper
 import com.ankilock.data.PreferencesManager
 import com.ankilock.ui.blossom.BlossomColors
-import com.ankilock.ui.reading.FishAudioDialog
-import com.ankilock.ui.reading.GeminiModelDialog
+import com.ankilock.ui.reading.FishAudioDialog 
+import com.ankilock.ui.reading.FishAudioVoiceDialog 
+import com.ankilock.ui.reading.GeminiModelDialog 
 import kotlinx.coroutines.launch
     
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,8 +95,11 @@ fun AiKeyConfigDialog(
     var isTestSuccess by remember { mutableStateOf(false) } 
     
     var showModelDialog by remember { mutableStateOf(false) } 
+    var showVoiceDialog by remember { mutableStateOf(false) } 
     var fishAudioApiKey by remember { mutableStateOf(prefs.fishAudioApiKey ?: "") } 
     var isFishAudioKeyVisible by remember { mutableStateOf(false) } 
+    var fishAudioVoiceId by remember { mutableStateOf(prefs.fishAudioVoiceId) } 
+    var fishAudioVoiceName by remember { mutableStateOf(prefs.fishAudioVoiceName ?: "") } 
     
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     ModalBottomSheet( 
@@ -261,6 +265,67 @@ fun AiKeyConfigDialog(
             } 
             
             Spacer(modifier = Modifier.height(14.dp)) 
+            Text( 
+                "Voice Model (Fish Audio)", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            
+            Surface( 
+                onClick = { showVoiceDialog = true }, 
+                shape = RoundedCornerShape(12.dp), 
+                color = BlossomColors.SurfaceElevated, 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Row( 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(horizontal = 14.dp, vertical = 12.dp), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.SpaceBetween 
+                ) { 
+                    Row( 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        modifier = Modifier.weight(1f, fill = false) 
+                    ) { 
+                        Icon( 
+                            Icons.Filled.GraphicEq, 
+                            contentDescription = null, 
+                            tint = BlossomColors.SakuraRose, 
+                            modifier = Modifier.size(18.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
+                        Text( 
+                            text = "Voice: ${if (fishAudioVoiceName.isNotBlank()) fishAudioVoiceName else PreferencesManager.getPresetVoiceDisplayName(fishAudioVoiceId)}", 
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = BlossomColors.TextPrimary, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis 
+                        ) 
+                    } 
+                    Spacer(modifier = Modifier.width(6.dp)) 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Text( 
+                            text = "Switch", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = BlossomColors.TextSecondary, 
+                            maxLines = 1, 
+                            softWrap = false 
+                        ) 
+                        Icon( 
+                            Icons.Filled.ArrowDropDown, 
+                            contentDescription = null, 
+                            tint = BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(18.dp) 
+                        ) 
+                    } 
+                } 
+            } 
             
             Text( 
                 "Gemini API Key", 
@@ -552,6 +617,10 @@ fun AiKeyConfigDialog(
                         prefs.aiModel = selectedModel 
                         prefs.wallhavenApiKey = wallhavenKeyText.trim() 
                         prefs.fishAudioApiKey = fishAudioApiKey.trim() 
+                        prefs.fishAudioVoiceId = fishAudioVoiceId.trim() 
+                        if (fishAudioVoiceName.isNotBlank()) { 
+                            prefs.fishAudioVoiceName = fishAudioVoiceName.trim() 
+                        } 
                         onSaved() 
                     }, 
                     shape = RoundedCornerShape(12.dp), 
@@ -573,6 +642,22 @@ fun AiKeyConfigDialog(
                 showModelDialog = false 
             }, 
             onDismiss = { showModelDialog = false } 
+        ) 
+    } 
+    
+    if (showVoiceDialog) { 
+        FishAudioVoiceDialog( 
+            currentVoiceId = fishAudioVoiceId, 
+            currentVoiceName = fishAudioVoiceName, 
+            apiKey = fishAudioApiKey, 
+            onSelectVoice = { newId, newName -> 
+                fishAudioVoiceId = newId 
+                fishAudioVoiceName = newName 
+                prefs.fishAudioVoiceId = newId 
+                prefs.fishAudioVoiceName = newName 
+                showVoiceDialog = false 
+            }, 
+            onDismiss = { showVoiceDialog = false } 
         ) 
     } 
 } 

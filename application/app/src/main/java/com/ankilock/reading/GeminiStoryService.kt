@@ -5,6 +5,7 @@ import com.ankilock.data.GeneratedStory
 import com.ankilock.data.PreferencesManager
 import com.ankilock.data.StoryQuizQuestion
 import com.ankilock.data.StoryThemes
+import com.ankilock.data.StoryWordItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -30,30 +31,21 @@ class GeminiStoryService {
     suspend fun generateStory( 
         apiKey: String, 
         jlptLevel: String, 
-        vocabularyList: List<AnkiVocabularyItem>, 
-        preferredModel: String = PreferencesManager.DEFAULT_GEMINI_MODEL, 
+        vocabularyList: List<AnkiVocabularyItem> = emptyList(), 
+        preferredModel: String = "gemini-2.5-flash", 
         theme: String? = null, 
         topic: String? = null, 
-        storyLength: String = "Medium", 
+        storyLength: String = "Medium (300 words)", 
         questionsCount: Int = 3 
     ): Result<GeneratedStory> = withContext(Dispatchers.IO) { 
         if (apiKey.isBlank()) { 
             return@withContext Result.failure(IllegalArgumentException("Gemini API key is required")) 
         } 
         
-        val studiedPool = vocabularyList.filter { !it.isSuspended } 
-        val suspendedPool = vocabularyList.filter { it.isSuspended } 
-        
-        val selectedWords = if (vocabularyList.isEmpty()) { 
-            emptyList() 
-        } else if (vocabularyList.size <= 5) { 
-            vocabularyList.distinctBy { it.displayWord } 
-        } else if (studiedPool.isNotEmpty() && suspendedPool.isNotEmpty()) { 
-            (studiedPool.shuffled().take(18) + suspendedPool.shuffled().take(10)).distinctBy { it.displayWord } 
-        } else if (studiedPool.isNotEmpty()) { 
-            studiedPool.shuffled().take(25).distinctBy { it.displayWord } 
+        val selectedWords = if (vocabularyList.isNotEmpty()) { 
+            vocabularyList.shuffled().take(12) 
         } else { 
-            suspendedPool.shuffled().take(25).distinctBy { it.displayWord } 
+            emptyList() 
         } 
         
         val wordPromptList = if (selectedWords.isNotEmpty()) { 
@@ -69,6 +61,14 @@ class GeminiStoryService {
         
         val prompt = buildJlptStoryPrompt(jlptLevel, wordPromptList, theme, topic, storyLength, questionsCount) 
         
+        val targetWordItems = selectedWords.map { 
+            StoryWordItem( 
+                kanji = it.kanji.ifBlank { it.reading }, 
+                reading = it.reading, 
+                meaning = it.meaning 
+            ) 
+        } 
+        
         try { 
             val story = callGeminiApi( 
                 apiKey = apiKey, 
@@ -76,6 +76,7 @@ class GeminiStoryService {
                 prompt = prompt, 
                 jlptLevel = jlptLevel, 
                 targetWords = selectedWords.map { it.displayWord }, 
+                targetWordsData = targetWordItems, 
                 theme = theme, 
                 topic = topic 
             ) 
@@ -93,6 +94,7 @@ class GeminiStoryService {
         prompt: String, 
         jlptLevel: String, 
         targetWords: List<String>, 
+        targetWordsData: List<StoryWordItem> = emptyList(), 
         theme: String? = null, 
         topic: String? = null 
     ): GeneratedStory { 
@@ -158,13 +160,14 @@ class GeminiStoryService {
             throw IOException("Story text was empty") 
         } 
         
-        return parseStoryResponse(rawText, jlptLevel, targetWords, theme, topic) 
+        return parseStoryResponse(rawText, jlptLevel, targetWords, targetWordsData, theme, topic) 
     } 
     
     private fun parseStoryResponse( 
         rawText: String, 
         jlptLevel: String, 
         targetWords: List<String>, 
+        targetWordsData: List<StoryWordItem> = emptyList(), 
         theme: String? = null, 
         topic: String? = null 
     ): GeneratedStory { 
@@ -207,6 +210,7 @@ class GeminiStoryService {
                 jlptLevel = jlptLevel, 
                 createdAt = System.currentTimeMillis(), 
                 targetWords = targetWords, 
+                targetWordsData = targetWordsData, 
                 questions = questions, 
                 theme = theme, 
                 topic = topic 
@@ -229,6 +233,7 @@ class GeminiStoryService {
                 jlptLevel = jlptLevel, 
                 createdAt = System.currentTimeMillis(), 
                 targetWords = targetWords, 
+                targetWordsData = targetWordsData, 
                 questions = emptyList(), 
                 theme = theme, 
                 topic = topic 

@@ -64,8 +64,13 @@ fun GlobalSeekerRow(
     onValueChange: (Float) -> Unit, 
     onValueChangeFinished: (() -> Unit)? = null, 
     accentColor: Color = BlossomColors.SlateBlue, 
+    snapValues: List<Float>? = null, 
     modifier: Modifier = Modifier 
 ) { 
+    val rangeSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f) 
+    val fraction = ((value - valueRange.start) / rangeSpan).coerceIn(0f, 1f) 
+    val stepsCount = if (snapValues != null && snapValues.size > 2) snapValues.size - 2 else 0 
+
     Column(modifier = modifier.fillMaxWidth()) { 
         Row( 
             verticalAlignment = Alignment.CenterVertically, 
@@ -106,6 +111,7 @@ fun GlobalSeekerRow(
             onValueChange = onValueChange, 
             onValueChangeFinished = onValueChangeFinished, 
             valueRange = valueRange, 
+            steps = stepsCount, 
             modifier = Modifier 
                 .fillMaxWidth() 
                 .height(36.dp), 
@@ -119,8 +125,6 @@ fun GlobalSeekerRow(
                 ) 
             }, 
             track = { _ -> 
-                val rangeSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f) 
-                val fraction = ((value - valueRange.start) / rangeSpan).coerceIn(0f, 1f) 
                 Box( 
                     modifier = Modifier 
                         .fillMaxWidth() 
@@ -138,17 +142,30 @@ fun GlobalSeekerRow(
                         modifier = Modifier 
                             .fillMaxSize() 
                     ) { 
-                        val dotCount = (size.width / 14.dp.toPx()).toInt().coerceIn(8, 32) 
-                        val step = size.width / (dotCount + 1) 
                         val cy = size.height / 2f 
-                        for (i in 1..dotCount) { 
-                            val cx = step * i 
-                            val isActive = cx <= size.width * fraction 
-                            drawCircle( 
-                                color = if (isActive) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.22f), 
-                                radius = 1.3.dp.toPx(), 
-                                center = Offset(cx, cy) 
-                            ) 
+                        if (snapValues != null && snapValues.isNotEmpty()) { 
+                            for (sv in snapValues) { 
+                                val snapFraction = ((sv - valueRange.start) / rangeSpan).coerceIn(0f, 1f) 
+                                val cx = size.width * snapFraction 
+                                val isActive = cx <= size.width * fraction + 1.5f 
+                                drawCircle( 
+                                    color = if (isActive) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.22f), 
+                                    radius = 1.3.dp.toPx(), 
+                                    center = Offset(cx, cy) 
+                                ) 
+                            } 
+                        } else { 
+                            val dotCount = (size.width / 14.dp.toPx()).toInt().coerceIn(8, 32) 
+                            val step = size.width / (dotCount + 1) 
+                            for (i in 1..dotCount) { 
+                                val cx = step * i 
+                                val isActive = cx <= size.width * fraction 
+                                drawCircle( 
+                                    color = if (isActive) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.22f), 
+                                    radius = 1.3.dp.toPx(), 
+                                    center = Offset(cx, cy) 
+                                ) 
+                            } 
                         } 
                     } 
                 } 

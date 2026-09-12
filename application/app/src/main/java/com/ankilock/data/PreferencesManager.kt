@@ -15,6 +15,14 @@ data class FishAudioModelOption(
     val description: String 
 ) 
     
+data class FishAudioVoiceOption( 
+    val id: String, 
+    val name: String, 
+    val author: String = "", 
+    val description: String = "", 
+    val tag: String = "" 
+) 
+    
 class PreferencesManager(context: Context) { 
     
     private val prefs: SharedPreferences = context.getSharedPreferences( 
@@ -527,6 +535,47 @@ class PreferencesManager(context: Context) {
             FishAudioModelOption("s2.1-pro-free", "s2.1-pro-free", "Free Tier ($0)"), 
             FishAudioModelOption("s2.1-pro", "s2.1-pro", "Paid Tier (Production)") 
         ) 
+        
+        val PRESET_FISH_AUDIO_VOICES = listOf( 
+            FishAudioVoiceOption( 
+                id = "5b09815a54a04395bf6ad642d57ce12a", 
+                name = "Yuna", 
+                author = "Official", 
+                description = "Gentle storyteller with balanced, clear Japanese pronunciation.", 
+                tag = "Default • Recommended" 
+            ), 
+            FishAudioVoiceOption( 
+                id = "1952e5ebf8c24f6cb65f12e84d43ae68", 
+                name = "Sakura", 
+                author = "Community", 
+                description = "Soft, expressive anime-style voice great for emotive dialogues.", 
+                tag = "Anime Style" 
+            ), 
+            FishAudioVoiceOption( 
+                id = "8f8605eb803848b6b1580228de684674", 
+                name = "Kenji", 
+                author = "Community", 
+                description = "Calm, steady and deep male narrator voice for classic stories.", 
+                tag = "Male Narrator" 
+            ), 
+            FishAudioVoiceOption( 
+                id = "800a744bbec9449884607ff9ec988ec7", 
+                name = "Aoi", 
+                author = "Community", 
+                description = "Natural conversation pacing and clear modern phrasing.", 
+                tag = "Conversational" 
+            ) 
+        ) 
+        
+        fun getPresetVoiceDisplayName(voiceId: String): String { 
+            val cleanId = extractVoiceId(voiceId) 
+            val preset = PRESET_FISH_AUDIO_VOICES.firstOrNull { it.id.equals(cleanId, ignoreCase = true) } 
+            return if (preset != null) { 
+                "${preset.name} (${preset.tag.substringBefore(" •")})" 
+            } else { 
+                if (cleanId.length > 8) "${cleanId.take(8)}..." else cleanId 
+            } 
+        } 
         
         fun extractVoiceId(input: String): String { 
             val trimmed = input.trim() 

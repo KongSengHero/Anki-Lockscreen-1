@@ -27,6 +27,22 @@ class ReadingHistoryManager(private val context: Context) {
                         words.add(targetWordsJson.getString(j)) 
                     } 
                 } 
+                val targetWordsDataJson = obj.optJSONArray("targetWordsData") 
+                val wordsData = mutableListOf<StoryWordItem>() 
+                if (targetWordsDataJson != null) { 
+                    for (j in 0 until targetWordsDataJson.length()) { 
+                        val twObj = targetWordsDataJson.getJSONObject(j) 
+                        wordsData.add( 
+                            StoryWordItem( 
+                                kanji = twObj.optString("kanji", ""), 
+                                reading = twObj.optString("reading", ""), 
+                                meaning = twObj.optString("meaning", ""), 
+                                pos = twObj.optString("pos", ""), 
+                                kanjiBreakdown = twObj.optString("kanjiBreakdown", "") 
+                            ) 
+                        ) 
+                    } 
+                } 
                 val questionsJson = obj.optJSONArray("questions") 
                 val questions = mutableListOf<StoryQuizQuestion>() 
                 if (questionsJson != null) { 
@@ -62,6 +78,7 @@ class ReadingHistoryManager(private val context: Context) {
                         jlptLevel = obj.optString("jlptLevel", "N5"), 
                         createdAt = obj.optLong("createdAt", System.currentTimeMillis()), 
                         targetWords = words, 
+                        targetWordsData = wordsData, 
                         questions = questions, 
                         theme = theme, 
                         topic = topic 
@@ -104,6 +121,19 @@ class ReadingHistoryManager(private val context: Context) {
                     put("jlptLevel", story.jlptLevel) 
                     put("createdAt", story.createdAt) 
                     put("targetWords", JSONArray(story.targetWords)) 
+                    
+                    val twDataArray = JSONArray() 
+                    for (tw in story.targetWordsData) { 
+                        val twObj = JSONObject().apply { 
+                            put("kanji", tw.kanji) 
+                            put("reading", tw.reading) 
+                            put("meaning", tw.meaning) 
+                            put("pos", tw.pos) 
+                            put("kanjiBreakdown", tw.kanjiBreakdown) 
+                        } 
+                        twDataArray.put(twObj) 
+                    } 
+                    put("targetWordsData", twDataArray) 
                     
                     val qArray = JSONArray() 
                     for (q in story.questions) { 

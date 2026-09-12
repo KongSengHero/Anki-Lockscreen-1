@@ -84,6 +84,8 @@ fun DeckCarouselCard(
     onAgain: (DeckInfo, CardInfo) -> Unit, 
     onGood: (DeckInfo, CardInfo) -> Unit, 
     onOpenAnki: () -> Unit, 
+    classicAction: String = "open_anki", 
+    onClassicAction: ((DeckInfo, CardInfo) -> Unit)? = null, 
     onDeckChanged: (Long) -> Unit, 
     onPlayWord: (CardInfo) -> Unit = {}, 
     onPlaySentence: (CardInfo) -> Unit = {}, 
@@ -177,34 +179,68 @@ fun DeckCarouselCard(
                 ) 
                 Spacer(modifier = Modifier.width(10.dp)) 
                 Row(verticalAlignment = Alignment.CenterVertically) { 
-                    Text( 
-                        text = "${activeStats.first}", 
-                        fontSize = 12.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = Color(0xFF8AB4F8) 
-                    ) 
+                    val activeType = centerCard?.cardType ?: 0 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { 
+                        Text( 
+                            text = "${activeStats.first}", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = Color(0xFF8AB4F8) 
+                        ) 
+                        if (activeType == 0 && centerCard != null) { 
+                            Box( 
+                                modifier = Modifier 
+                                    .padding(top = 1.dp) 
+                                    .width(14.dp) 
+                                    .height(2.dp) 
+                                    .background(Color(0xFF8AB4F8), RoundedCornerShape(1.dp)) 
+                            ) 
+                        } 
+                    } 
                     Text( 
                         text = " · ", 
                         fontSize = 12.sp, 
                         color = BlossomColors.TextMuted 
                     ) 
-                    Text( 
-                        text = "${activeStats.second}", 
-                        fontSize = 12.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = Color(0xFFF28B82) 
-                    ) 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { 
+                        Text( 
+                            text = "${activeStats.second}", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = Color(0xFFF28B82) 
+                        ) 
+                        if (activeType == 1 && centerCard != null) { 
+                            Box( 
+                                modifier = Modifier 
+                                    .padding(top = 1.dp) 
+                                    .width(14.dp) 
+                                    .height(2.dp) 
+                                    .background(Color(0xFFF28B82), RoundedCornerShape(1.dp)) 
+                            ) 
+                        } 
+                    } 
                     Text( 
                         text = " · ", 
                         fontSize = 12.sp, 
                         color = BlossomColors.TextMuted 
                     ) 
-                    Text( 
-                        text = "${activeStats.third}", 
-                        fontSize = 12.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = Color(0xFF81C995) 
-                    ) 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { 
+                        Text( 
+                            text = "${activeStats.third}", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = Color(0xFF81C995) 
+                        ) 
+                        if (activeType == 2 && centerCard != null) { 
+                            Box( 
+                                modifier = Modifier 
+                                    .padding(top = 1.dp) 
+                                    .width(14.dp) 
+                                    .height(2.dp) 
+                                    .background(Color(0xFF81C995), RoundedCornerShape(1.dp)) 
+                            ) 
+                        } 
+                    } 
                 } 
                 Spacer(modifier = Modifier.weight(1f)) 
                 IconButton( 
@@ -515,9 +551,22 @@ fun DeckCarouselCard(
                     ) 
                 } 
                 
+                val classicActionLabel = when (classicAction) { 
+                    "suspend" -> "Suspend" 
+                    "undo" -> "Undo" 
+                    "open_app" -> "App" 
+                    else -> "Anki" 
+                } 
+                
                 Button( 
-                    onClick = onOpenAnki, 
-                    enabled = true, 
+                    onClick = { 
+                        if (currentCenterDeck != null && centerCard != null && onClassicAction != null) { 
+                            onClassicAction(currentCenterDeck, centerCard) 
+                        } else { 
+                            onOpenAnki() 
+                        } 
+                    }, 
+                    enabled = if (classicAction == "suspend") (centerCard != null && !isProcessing) else true, 
                     shape = RoundedCornerShape(8.dp), 
                     colors = ButtonDefaults.buttonColors( 
                         containerColor = BlossomColors.BtnAnkiBg, 
@@ -530,7 +579,7 @@ fun DeckCarouselCard(
                     contentPadding = PaddingValues(horizontal = 2.dp) 
                 ) { 
                     Text( 
-                        text = "Anki", 
+                        text = classicActionLabel, 
                         fontSize = 12.5.sp, 
                         fontWeight = FontWeight.SemiBold, 
                         color = BlossomColors.BtnAnkiText, 

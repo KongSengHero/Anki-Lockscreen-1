@@ -57,9 +57,35 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.ankilock.data.StoryQuizQuestion
-import com.ankilock.ui.blossom.BlossomColors
+import androidx.compose.ui.window.DialogProperties 
+import android.view.Gravity 
+import android.view.ViewGroup 
+import android.app.Activity 
+import android.content.Context 
+import android.content.ContextWrapper 
+import androidx.compose.foundation.layout.WindowInsets 
+import androidx.compose.foundation.layout.asPaddingValues 
+import androidx.compose.foundation.layout.navigationBars 
+import androidx.compose.foundation.layout.statusBars 
+import androidx.compose.ui.platform.LocalContext 
+import androidx.compose.ui.platform.LocalDensity 
+import androidx.core.view.ViewCompat 
+import androidx.core.view.WindowInsetsCompat 
+import androidx.compose.runtime.DisposableEffect 
+import androidx.compose.ui.platform.LocalView 
+import androidx.compose.ui.window.DialogWindowProvider 
+import androidx.core.view.WindowCompat 
+import com.ankilock.data.StoryQuizQuestion 
+import com.ankilock.ui.blossom.BlossomColors 
+
+private fun Context.findActivity(): Activity? { 
+    var current = this 
+    while (current is ContextWrapper) { 
+        if (current is Activity) return current 
+        current = current.baseContext 
+    } 
+    return null 
+} 
 
 @Composable
 fun ComprehensionQuizOverlay( 
@@ -72,6 +98,22 @@ fun ComprehensionQuizOverlay(
     val userAnswers = remember { mutableStateMapOf<Int, Int>() } 
     var isQuizCompleted by remember { mutableStateOf(false) } 
     
+    val context = LocalContext.current 
+    val density = LocalDensity.current 
+    val activity = remember(context) { context.findActivity() } 
+    val activityInsets = activity?.window?.decorView?.let { ViewCompat.getRootWindowInsets(it) } 
+    val navBarPx = activityInsets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0 
+    val navBarDp = with(density) { navBarPx.toDp() } 
+    val insetsNavDp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() 
+    val effectiveNavBottom = maxOf(navBarDp, insetsNavDp) 
+    val safeBottomPadding = maxOf(effectiveNavBottom + 24.dp, 72.dp) 
+    
+    val statusBarPx = activityInsets?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0 
+    val statusBarDp = with(density) { statusBarPx.toDp() } 
+    val insetsStatusDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() 
+    val effectiveStatusTop = maxOf(statusBarDp, insetsStatusDp) 
+    val safeTopPadding = maxOf(effectiveStatusTop + 6.dp, 28.dp) 
+    
     Dialog( 
         onDismissRequest = onDismiss, 
         properties = DialogProperties( 
@@ -79,6 +121,22 @@ fun ComprehensionQuizOverlay(
             decorFitsSystemWindows = false 
         ) 
     ) { 
+        val view = LocalView.current 
+        DisposableEffect(view) { 
+            var parent = view.parent 
+            while (parent != null && parent !is DialogWindowProvider) { 
+                parent = parent.parent 
+            } 
+            (parent as? DialogWindowProvider)?.window?.let { window -> 
+                window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT) 
+                window.setGravity(Gravity.TOP or Gravity.START) 
+                window.statusBarColor = android.graphics.Color.TRANSPARENT 
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT 
+                WindowCompat.setDecorFitsSystemWindows(window, false) 
+            } 
+            onDispose {} 
+        } 
+        
         Box( 
             modifier = Modifier 
                 .fillMaxSize() 
@@ -87,9 +145,8 @@ fun ComprehensionQuizOverlay(
             Column( 
                 modifier = Modifier 
                     .fillMaxSize() 
-                    .statusBarsPadding() 
-                    .navigationBarsPadding() 
-                    .padding(horizontal = 20.dp, vertical = 16.dp) 
+                    .padding(horizontal = 20.dp) 
+                    .padding(top = safeTopPadding, bottom = safeBottomPadding) 
             ) { 
                 Row( 
                     modifier = Modifier.fillMaxWidth(), 
@@ -147,7 +204,7 @@ fun ComprehensionQuizOverlay(
                     } 
                 } 
                 
-                Spacer(modifier = Modifier.height(16.dp)) 
+                Spacer(modifier = Modifier.height(10.dp)) 
                 
                 val progress = if (isQuizCompleted) 1f else (currentIndex.toFloat() / questions.size) 
                 LinearProgressIndicator( 
@@ -160,59 +217,89 @@ fun ComprehensionQuizOverlay(
                     trackColor = BlossomColors.SurfaceCard2 
                 ) 
                 
-                Spacer(modifier = Modifier.height(20.dp)) 
+                Spacer(modifier = Modifier.height(14.dp)) 
                 
                 AnimatedContent( 
                     targetState = isQuizCompleted, 
                     transitionSpec = { 
                         fadeIn(tween(200)) togetherWith fadeOut(tween(150)) 
                     }, 
-                    label = "QuizStepTransition" 
+                    label = "QuizStepTransition", 
+                    modifier = Modifier 
+                        .weight(1f) 
+                        .fillMaxWidth() 
                 ) { completed -> 
                     if (completed) { 
                         val correctCount = questions.count { userAnswers[it.id] == it.correctOptionIndex } 
-                        val isPerfect = correctCount == questions.size 
+                        val totalQuestions = questions.size 
+                        val percent = if (totalQuestions > 0) (correctCount * 100) / totalQuestions else 0 
+                        val isPassed = percent >= 80 
+                        val isPerfect = correctCount == totalQuestions 
                         
                         Column( 
-                            modifier = Modifier 
-                                .fillMaxSize() 
-                                .verticalScroll(rememberScrollState()), 
-                            horizontalAlignment = Alignment.CenterHorizontally, 
-                            verticalArrangement = Arrangement.spacedBy(16.dp) 
+                            modifier = Modifier.fillMaxSize() 
                         ) { 
-                            Spacer(modifier = Modifier.height(24.dp)) 
+                            Column( 
+                                modifier = Modifier 
+                                    .weight(1f) 
+                                    .fillMaxWidth() 
+                                    .verticalScroll(rememberScrollState()), 
+                                horizontalAlignment = Alignment.CenterHorizontally, 
+                                verticalArrangement = Arrangement.spacedBy(14.dp) 
+                            ) { 
+                                Spacer(modifier = Modifier.height(12.dp)) 
                             
                             Surface( 
                                 shape = CircleShape, 
-                                color = if (isPerfect) BlossomColors.BlossomGreenSurface else BlossomColors.SakuraRoseContainer, 
+                                color = if (isPassed) BlossomColors.BlossomGreenSurface else BlossomColors.BlossomRed.copy(alpha = 0.15f), 
                                 border = BorderStroke( 
                                     2.dp, 
-                                    if (isPerfect) BlossomColors.BlossomGreen else BlossomColors.SakuraRose 
+                                    if (isPassed) BlossomColors.BlossomGreen else BlossomColors.BlossomRed 
                                 ), 
                                 modifier = Modifier.size(90.dp) 
                             ) { 
                                 Box(contentAlignment = Alignment.Center) { 
                                     Icon( 
-                                        imageVector = Icons.Filled.EmojiEvents, 
+                                        imageVector = if (isPassed) Icons.Filled.EmojiEvents else Icons.Filled.Close, 
                                         contentDescription = null, 
-                                        tint = if (isPerfect) BlossomColors.BlossomGreen else BlossomColors.SakuraRose, 
+                                        tint = if (isPassed) BlossomColors.BlossomGreen else BlossomColors.BlossomRed, 
                                         modifier = Modifier.size(46.dp) 
                                     ) 
                                 } 
                             } 
                             
                             Text( 
-                                text = if (isPerfect) "素晴らしい！ Perfect Score!" else "Quiz Complete!", 
+                                text = when { 
+                                    isPerfect -> "素晴らしい！ Perfect Score!" 
+                                    isPassed -> "合格！ You Passed!" 
+                                    else -> "不合格 - You Failed" 
+                                }, 
                                 fontSize = 22.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = BlossomColors.TextPrimary 
+                                color = if (isPassed) BlossomColors.TextPrimary else BlossomColors.BlossomRed 
                             ) 
                             
                             Text( 
-                                text = "You got $correctCount out of ${questions.size} correct", 
+                                text = "You got $correctCount out of $totalQuestions correct ($percent%)", 
                                 fontSize = 15.sp, 
                                 color = BlossomColors.TextSecondary 
                             ) 
+                            
+                            if (!isPassed) { 
+                                Surface( 
+                                    shape = RoundedCornerShape(8.dp), 
+                                    color = BlossomColors.BlossomRed.copy(alpha = 0.1f), 
+                                    border = BorderStroke(1.dp, BlossomColors.BlossomRed.copy(alpha = 0.3f)) 
+                                ) { 
+                                    Text( 
+                                        text = "Passing requirement: 80%", 
+                                        fontSize = 12.sp, 
+                                        fontWeight = FontWeight.SemiBold, 
+                                        color = BlossomColors.BlossomRed, 
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp) 
+                                    ) 
+                                } 
+                            } 
                             
                             Spacer(modifier = Modifier.height(8.dp)) 
                             
@@ -281,6 +368,8 @@ fun ComprehensionQuizOverlay(
                                 } 
                             } 
                             
+                            } 
+                            
                             Spacer(modifier = Modifier.height(16.dp)) 
                             
                             Row( 
@@ -290,10 +379,10 @@ fun ComprehensionQuizOverlay(
                                 Box( 
                                     modifier = Modifier 
                                         .weight(1f) 
-                                        .height(52.dp) 
-                                        .clip(RoundedCornerShape(20.dp)) 
+                                        .height(50.dp) 
+                                        .clip(RoundedCornerShape(18.dp)) 
                                         .background(BlossomColors.SurfaceElevated) 
-                                        .border(BorderStroke(1.dp, BlossomColors.CardBorder), shape = RoundedCornerShape(20.dp)) 
+                                        .border(BorderStroke(1.dp, BlossomColors.CardBorder), shape = RoundedCornerShape(18.dp)) 
                                         .clickable { 
                                             userAnswers.clear() 
                                             currentIndex = 0 
@@ -312,10 +401,10 @@ fun ComprehensionQuizOverlay(
                                 Box( 
                                     modifier = Modifier 
                                         .weight(1f) 
-                                        .height(52.dp) 
-                                        .clip(RoundedCornerShape(20.dp)) 
+                                        .height(50.dp) 
+                                        .clip(RoundedCornerShape(18.dp)) 
                                         .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
-                                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
+                                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(18.dp)) 
                                         .clickable { onDismiss() }, 
                                     contentAlignment = Alignment.Center 
                                 ) { 
@@ -333,12 +422,15 @@ fun ComprehensionQuizOverlay(
                         val selectedOpt = userAnswers[currentQuestion.id] 
                         
                         Column( 
-                            modifier = Modifier 
-                                .fillMaxSize() 
-                                .verticalScroll(rememberScrollState()), 
-                            verticalArrangement = Arrangement.SpaceBetween 
+                            modifier = Modifier.fillMaxSize() 
                         ) { 
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
+                            Column( 
+                                modifier = Modifier 
+                                    .weight(1f) 
+                                    .fillMaxWidth() 
+                                    .verticalScroll(rememberScrollState()), 
+                                verticalArrangement = Arrangement.spacedBy(14.dp) 
+                            ) { 
                                 Surface( 
                                     shape = RoundedCornerShape(16.dp), 
                                     color = BlossomColors.SurfaceElevated, 
@@ -347,11 +439,11 @@ fun ComprehensionQuizOverlay(
                                 ) { 
                                     Text( 
                                         text = currentQuestion.questionText, 
-                                        fontSize = 17.sp, 
+                                        fontSize = 16.sp, 
                                         fontWeight = FontWeight.Bold, 
                                         color = BlossomColors.TextPrimary, 
-                                        lineHeight = 24.sp, 
-                                        modifier = Modifier.padding(20.dp) 
+                                        lineHeight = 23.sp, 
+                                        modifier = Modifier.padding(18.dp) 
                                     ) 
                                 } 
                                 
@@ -374,13 +466,13 @@ fun ComprehensionQuizOverlay(
                                             modifier = Modifier.fillMaxWidth() 
                                         ) { 
                                             Row( 
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp), 
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), 
                                                 verticalAlignment = Alignment.CenterVertically 
                                             ) { 
                                                 Surface( 
                                                     shape = CircleShape, 
                                                     color = if (isSelected) BlossomColors.SakuraRose else BlossomColors.SurfaceCard2, 
-                                                    modifier = Modifier.size(32.dp) 
+                                                    modifier = Modifier.size(30.dp) 
                                                 ) { 
                                                     Box(contentAlignment = Alignment.Center) { 
                                                         Text( 
@@ -394,7 +486,7 @@ fun ComprehensionQuizOverlay(
                                                 Spacer(modifier = Modifier.width(12.dp)) 
                                                 Text( 
                                                     text = optText, 
-                                                    fontSize = 15.sp, 
+                                                    fontSize = 14.sp, 
                                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium, 
                                                     color = textColor, 
                                                     modifier = Modifier.weight(1f) 
@@ -405,80 +497,42 @@ fun ComprehensionQuizOverlay(
                                 } 
                             } 
                             
-                            Column { 
-                                Spacer(modifier = Modifier.height(20.dp)) 
-                                val isFinalQuestion = currentIndex == questions.size - 1 
-                                val hasAnsweredCurrent = userAnswers[currentQuestion.id] != null 
-                                val nextButtonBackground = if (hasAnsweredCurrent) { 
-                                    BlossomColors.SakuraRose.copy(alpha = 0.85f) 
-                                } else { 
-                                    BlossomColors.SurfaceElevated 
-                                } 
-                                val nextButtonBorder = if (hasAnsweredCurrent) { 
-                                    BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) 
-                                } else { 
-                                    BorderStroke(1.dp, BlossomColors.CardBorder) 
-                                } 
-                                val nextTextColor = if (hasAnsweredCurrent) { 
-                                    BlossomColors.BlossomWhite 
-                                } else { 
-                                    BlossomColors.TextSecondary 
-                                } 
-                                
-                                Row( 
-                                    modifier = Modifier.fillMaxWidth(), 
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp) 
-                                ) { 
-                                    if (currentIndex > 0) { 
-                                        Box( 
-                                            modifier = Modifier 
-                                                .weight(1f) 
-                                                .height(52.dp) 
-                                                .clip(RoundedCornerShape(20.dp)) 
-                                                .background(BlossomColors.SurfaceElevated) 
-                                                .border( 
-                                                    BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                                    shape = RoundedCornerShape(20.dp) 
-                                                ) 
-                                                .clickable { 
-                                                    currentIndex-- 
-                                                }, 
-                                            contentAlignment = Alignment.Center 
-                                        ) { 
-                                            Row( 
-                                                verticalAlignment = Alignment.CenterVertically, 
-                                                horizontalArrangement = Arrangement.Center 
-                                            ) { 
-                                                Icon( 
-                                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
-                                                    contentDescription = null, 
-                                                    tint = BlossomColors.TextSecondary, 
-                                                    modifier = Modifier.size(18.dp) 
-                                                ) 
-                                                Spacer(modifier = Modifier.width(6.dp)) 
-                                                Text( 
-                                                    text = "Previous", 
-                                                    fontSize = 15.sp, 
-                                                    fontWeight = FontWeight.SemiBold, 
-                                                    color = BlossomColors.TextSecondary 
-                                                ) 
-                                            } 
-                                        } 
-                                    } 
-                                    
+                            Spacer(modifier = Modifier.height(16.dp)) 
+                            val isFinalQuestion = currentIndex == questions.size - 1 
+                            val hasAnsweredCurrent = userAnswers[currentQuestion.id] != null 
+                            val nextButtonBackground = if (hasAnsweredCurrent) { 
+                                BlossomColors.SakuraRose.copy(alpha = 0.85f) 
+                            } else { 
+                                BlossomColors.SurfaceElevated 
+                            } 
+                            val nextButtonBorder = if (hasAnsweredCurrent) { 
+                                BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) 
+                            } else { 
+                                BorderStroke(1.dp, BlossomColors.CardBorder) 
+                            } 
+                            val nextTextColor = if (hasAnsweredCurrent) { 
+                                BlossomColors.BlossomWhite 
+                            } else { 
+                                BlossomColors.TextSecondary 
+                            } 
+                            
+                            Row( 
+                                modifier = Modifier.fillMaxWidth(), 
+                                horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                            ) { 
+                                if (currentIndex > 0) { 
                                     Box( 
                                         modifier = Modifier 
-                                            .weight(if (currentIndex > 0) 1.5f else 1f) 
-                                            .height(52.dp) 
-                                            .clip(RoundedCornerShape(20.dp)) 
-                                            .background(nextButtonBackground) 
-                                            .border(nextButtonBorder, shape = RoundedCornerShape(20.dp)) 
-                                            .clickable(enabled = hasAnsweredCurrent) { 
-                                                if (!isFinalQuestion) { 
-                                                    currentIndex++ 
-                                                } else { 
-                                                    isQuizCompleted = true 
-                                                } 
+                                            .weight(1f) 
+                                            .height(50.dp) 
+                                            .clip(RoundedCornerShape(18.dp)) 
+                                            .background(BlossomColors.SurfaceElevated) 
+                                            .border( 
+                                                BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                                shape = RoundedCornerShape(18.dp) 
+                                            ) 
+                                            .clickable { 
+                                                currentIndex-- 
                                             }, 
                                         contentAlignment = Alignment.Center 
                                     ) { 
@@ -486,20 +540,56 @@ fun ComprehensionQuizOverlay(
                                             verticalAlignment = Alignment.CenterVertically, 
                                             horizontalArrangement = Arrangement.Center 
                                         ) { 
-                                            Text( 
-                                                text = if (isFinalQuestion) "Submit Quiz" else "Next Question", 
-                                                fontSize = 15.sp, 
-                                                fontWeight = FontWeight.Bold, 
-                                                color = nextTextColor 
-                                            ) 
-                                            Spacer(modifier = Modifier.width(8.dp)) 
                                             Icon( 
-                                                imageVector = if (isFinalQuestion) Icons.Filled.Check else Icons.AutoMirrored.Filled.ArrowForward, 
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
                                                 contentDescription = null, 
-                                                tint = nextTextColor, 
+                                                tint = BlossomColors.TextSecondary, 
                                                 modifier = Modifier.size(18.dp) 
                                             ) 
+                                            Spacer(modifier = Modifier.width(6.dp)) 
+                                            Text( 
+                                                text = "Previous", 
+                                                fontSize = 15.sp, 
+                                                fontWeight = FontWeight.SemiBold, 
+                                                color = BlossomColors.TextSecondary 
+                                            ) 
                                         } 
+                                    } 
+                                } 
+                                
+                                Box( 
+                                    modifier = Modifier 
+                                        .weight(if (currentIndex > 0) 1.5f else 1f) 
+                                        .height(50.dp) 
+                                        .clip(RoundedCornerShape(18.dp)) 
+                                        .background(nextButtonBackground) 
+                                        .border(nextButtonBorder, shape = RoundedCornerShape(18.dp)) 
+                                        .clickable(enabled = hasAnsweredCurrent) { 
+                                            if (!isFinalQuestion) { 
+                                                currentIndex++ 
+                                            } else { 
+                                                isQuizCompleted = true 
+                                            } 
+                                        }, 
+                                    contentAlignment = Alignment.Center 
+                                ) { 
+                                    Row( 
+                                        verticalAlignment = Alignment.CenterVertically, 
+                                        horizontalArrangement = Arrangement.Center 
+                                    ) { 
+                                        Text( 
+                                            text = if (isFinalQuestion) "Submit Quiz" else "Next Question", 
+                                            fontSize = 15.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = nextTextColor 
+                                        ) 
+                                        Spacer(modifier = Modifier.width(8.dp)) 
+                                        Icon( 
+                                            imageVector = if (isFinalQuestion) Icons.Filled.Check else Icons.AutoMirrored.Filled.ArrowForward, 
+                                            contentDescription = null, 
+                                            tint = nextTextColor, 
+                                            modifier = Modifier.size(18.dp) 
+                                        ) 
                                     } 
                                 } 
                             } 

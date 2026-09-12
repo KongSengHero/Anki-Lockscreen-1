@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,10 +60,21 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Wallpaper
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import com.ankilock.data.StoryWordItem
 import com.ankilock.ui.blossom.BlossomStoryTokenView
+import com.ankilock.ui.blossom.BlossomWordBottomSheet
 import com.ankilock.ui.blossom.story.StoryTokenizer
+import com.ankilock.ui.study.WallhavenImagePickerSheet
+import com.ankilock.util.ImageBlurUtil
 import com.ankilock.util.JapaneseTtsHelper
+import androidx.compose.ui.graphics.graphicsLayer
+import java.io.File
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -224,6 +236,38 @@ fun ReadingScreen(
     var showTranslationSheet by remember { mutableStateOf(false) } 
     var translateTargetText by remember { mutableStateOf("") } 
     
+    var showWallhavenPicker by remember { mutableStateOf(false) } 
+    var wallpaperUpdateTrigger by remember { mutableIntStateOf(0) } 
+    var quickJishoWord by remember { mutableStateOf<String?>(null) } 
+    
+    val currentCoverFile = remember(currentStory?.id, wallpaperUpdateTrigger) { 
+        currentStory?.id?.let { id -> 
+            val f = File(context.filesDir, "stories/images/$id/cover.png") 
+            if (f.exists()) f else null 
+        } 
+    } 
+    val rawCoverBitmap = remember(currentCoverFile) { 
+        currentCoverFile?.let { 
+            try { 
+                BitmapFactory.decodeFile(it.absolutePath) 
+            } catch (e: Exception) { 
+                null 
+            } 
+        } 
+    } 
+    val blurRadius = prefs.appBlurRadius 
+    val coverBitmap = remember(rawCoverBitmap, blurRadius) { 
+        if (rawCoverBitmap != null && blurRadius > 0) { 
+            try { 
+                ImageBlurUtil.fastBlur(rawCoverBitmap, 0.25f, blurRadius.coerceIn(1, 60))?.asImageBitmap() 
+            } catch (e: Exception) { 
+                rawCoverBitmap.asImageBitmap() 
+            } 
+        } else { 
+            rawCoverBitmap?.asImageBitmap() 
+        } 
+    } 
+    
     LaunchedEffect(openHistoryTrigger) { 
         if (openHistoryTrigger > 0) { 
             savedStories = historyManager.getStories() 
@@ -298,8 +342,21 @@ fun ReadingScreen(
                 questionsCount = prefs.storyQuestionsCount 
             ) 
             result.onSuccess { story -> 
-                currentStory = story 
-                historyManager.saveStory(story) 
+                val enrichedStory = if (story.targetWordsData.isEmpty() && words.isNotEmpty()) { 
+                    story.copy( 
+                        targetWordsData = words.map { 
+                            StoryWordItem( 
+                                kanji = it.kanji.ifBlank { it.reading }, 
+                                reading = it.reading, 
+                                meaning = it.meaning 
+                            ) 
+                        } 
+                    ) 
+                } else { 
+                    story 
+                } 
+                currentStory = enrichedStory 
+                historyManager.saveStory(enrichedStory) 
                 savedStories = historyManager.getStories() 
             }.onFailure { err -> 
                 generationError = err.message ?: "Failed to generate story" 
@@ -308,15 +365,58 @@ fun ReadingScreen(
         } 
     } 
     
-    Column( 
-        modifier = Modifier 
-            .fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 10.dp), 
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) { 
-    
+    val story = currentStory 
+
+    Box(modifier = Modifier.fillMaxSize()) { 
+        if (coverBitmap != null) { 
+            Box( 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .height(520.dp) 
+                    .background(BlossomColors.BackgroundDeep) 
+            ) { 
+                Image( 
+                    bitmap = coverBitmap, 
+                    contentDescription = null, 
+                    contentScale = ContentScale.Crop, 
+                    modifier = Modifier 
+                        .fillMaxSize() 
+                        .graphicsLayer { alpha = prefs.appArtworkOpacity.coerceIn(0.05f, 1f) } 
+                ) 
+                if (prefs.appDimOpacity > 0f) { 
+                    Box( 
+                        modifier = Modifier 
+                            .fillMaxSize() 
+                            .background(Color.Black.copy(alpha = prefs.appDimOpacity.coerceIn(0f, 0.95f))) 
+                    ) 
+                } 
+                Box( 
+                    modifier = Modifier 
+                        .fillMaxSize() 
+                        .background( 
+                            Brush.verticalGradient( 
+                                colorStops = arrayOf( 
+                                    0.0f to Color(0xCC000000), 
+                                    0.18f to Color(0x66000000), 
+                                    0.32f to Color.Transparent, 
+                                    0.55f to BlossomColors.BackgroundDeep.copy(alpha = 0.40f), 
+                                    0.80f to BlossomColors.BackgroundDeep.copy(alpha = 0.85f), 
+                                    1.0f to BlossomColors.BackgroundDeep 
+                                ) 
+                            ) 
+                        ) 
+                ) 
+            } 
+        } 
+
+        Column( 
+            modifier = Modifier 
+                .fillMaxSize() 
+                .padding(padding) 
+                .verticalScroll(rememberScrollState()) 
+                .padding(horizontal = 16.dp, vertical = 10.dp), 
+            verticalArrangement = Arrangement.spacedBy(16.dp) 
+        ) { 
         Card( 
             modifier = Modifier.fillMaxWidth(), 
             shape = BlossomShapes.SquircleLarge, 
@@ -350,7 +450,7 @@ fun ReadingScreen(
                     ) { 
                         Icon( 
                             Icons.Filled.History, 
-                            contentDescription = "Reading History", 
+                            contentDescription = "Stories History", 
                             tint = if (savedStories.isNotEmpty()) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
                             modifier = Modifier.size(20.dp) 
                         ) 
@@ -447,37 +547,36 @@ fun ReadingScreen(
                 } 
             } 
         } 
-        
-        
+
         if (apiKey.isBlank()) { 
             Card( 
                 shape = RoundedCornerShape(20.dp), 
                 colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceElevated), 
-                border = BorderStroke(1.dp, BlossomColors.WisteriaViolet.copy(alpha = 0.35f))
+                border = BorderStroke(1.dp, BlossomColors.WisteriaViolet.copy(alpha = 0.35f)) 
             ) { 
                 Column(modifier = Modifier.padding(18.dp)) { 
                     Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = BlossomColors.WisteriaViolet)
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = BlossomColors.WisteriaViolet) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
                         Text( 
                             text = "GEMINI API KEY REQUIRED", 
                             fontSize = 12.sp, 
                             fontWeight = FontWeight.Bold, 
                             color = BlossomColors.WisteriaViolet, 
                             letterSpacing = 1.sp 
-                        )
+                        ) 
                     } 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp)) 
                     Text( 
                         text = "To generate personalized Japanese reading stories based on your Anki flashcards, connect your free Google Gemini API key.", 
                         fontSize = 13.sp, 
                         color = BlossomColors.TextSecondary, 
                         lineHeight = 18.sp 
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    ) 
+                    Spacer(modifier = Modifier.height(14.dp)) 
                     Row( 
                         modifier = Modifier.fillMaxWidth(), 
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp) 
                     ) { 
                         Button( 
                             onClick = { showApiKeyDialog = true }, 
@@ -487,30 +586,665 @@ fun ReadingScreen(
                             ), 
                             shape = RoundedCornerShape(12.dp), 
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), 
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f) 
                         ) { 
-                            Text("Enter API Key", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, maxLines = 1, softWrap = false)
+                            Text("Enter API Key", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, maxLines = 1, softWrap = false) 
                         } 
                         OutlinedButton( 
                             onClick = { 
                                 val url = "https://aistudio.google.com/app/apikey" 
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                context.startActivity(intent)
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)) 
+                                context.startActivity(intent) 
                             }, 
                             shape = RoundedCornerShape(12.dp), 
                             border = BorderStroke(1.dp, BlossomColors.CardBorder), 
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), 
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f) 
                         ) { 
-                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(15.dp), tint = BlossomColors.TextPrimary)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Get Free Key", color = BlossomColors.TextPrimary, fontSize = 12.5.sp, maxLines = 1, softWrap = false)
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(15.dp), tint = BlossomColors.TextPrimary) 
+                            Spacer(modifier = Modifier.width(6.dp)) 
+                            Text("Get Free Key", color = BlossomColors.TextPrimary, fontSize = 12.5.sp, maxLines = 1, softWrap = false) 
                         } 
                     } 
                 } 
             } 
         } 
+
+        if (story != null) { 
+            Card( 
+                shape = RoundedCornerShape(26.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder) 
+            ) { 
+                Column(modifier = Modifier.padding(22.dp)) { 
+                        Row( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            horizontalArrangement = Arrangement.SpaceBetween 
+                        ) { 
+                            Surface( 
+                                shape = RoundedCornerShape(8.dp), 
+                                color = BlossomColors.SurfaceElevated, 
+                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                modifier = Modifier.clickable { showStoryConfigDialog = true } 
+                            ) { 
+                                Text( 
+                                    text = "JLPT ${story.jlptLevel}", 
+                                    fontSize = 12.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = BlossomColors.SakuraRose, 
+                                    maxLines = 1, 
+                                    softWrap = false, 
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp) 
+                                ) 
+                            } 
+
+                            Row(verticalAlignment = Alignment.CenterVertically) { 
+                                val isCurrentStoryPlaying = isNarrating && currentlyPlayingStoryId == story.id 
+                                val isCurrentStorySynthesizing = isSynthesizingAudio && currentlyPlayingStoryId == story.id 
+
+                                IconButton( 
+                                    onClick = { 
+                                        if (isCurrentStoryPlaying) { 
+                                            audioService.stopAudio() 
+                                            ttsHelper.stop() 
+                                            isNarrating = false 
+                                            currentlyPlayingStoryId = null 
+                                        } else { 
+                                            audioService.stopAudio() 
+                                            ttsHelper.stop() 
+                                            isNarrating = false 
+                                            currentlyPlayingStoryId = story.id 
+
+                                            if (fishAudioApiKey.isNotBlank()) { 
+                                                isSynthesizingAudio = true 
+                                                coroutineScope.launch { 
+                                                    val narrationText = "${story.title}。\n\n${story.content}" 
+                                                    val result = audioService.synthesizeStoryAudio( 
+                                                        apiKey = fishAudioApiKey, 
+                                                        voiceId = fishAudioVoiceId, 
+                                                        model = fishAudioModel, 
+                                                        storyId = story.id, 
+                                                        text = narrationText 
+                                                    ) 
+                                                    isSynthesizingAudio = false 
+                                                    result.onSuccess { audioFile -> 
+                                                        isNarrating = true 
+                                                        audioService.playAudio( 
+                                                            file = audioFile, 
+                                                            onPlaybackStateChanged = { playing -> 
+                                                                isNarrating = playing 
+                                                                if (!playing && currentlyPlayingStoryId == story.id) { 
+                                                                    currentlyPlayingStoryId = null 
+                                                                } 
+                                                            }, 
+                                                            onCompletion = { 
+                                                                isNarrating = false 
+                                                                currentlyPlayingStoryId = null 
+                                                            } 
+                                                        ) 
+                                                    }.onFailure { error -> 
+                                                        isNarrating = false 
+                                                        currentlyPlayingStoryId = null 
+                                                        Toast.makeText(context, "Narration error: ${error.message ?: "Failed to generate audio"}", Toast.LENGTH_LONG).show() 
+                                                    } 
+                                                } 
+                                            } else { 
+                                                val narrationText = "${story.title}。\n\n${story.content}" 
+                                                isNarrating = true 
+                                                ttsHelper.speak( 
+                                                    text = narrationText, 
+                                                    onStart = { 
+                                                        isNarrating = true 
+                                                        currentlyPlayingStoryId = story.id 
+                                                    }, 
+                                                    onDone = { 
+                                                        isNarrating = false 
+                                                        if (currentlyPlayingStoryId == story.id) { 
+                                                            currentlyPlayingStoryId = null 
+                                                        } 
+                                                    }, 
+                                                    onError = { 
+                                                        isNarrating = false 
+                                                        if (currentlyPlayingStoryId == story.id) { 
+                                                            currentlyPlayingStoryId = null 
+                                                        } 
+                                                    } 
+                                                ) 
+                                            } 
+                                        } 
+                                    } 
+                                ) { 
+                                    if (isCurrentStorySynthesizing) { 
+                                        CircularProgressIndicator( 
+                                            modifier = Modifier.size(18.dp), 
+                                            strokeWidth = 2.dp, 
+                                            color = BlossomColors.SakuraRose 
+                                        ) 
+                                    } else if (isCurrentStoryPlaying) { 
+                                        Icon( 
+                                            Icons.Filled.Stop, 
+                                            contentDescription = "Stop Narration", 
+                                            tint = BlossomColors.BlossomRed, 
+                                            modifier = Modifier.size(20.dp) 
+                                        ) 
+                                    } else { 
+                                        Icon( 
+                                            Icons.AutoMirrored.Filled.VolumeUp, 
+                                            contentDescription = "Narrate Story", 
+                                            tint = BlossomColors.TextSecondary, 
+                                            modifier = Modifier.size(20.dp) 
+                                        ) 
+                                    } 
+                                } 
+
+                                IconButton( 
+                                    onClick = { 
+                                        translateTargetText = story.content 
+                                        showTranslationSheet = true 
+                                    } 
+                                ) { 
+                                    Icon( 
+                                        Icons.Filled.Translate, 
+                                        contentDescription = "Translate Story", 
+                                        tint = BlossomColors.TextSecondary, 
+                                        modifier = Modifier.size(20.dp) 
+                                    ) 
+                                } 
+
+                                IconButton( 
+                                    onClick = { 
+                                        showFurigana = !showFurigana 
+                                        prefs.showFuriganaInReader = showFurigana 
+                                    } 
+                                ) { 
+                                    Surface( 
+                                        shape = RoundedCornerShape(6.dp), 
+                                        color = if (showFurigana) BlossomColors.SakuraRoseContainer else Color.Transparent, 
+                                        border = BorderStroke( 
+                                            1.dp, 
+                                            if (showFurigana) BlossomColors.SakuraRose.copy(alpha = 0.6f) else BlossomColors.CardBorder 
+                                        ), 
+                                        modifier = Modifier.size(26.dp) 
+                                    ) { 
+                                        Box(contentAlignment = Alignment.Center) { 
+                                            Text( 
+                                                text = "ふ", 
+                                                fontSize = 12.sp, 
+                                                fontWeight = FontWeight.Bold, 
+                                                color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
+                                            ) 
+                                        } 
+                                    } 
+                                } 
+
+                                IconButton( 
+                                    onClick = { 
+                                        highlightWords = !highlightWords 
+                                        prefs.highlightVocabularyWords = highlightWords 
+                                    } 
+                                ) { 
+                                    Icon( 
+                                        Icons.Filled.AutoAwesome, 
+                                        contentDescription = "Toggle Vocabulary Highlight", 
+                                        tint = if (highlightWords) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                        modifier = Modifier.size(20.dp) 
+                                    ) 
+                                } 
+
+                                IconButton( 
+                                    onClick = { 
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager 
+                                        val clip = ClipData.newPlainText("Japanese Story", "${story.title}\n\n${story.content}") 
+                                        clipboard.setPrimaryClip(clip) 
+                                        Toast.makeText(context, "Story copied to clipboard!", Toast.LENGTH_SHORT).show() 
+                                    } 
+                                ) { 
+                                    Icon( 
+                                        Icons.Filled.ContentCopy, 
+                                        contentDescription = "Copy Story", 
+                                        tint = BlossomColors.TextSecondary, 
+                                        modifier = Modifier.size(20.dp) 
+                                    ) 
+                                } 
+
+                                IconButton( 
+                                    onClick = { showWallhavenPicker = true } 
+                                ) { 
+                                    Icon( 
+                                        Icons.Filled.Wallpaper, 
+                                        contentDescription = "Change Wallpaper", 
+                                        tint = if (coverBitmap != null) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                        modifier = Modifier.size(20.dp) 
+                                    ) 
+                                } 
+                            } 
+                        } 
+
+                        Spacer(modifier = Modifier.height(16.dp)) 
+
+                        CustomSelectionContainer( 
+                            onTranslate = { selectedText -> 
+                                translateTargetText = selectedText 
+                                showTranslationSheet = true 
+                            }, 
+                            onJisho = { selectedWord -> 
+                                quickJishoWord = selectedWord 
+                            } 
+                        ) { 
+                            SelectionContainer { 
+                                Column { 
+                                    Text( 
+                                        text = story.title, 
+                                        fontSize = 22.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = BlossomColors.TextPrimary, 
+                                        lineHeight = 30.sp 
+                                    ) 
+                                    
+                                    Spacer(modifier = Modifier.height(16.dp)) 
+                                    
+                                    val targetVocabWords = remember(story.targetWords, story.targetWordsData, vocabSummary?.words, highlightWords) { 
+                                        if (!highlightWords || (story.targetWords.isEmpty() && story.targetWordsData.isEmpty())) { 
+                                            emptyList() 
+                                        } else if (story.targetWordsData.isNotEmpty()) { 
+                                            story.targetWordsData.map { 
+                                                AnkiVocabularyItem( 
+                                                    kanji = it.kanji, 
+                                                    reading = it.reading, 
+                                                    meaning = it.meaning 
+                                                ) 
+                                            } 
+                                        } else { 
+                                            val found = vocabSummary?.words?.filter { wordItem -> 
+                                                story.targetWords.any { tw -> 
+                                                    wordItem.displayWord.equals(tw, ignoreCase = true) || 
+                                                    wordItem.kanji.equals(tw, ignoreCase = true) || 
+                                                    wordItem.reading.equals(tw, ignoreCase = true) 
+                                                } 
+                                            } ?: emptyList() 
+                                            if (found.isNotEmpty()) found 
+                                            else story.targetWords.map { AnkiVocabularyItem(kanji = it) } 
+                                        } 
+                                    } 
+                                    
+                                    if (showFurigana) { 
+                                        val paragraphs = remember(story.content) { 
+                                            story.content.split("\n\n", "\n").filter { it.isNotBlank() } 
+                                        } 
+                                        val targetWordItems = remember(story.targetWords, story.targetWordsData, vocabSummary?.words) { 
+                                            if (story.targetWordsData.isNotEmpty()) { 
+                                                story.targetWordsData 
+                                            } else { 
+                                                story.targetWords.map { tw -> 
+                                                    val v = vocabSummary?.words?.find { 
+                                                        it.displayWord.equals(tw, ignoreCase = true) || 
+                                                        it.kanji.equals(tw, ignoreCase = true) || 
+                                                        it.reading.equals(tw, ignoreCase = true) 
+                                                    } 
+                                                    StoryWordItem( 
+                                                        kanji = v?.kanji?.ifBlank { tw } ?: tw, 
+                                                        reading = v?.reading ?: "", 
+                                                        meaning = v?.meaning ?: "" 
+                                                    ) 
+                                                } 
+                                            } 
+                                        } 
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
+                                            paragraphs.forEach { para -> 
+                                                val tokens = remember(para, targetWordItems) { 
+                                                    StoryTokenizer.tokenizeToStoryTokens(para, targetWordItems) 
+                                                } 
+                                                FlowRow( 
+                                                    modifier = Modifier.fillMaxWidth(), 
+                                                    horizontalArrangement = Arrangement.Start, 
+                                                    verticalArrangement = Arrangement.Center 
+                                                ) { 
+                                                    tokens.forEach { token -> 
+                                                        val isTarget = highlightWords && ( 
+                                                            token.isTarget || 
+                                                            story.targetWords.any { tw -> 
+                                                                token.surface.isNotBlank() && ( 
+                                                                    tw.equals(token.surface, ignoreCase = true) || 
+                                                                    (tw.length >= 2 && token.surface.contains(tw)) || 
+                                                                    (token.surface.length >= 2 && tw.contains(token.surface)) || 
+                                                                    (token.surface.any { StoryTokenizer.isKanji(it) } && tw.any { StoryTokenizer.isKanji(it) } && 
+                                                                        token.surface.filter { StoryTokenizer.isKanji(it) } == tw.filter { StoryTokenizer.isKanji(it) }) 
+                                                                ) 
+                                                            } || 
+                                                            story.targetWordsData.any { td -> 
+                                                                token.surface.isNotBlank() && ( 
+                                                                    td.kanji.equals(token.surface, ignoreCase = true) || 
+                                                                    (td.kanji.any { StoryTokenizer.isKanji(it) } && token.surface.any { StoryTokenizer.isKanji(it) } && 
+                                                                        td.kanji.filter { StoryTokenizer.isKanji(it) } == token.surface.filter { StoryTokenizer.isKanji(it) }) 
+                                                                ) 
+                                                            } 
+                                                        ) 
+                                                        BlossomStoryTokenView( 
+                                                            token = token, 
+                                                            showPronunciation = true, 
+                                                            pronunciationType = "japanese", 
+                                                            isSelected = isTarget, 
+                                                            onClick = { 
+                                                                if (token.surface.isNotBlank()) { 
+                                                                    val item = story.targetWordsData.find { 
+                                                                        it.kanji == token.surface || it.surface == token.surface || 
+                                                                        (it.kanji.any { c -> StoryTokenizer.isKanji(c) } && 
+                                                                            it.kanji.filter { c -> StoryTokenizer.isKanji(c) } == token.surface.filter { c -> StoryTokenizer.isKanji(c) }) 
+                                                                    }?.let { 
+                                                                        AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
+                                                                    } ?: vocabSummary?.words?.find { it.displayWord == token.surface || it.kanji == token.surface } 
+                                                                      ?: AnkiVocabularyItem( 
+                                                                          kanji = token.surface, 
+                                                                          reading = token.segments.joinToString("") { it.ruby ?: it.text }, 
+                                                                          meaning = token.meaning 
+                                                                      ) 
+                                                                    selectedWordDetail = item 
+                                                                } 
+                                                            } 
+                                                        ) 
+                                                    } 
+                                                } 
+                                            } 
+                                        } 
+                                    } else { 
+                                        val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
+                                            if (targetVocabWords.isNotEmpty()) { 
+                                                buildHighlightedStoryText( 
+                                                    content = story.content, 
+                                                    vocabWords = targetVocabWords 
+                                                ) 
+                                            } else { 
+                                                AnnotatedString(story.content) 
+                                            } 
+                                        } 
+                                        var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
+                                        Text( 
+                                            text = annotatedContent, 
+                                            fontSize = 17.sp, 
+                                            color = BlossomColors.TextPrimary, 
+                                            lineHeight = 30.sp 
+                                        ) 
+                                        
+                                        Spacer(modifier = Modifier.height(16.dp)) 
+                                        
+                                        val targetVocabWords = remember(story.targetWords, story.targetWordsData, vocabSummary?.words, highlightWords) { 
+                                            if (!highlightWords || (story.targetWords.isEmpty() && story.targetWordsData.isEmpty())) { 
+                                                emptyList() 
+                                            } else if (story.targetWordsData.isNotEmpty()) { 
+                                                story.targetWordsData.map { 
+                                                    AnkiVocabularyItem( 
+                                                        kanji = it.kanji, 
+                                                        reading = it.reading, 
+                                                        meaning = it.meaning 
+                                                    ) 
+                                                } 
+                                            } else { 
+                                                val found = vocabSummary?.words?.filter { wordItem -> 
+                                                    story.targetWords.any { tw -> 
+                                                        wordItem.displayWord.equals(tw, ignoreCase = true) || 
+                                                        wordItem.kanji.equals(tw, ignoreCase = true) || 
+                                                        wordItem.reading.equals(tw, ignoreCase = true) 
+                                                    } 
+                                                } ?: emptyList() 
+                                                if (found.isNotEmpty()) found 
+                                                else story.targetWords.map { AnkiVocabularyItem(kanji = it) } 
+                                            } 
+                                        } 
+                                        
+                                        if (showFurigana) { 
+                                            val paragraphs = remember(story.content) { 
+                                                story.content.split("\n\n", "\n").filter { it.isNotBlank() } 
+                                            } 
+                                            val targetWordItems = remember(story.targetWords, story.targetWordsData, vocabSummary?.words) { 
+                                                if (story.targetWordsData.isNotEmpty()) { 
+                                                    story.targetWordsData 
+                                                } else { 
+                                                    story.targetWords.map { tw -> 
+                                                        val v = vocabSummary?.words?.find { 
+                                                            it.displayWord.equals(tw, ignoreCase = true) || 
+                                                            it.kanji.equals(tw, ignoreCase = true) || 
+                                                            it.reading.equals(tw, ignoreCase = true) 
+                                                        } 
+                                                        StoryWordItem( 
+                                                            kanji = v?.kanji?.ifBlank { tw } ?: tw, 
+                                                            reading = v?.reading ?: "", 
+                                                            meaning = v?.meaning ?: "" 
+                                                        ) 
+                                                    } 
+                                                } 
+                                            } 
+                                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
+                                                paragraphs.forEach { para -> 
+                                                    val tokens = remember(para, targetWordItems) { 
+                                                        StoryTokenizer.tokenizeToStoryTokens(para, targetWordItems) 
+                                                    } 
+                                                    FlowRow( 
+                                                        modifier = Modifier.fillMaxWidth(), 
+                                                        horizontalArrangement = Arrangement.Start, 
+                                                        verticalArrangement = Arrangement.Center 
+                                                    ) { 
+                                                        tokens.forEach { token -> 
+                                                            val isTarget = highlightWords && ( 
+                                                                token.isTarget || 
+                                                                story.targetWords.any { tw -> 
+                                                                    token.surface.isNotBlank() && ( 
+                                                                        tw.equals(token.surface, ignoreCase = true) || 
+                                                                        (tw.length >= 2 && token.surface.contains(tw)) || 
+                                                                        (token.surface.length >= 2 && tw.contains(token.surface)) || 
+                                                                        (token.surface.any { StoryTokenizer.isKanji(it) } && tw.any { StoryTokenizer.isKanji(it) } && 
+                                                                            token.surface.filter { StoryTokenizer.isKanji(it) } == tw.filter { StoryTokenizer.isKanji(it) }) 
+                                                                    ) 
+                                                                } || 
+                                                                story.targetWordsData.any { td -> 
+                                                                    token.surface.isNotBlank() && ( 
+                                                                        td.kanji.equals(token.surface, ignoreCase = true) || 
+                                                                        (td.kanji.any { StoryTokenizer.isKanji(it) } && token.surface.any { StoryTokenizer.isKanji(it) } && 
+                                                                            td.kanji.filter { StoryTokenizer.isKanji(it) } == token.surface.filter { StoryTokenizer.isKanji(it) }) 
+                                                                    ) 
+                                                                } 
+                                                            ) 
+                                                            BlossomStoryTokenView( 
+                                                                token = token, 
+                                                                showPronunciation = true, 
+                                                                pronunciationType = "japanese", 
+                                                                isSelected = isTarget, 
+                                                                onClick = { 
+                                                                    if (token.surface.isNotBlank()) { 
+                                                                        val item = story.targetWordsData.find { 
+                                                                            it.kanji == token.surface || it.surface == token.surface || 
+                                                                            (it.kanji.any { c -> StoryTokenizer.isKanji(c) } && 
+                                                                                it.kanji.filter { c -> StoryTokenizer.isKanji(c) } == token.surface.filter { c -> StoryTokenizer.isKanji(c) }) 
+                                                                        }?.let { 
+                                                                            AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
+                                                                        } ?: vocabSummary?.words?.find { it.displayWord == token.surface || it.kanji == token.surface } 
+                                                                          ?: AnkiVocabularyItem( 
+                                                                              kanji = token.surface, 
+                                                                              reading = token.segments.joinToString("") { it.ruby ?: it.text }, 
+                                                                              meaning = token.meaning 
+                                                                          ) 
+                                                                        selectedWordDetail = item 
+                                                                    } 
+                                                                } 
+                                                            ) 
+                                                        } 
+                                                    } 
+                                                } 
+                                            } 
+                                        } else { 
+                                            val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
+                                                if (targetVocabWords.isNotEmpty()) { 
+                                                    buildHighlightedStoryText( 
+                                                        content = story.content, 
+                                                        vocabWords = targetVocabWords 
+                                                    ) 
+                                                } else { 
+                                                    AnnotatedString(story.content) 
+                                                } 
+                                            } 
+                                            var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
+                                            Text( 
+                                                text = annotatedContent, 
+                                                fontSize = 17.sp, 
+                                                color = BlossomColors.TextPrimary, 
+                                                lineHeight = 34.sp, 
+                                                letterSpacing = 0.5.sp, 
+                                                onTextLayout = { textLayoutResult = it }, 
+                                                modifier = Modifier.pointerInput(targetVocabWords) { 
+                                                    if (targetVocabWords.isNotEmpty()) { 
+                                                        detectTapGestures { offset -> 
+                                                            textLayoutResult?.let { layout -> 
+                                                                val position = layout.getOffsetForPosition(offset) 
+                                                                annotatedContent.getStringAnnotations(tag = "WORD", start = position, end = position) 
+                                                                    .firstOrNull()?.let { annotation -> 
+                                                                        val word = targetVocabWords.find { it.displayWord == annotation.item } 
+                                                                        if (word != null) { 
+                                                                            selectedWordDetail = word 
+                                                                        } 
+                                                                    } 
+                                                            } 
+                                                        } 
+                                                    } 
+                                                } 
+                                            ) 
+                                        } 
+                                        
+                                        if (story.targetWords.isNotEmpty()) { 
+                                            Spacer(modifier = Modifier.height(20.dp)) 
+                                            Surface( 
+                                                shape = RoundedCornerShape(14.dp), 
+                                                color = BlossomColors.SurfaceElevated, 
+                                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                                modifier = Modifier.fillMaxWidth() 
+                                            ) { 
+                                                Column(modifier = Modifier.padding(14.dp)) { 
+                                                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                                                        Icon( 
+                                                            Icons.Filled.School, 
+                                                            contentDescription = null, 
+                                                            tint = BlossomColors.SakuraRose, 
+                                                            modifier = Modifier.size(16.dp) 
+                                                        ) 
+                                                        Spacer(modifier = Modifier.width(8.dp)) 
+                                                        Text( 
+                                                            text = "TARGET WORDS FROM YOUR CARDS (${story.targetWords.size})", 
+                                                            fontSize = 11.sp, 
+                                                            fontWeight = FontWeight.Bold, 
+                                                            color = BlossomColors.TextSecondary, 
+                                                            letterSpacing = 0.5.sp 
+                                                        ) 
+                                                    } 
+                                                    Spacer(modifier = Modifier.height(10.dp)) 
+                                                    FlowRow( 
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp), 
+                                                        verticalArrangement = Arrangement.spacedBy(6.dp), 
+                                                        modifier = Modifier.fillMaxWidth() 
+                                                    ) { 
+                                                        story.targetWords.forEach { word -> 
+                                                            val isPresent = story.content.contains(word) 
+                                                            val matchedItem = story.targetWordsData.find { it.kanji == word || it.surface == word }?.let { 
+                                                                AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
+                                                            } ?: vocabSummary?.words?.find { it.displayWord == word || it.kanji == word } 
+                                                            Surface( 
+                                                                shape = RoundedCornerShape(8.dp), 
+                                                                color = if (isPresent) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard1, 
+                                                                border = BorderStroke( 
+                                                                    1.dp, 
+                                                                    if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
+                                                                ), 
+                                                                onClick = { 
+                                                                    matchedItem?.let { selectedWordDetail = it } 
+                                                                } 
+                                                            ) { 
+                                                                Row( 
+                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
+                                                                    verticalAlignment = Alignment.CenterVertically 
+                                                                ) { 
+                                                                    Text( 
+                                                                        text = word, 
+                                                                        fontSize = 12.sp, 
+                                                                        fontWeight = if (isPresent) FontWeight.Bold else FontWeight.Normal, 
+                                                                        color = if (isPresent) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                                                        maxLines = 1, 
+                                                                        softWrap = false 
+                                                                    ) 
+                                                                    if (isPresent) { 
+                                                                        Spacer(modifier = Modifier.width(4.dp)) 
+                                                                        Icon( 
+                                                                            Icons.Filled.Check, 
+                                                                            contentDescription = "Used in story", 
+                                                                            tint = BlossomColors.BlossomGreen, 
+                                                                            modifier = Modifier.size(12.dp) 
+                                                                        ) 
+                                                                    } 
+                                                                } 
+                                                            } 
+                                                        } 
+                                                    } 
+                                                } 
+                                            } 
+                                        } 
+                                        
+                                        if (story.questions.isNotEmpty()) { 
+                                            Spacer(modifier = Modifier.height(20.dp)) 
+                                            Box( 
+                                                modifier = Modifier 
+                                                    .fillMaxWidth() 
+                                                    .height(52.dp) 
+                                                    .clip(RoundedCornerShape(20.dp)) 
+                                                    .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
+                                                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
+                                                    .clickable { showQuizOverlay = true }, 
+                                                contentAlignment = Alignment.Center 
+                                            ) { 
+                                                Row( 
+                                                    verticalAlignment = Alignment.CenterVertically, 
+                                                    horizontalArrangement = Arrangement.Center 
+                                                ) { 
+                                                    Icon( 
+                                                        Icons.Filled.AutoAwesome, 
+                                                        contentDescription = null, 
+                                                        tint = BlossomColors.BlossomWhite, 
+                                                        modifier = Modifier.size(18.dp) 
+                                                    ) 
+                                                    Spacer(modifier = Modifier.width(8.dp)) 
+                                                    Text( 
+                                                        text = "Take Comprehension Quiz (${story.questions.size})", 
+                                                        fontSize = 15.sp, 
+                                                        fontWeight = FontWeight.Bold, 
+                                                        color = BlossomColors.BlossomWhite 
+                                                    ) 
+                                                } 
+                                            } 
+                                        } 
+                                    } 
+                                } 
+                            } 
+                        } 
+                    } 
+            } 
+        } 
         
+        if (generationError != null) { 
+            Card( 
+                shape = RoundedCornerShape(16.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SakuraRoseContainer), 
+                border = BorderStroke(1.dp, BlossomColors.BlossomRed.copy(alpha = 0.4f)) 
+            ) { 
+                Row( 
+                    modifier = Modifier.padding(14.dp), 
+                    verticalAlignment = Alignment.CenterVertically 
+                ) { 
+                    Icon(Icons.Filled.Warning, contentDescription = null, tint = BlossomColors.BlossomRed) 
+                    Spacer(modifier = Modifier.width(10.dp)) 
+                    Text( 
+                        text = generationError ?: "Error generating story", 
+                        fontSize = 13.sp, 
+                        color = BlossomColors.BlossomRed 
+                    ) 
+                } 
+            } 
+        } 
         
         val isLockedWithoutKey = apiKey.isBlank() 
         val buttonBackground = when { 
@@ -616,475 +1350,11 @@ fun ReadingScreen(
                 } 
             } 
         } 
-        
-        
-        if (generationError != null) { 
-            Card( 
-                shape = RoundedCornerShape(16.dp), 
-                colors = CardDefaults.cardColors(containerColor = BlossomColors.SakuraRoseContainer), 
-                border = BorderStroke(1.dp, BlossomColors.BlossomRed.copy(alpha = 0.4f))
-            ) { 
-                Row( 
-                    modifier = Modifier.padding(14.dp), 
-                    verticalAlignment = Alignment.CenterVertically 
-                ) { 
-                    Icon(Icons.Filled.Warning, contentDescription = null, tint = BlossomColors.BlossomRed)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text( 
-                        text = generationError ?: "Error generating story", 
-                        fontSize = 13.sp, 
-                        color = BlossomColors.BlossomRed 
-                    )
-                } 
-            } 
-        } 
-        
-        
-        val story = currentStory 
-        if (story != null) { 
-            Card( 
-                shape = RoundedCornerShape(26.dp), 
-                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
-                border = BorderStroke(1.dp, BlossomColors.CardBorder) 
-            ) { 
-                Column(modifier = Modifier.padding(22.dp)) { 
-                    
-                    Row( 
-                        modifier = Modifier.fillMaxWidth(), 
-                        verticalAlignment = Alignment.CenterVertically, 
-                        horizontalArrangement = Arrangement.SpaceBetween 
-                    ) { 
-                        Surface( 
-                            shape = RoundedCornerShape(8.dp), 
-                            color = BlossomColors.SurfaceElevated, 
-                            border = BorderStroke(1.dp, BlossomColors.CardBorder) 
-                        ) { 
-                            Text( 
-                                text = "JLPT ${story.jlptLevel}", 
-                                fontSize = 12.sp, 
-                                fontWeight = FontWeight.Bold, 
-                                color = BlossomColors.SakuraRose, 
-                                maxLines = 1, 
-                                softWrap = false, 
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp) 
-                            ) 
-                        } 
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) { 
-                            val isCurrentStoryPlaying = isNarrating && currentlyPlayingStoryId == story.id 
-                            val isCurrentStorySynthesizing = isSynthesizingAudio && currentlyPlayingStoryId == story.id 
-                            
-                            IconButton( 
-                                onClick = { 
-                                    if (isCurrentStoryPlaying) { 
-                                        audioService.stopAudio() 
-                                        ttsHelper.stop() 
-                                        isNarrating = false 
-                                        currentlyPlayingStoryId = null 
-                                    } else { 
-                                        audioService.stopAudio() 
-                                        ttsHelper.stop() 
-                                        isNarrating = false 
-                                        currentlyPlayingStoryId = story.id 
-                                        
-                                        if (fishAudioApiKey.isNotBlank()) { 
-                                            isSynthesizingAudio = true 
-                                            coroutineScope.launch { 
-                                                val narrationText = "${story.title}。\n\n${story.content}" 
-                                                val result = audioService.synthesizeStoryAudio( 
-                                                    apiKey = fishAudioApiKey, 
-                                                    voiceId = fishAudioVoiceId, 
-                                                    model = fishAudioModel, 
-                                                    storyId = story.id, 
-                                                    text = narrationText 
-                                                ) 
-                                                isSynthesizingAudio = false 
-                                                result.onSuccess { audioFile -> 
-                                                    isNarrating = true 
-                                                    audioService.playAudio( 
-                                                        file = audioFile, 
-                                                        onPlaybackStateChanged = { playing -> 
-                                                            isNarrating = playing 
-                                                            if (!playing && currentlyPlayingStoryId == story.id) { 
-                                                                currentlyPlayingStoryId = null 
-                                                            } 
-                                                        }, 
-                                                        onCompletion = { 
-                                                            isNarrating = false 
-                                                            currentlyPlayingStoryId = null 
-                                                        } 
-                                                    ) 
-                                                }.onFailure { error -> 
-                                                    isNarrating = false 
-                                                    currentlyPlayingStoryId = null 
-                                                    Toast.makeText(context, "Narration error: ${error.message ?: "Failed to generate audio"}", Toast.LENGTH_LONG).show() 
-                                                } 
-                                            } 
-                                        } else { 
-                                            val narrationText = "${story.title}。\n\n${story.content}" 
-                                            isNarrating = true 
-                                            ttsHelper.speak( 
-                                                text = narrationText, 
-                                                onStart = { 
-                                                    isNarrating = true 
-                                                    currentlyPlayingStoryId = story.id 
-                                                }, 
-                                                onDone = { 
-                                                    isNarrating = false 
-                                                    if (currentlyPlayingStoryId == story.id) { 
-                                                        currentlyPlayingStoryId = null 
-                                                    } 
-                                                }, 
-                                                onError = { 
-                                                    isNarrating = false 
-                                                    if (currentlyPlayingStoryId == story.id) { 
-                                                        currentlyPlayingStoryId = null 
-                                                    } 
-                                                } 
-                                            ) 
-                                        } 
-                                    } 
-                                } 
-                            ) { 
-                                if (isCurrentStorySynthesizing) { 
-                                    CircularProgressIndicator( 
-                                        modifier = Modifier.size(18.dp), 
-                                        strokeWidth = 2.dp, 
-                                        color = BlossomColors.SakuraRose 
-                                    ) 
-                                } else if (isCurrentStoryPlaying) { 
-                                    Icon( 
-                                        Icons.Filled.Stop, 
-                                        contentDescription = "Stop Narration", 
-                                        tint = BlossomColors.BlossomRed, 
-                                        modifier = Modifier.size(20.dp) 
-                                    ) 
-                                } else { 
-                                    Icon( 
-                                        Icons.AutoMirrored.Filled.VolumeUp, 
-                                        contentDescription = "Narrate Story", 
-                                        tint = BlossomColors.TextSecondary, 
-                                        modifier = Modifier.size(20.dp) 
-                                    ) 
-                                } 
-                            } 
-                            
-                            IconButton( 
-                                onClick = { 
-                                    translateTargetText = story.content 
-                                    showTranslationSheet = true 
-                                } 
-                            ) { 
-                                Icon( 
-                                    Icons.Filled.Translate, 
-                                    contentDescription = "Translate Story", 
-                                    tint = BlossomColors.TextSecondary, 
-                                    modifier = Modifier.size(20.dp) 
-                                ) 
-                            } 
-                            
-                            IconButton( 
-                                onClick = { 
-                                    showFurigana = !showFurigana 
-                                    prefs.showFuriganaInReader = showFurigana 
-                                } 
-                            ) { 
-                                Surface( 
-                                    shape = RoundedCornerShape(6.dp), 
-                                    color = if (showFurigana) BlossomColors.SakuraRoseContainer else Color.Transparent, 
-                                    border = BorderStroke( 
-                                        1.dp, 
-                                        if (showFurigana) BlossomColors.SakuraRose.copy(alpha = 0.6f) else BlossomColors.CardBorder 
-                                    ), 
-                                    modifier = Modifier.size(26.dp) 
-                                ) { 
-                                    Box(contentAlignment = Alignment.Center) { 
-                                        Text( 
-                                            text = "ふ", 
-                                            fontSize = 12.sp, 
-                                            fontWeight = FontWeight.Bold, 
-                                            color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
-                                        ) 
-                                    } 
-                                } 
-                            } 
-                            
-                            IconButton( 
-                                onClick = { 
-                                    highlightWords = !highlightWords 
-                                    prefs.highlightVocabularyWords = highlightWords 
-                                } 
-                            ) { 
-                                Icon( 
-                                    Icons.Filled.AutoAwesome, 
-                                    contentDescription = "Toggle Vocabulary Highlight", 
-                                    tint = if (highlightWords) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                                    modifier = Modifier.size(20.dp) 
-                                ) 
-                            } 
-                            
-                            IconButton( 
-                                onClick = { 
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager 
-                                    val clip = ClipData.newPlainText("Japanese Story", "${story.title}\n\n${story.content}") 
-                                    clipboard.setPrimaryClip(clip) 
-                                    Toast.makeText(context, "Story copied to clipboard!", Toast.LENGTH_SHORT).show() 
-                                } 
-                            ) { 
-                                Icon( 
-                                    Icons.Filled.ContentCopy, 
-                                    contentDescription = "Copy Story", 
-                                    tint = BlossomColors.TextSecondary, 
-                                    modifier = Modifier.size(20.dp) 
-                                ) 
-                            } 
-                        } 
-                    } 
-                    
-                    CustomSelectionContainer( 
-                        onTranslate = { selectedText -> 
-                            translateTargetText = selectedText 
-                            showTranslationSheet = true 
-                        } 
-                    ) { 
-                        SelectionContainer { 
-                            Column { 
-                                Spacer(modifier = Modifier.height(16.dp)) 
-                                
-                                Text( 
-                                    text = story.title, 
-                                    fontSize = 22.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = BlossomColors.TextPrimary, 
-                                    lineHeight = 30.sp 
-                                ) 
-                                
-                                Spacer(modifier = Modifier.height(16.dp)) 
-                                
-                                val targetVocabWords = remember(story.targetWords, vocabSummary?.words, highlightWords) { 
-                                    if (!highlightWords || story.targetWords.isEmpty()) { 
-                                        emptyList() 
-                                    } else { 
-                                        val found = vocabSummary?.words?.filter { wordItem -> 
-                                            story.targetWords.any { tw -> 
-                                                wordItem.displayWord.equals(tw, ignoreCase = true) || 
-                                                wordItem.kanji.equals(tw, ignoreCase = true) || 
-                                                wordItem.reading.equals(tw, ignoreCase = true) 
-                                            } 
-                                        } ?: emptyList() 
-                                        if (found.isNotEmpty()) found 
-                                        else story.targetWords.map { AnkiVocabularyItem(kanji = it) } 
-                                    } 
-                                } 
-                                
-                                if (showFurigana) { 
-                                    val paragraphs = remember(story.content) { 
-                                        story.content.split("\n\n", "\n").filter { it.isNotBlank() } 
-                                    } 
-                                    val targetWordItems = remember(story.targetWords, vocabSummary?.words) { 
-                                        story.targetWords.map { tw -> 
-                                            val v = vocabSummary?.words?.find { 
-                                                it.displayWord.equals(tw, ignoreCase = true) || 
-                                                it.kanji.equals(tw, ignoreCase = true) || 
-                                                it.reading.equals(tw, ignoreCase = true) 
-                                            } 
-                                            StoryWordItem( 
-                                                kanji = v?.kanji?.ifBlank { tw } ?: tw, 
-                                                reading = v?.reading ?: "", 
-                                                meaning = v?.meaning ?: "" 
-                                            ) 
-                                        } 
-                                    } 
-                                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { 
-                                        paragraphs.forEach { para -> 
-                                            val tokens = remember(para, targetWordItems) { 
-                                                StoryTokenizer.tokenizeToStoryTokens(para, targetWordItems) 
-                                            } 
-                                            FlowRow( 
-                                                modifier = Modifier.fillMaxWidth(), 
-                                                horizontalArrangement = Arrangement.Start, 
-                                                verticalArrangement = Arrangement.Center 
-                                            ) { 
-                                                tokens.forEach { token -> 
-                                                    val isTarget = highlightWords && story.targetWords.any { tw -> 
-                                                        tw.equals(token.surface, ignoreCase = true) || 
-                                                        (token.isTarget && tw.equals(token.surface, ignoreCase = true)) 
-                                                    } 
-                                                    BlossomStoryTokenView( 
-                                                        token = token, 
-                                                        showPronunciation = true, 
-                                                        pronunciationType = "japanese", 
-                                                        isSelected = isTarget, 
-                                                        onClick = { 
-                                                            if (token.surface.isNotBlank()) { 
-                                                                val item = vocabSummary?.words?.find { it.displayWord == token.surface || it.kanji == token.surface } 
-                                                                    ?: AnkiVocabularyItem( 
-                                                                        kanji = token.surface, 
-                                                                        reading = token.segments.joinToString("") { it.ruby ?: it.text }, 
-                                                                        meaning = token.meaning 
-                                                                    ) 
-                                                                selectedWordDetail = item 
-                                                            } 
-                                                        } 
-                                                    ) 
-                                                } 
-                                            } 
-                                        } 
-                                    } 
-                                } else { 
-                                    val annotatedContent = remember(story.content, targetVocabWords, BlossomColors.currentTheme) { 
-                                        if (targetVocabWords.isNotEmpty()) { 
-                                            buildHighlightedStoryText( 
-                                                content = story.content, 
-                                                vocabWords = targetVocabWords 
-                                            ) 
-                                        } else { 
-                                            AnnotatedString(story.content) 
-                                        } 
-                                    } 
-                                    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
-                                    Text( 
-                                        text = annotatedContent, 
-                                        fontSize = 17.sp, 
-                                        color = BlossomColors.TextPrimary, 
-                                        lineHeight = 34.sp, 
-                                        letterSpacing = 0.5.sp, 
-                                        onTextLayout = { textLayoutResult = it }, 
-                                        modifier = Modifier.pointerInput(targetVocabWords) { 
-                                            if (targetVocabWords.isNotEmpty()) { 
-                                                detectTapGestures { offset -> 
-                                                    textLayoutResult?.let { layout -> 
-                                                        val position = layout.getOffsetForPosition(offset) 
-                                                        annotatedContent.getStringAnnotations(tag = "WORD", start = position, end = position) 
-                                                            .firstOrNull()?.let { annotation -> 
-                                                                val word = targetVocabWords.find { it.displayWord == annotation.item } 
-                                                                if (word != null) { 
-                                                                    selectedWordDetail = word 
-                                                                } 
-                                                            } 
-                                                    } 
-                                                } 
-                                            } 
-                                        } 
-                                    ) 
-                                } 
-                                
-                                if (story.targetWords.isNotEmpty()) { 
-                                    Spacer(modifier = Modifier.height(20.dp)) 
-                                    Surface( 
-                                        shape = RoundedCornerShape(14.dp), 
-                                        color = BlossomColors.SurfaceElevated, 
-                                        border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                        modifier = Modifier.fillMaxWidth() 
-                                    ) { 
-                                        Column(modifier = Modifier.padding(14.dp)) { 
-                                            Row(verticalAlignment = Alignment.CenterVertically) { 
-                                                Icon( 
-                                                    Icons.Filled.School, 
-                                                    contentDescription = null, 
-                                                    tint = BlossomColors.SakuraRose, 
-                                                    modifier = Modifier.size(16.dp) 
-                                                ) 
-                                                Spacer(modifier = Modifier.width(8.dp)) 
-                                                Text( 
-                                                    text = "TARGET WORDS FROM YOUR CARDS (${story.targetWords.size})", 
-                                                    fontSize = 11.sp, 
-                                                    fontWeight = FontWeight.Bold, 
-                                                    color = BlossomColors.TextSecondary, 
-                                                    letterSpacing = 0.5.sp 
-                                                ) 
-                                            } 
-                                            Spacer(modifier = Modifier.height(10.dp)) 
-                                            FlowRow( 
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp), 
-                                                verticalArrangement = Arrangement.spacedBy(6.dp), 
-                                                modifier = Modifier.fillMaxWidth() 
-                                            ) { 
-                                                story.targetWords.forEach { word -> 
-                                                    val isPresent = story.content.contains(word) 
-                                                    val matchedItem = vocabSummary?.words?.find { it.displayWord == word || it.kanji == word } 
-                                                    Surface( 
-                                                        shape = RoundedCornerShape(8.dp), 
-                                                        color = if (isPresent) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard1, 
-                                                        border = BorderStroke( 
-                                                            1.dp, 
-                                                            if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
-                                                        ), 
-                                                        onClick = { 
-                                                            matchedItem?.let { selectedWordDetail = it } 
-                                                        } 
-                                                    ) { 
-                                                        Row( 
-                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                                            verticalAlignment = Alignment.CenterVertically 
-                                                        ) { 
-                                                            Text( 
-                                                                text = word, 
-                                                                fontSize = 12.sp, 
-                                                                fontWeight = if (isPresent) FontWeight.Bold else FontWeight.Normal, 
-                                                                color = if (isPresent) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                                                                maxLines = 1, 
-                                                                softWrap = false 
-                                                            ) 
-                                                            if (isPresent) { 
-                                                                Spacer(modifier = Modifier.width(4.dp)) 
-                                                                Icon( 
-                                                                    Icons.Filled.Check, 
-                                                                    contentDescription = "Used in story", 
-                                                                    tint = BlossomColors.BlossomGreen, 
-                                                                    modifier = Modifier.size(12.dp) 
-                                                                ) 
-                                                            } 
-                                                        } 
-                                                    } 
-                                                } 
-                                            } 
-                                        } 
-                                    } 
-                                } 
-                                
-                                if (story.questions.isNotEmpty()) { 
-                                    Spacer(modifier = Modifier.height(20.dp)) 
-                                    Box( 
-                                        modifier = Modifier 
-                                            .fillMaxWidth() 
-                                            .height(52.dp) 
-                                            .clip(RoundedCornerShape(20.dp)) 
-                                            .background(BlossomColors.SakuraRose.copy(alpha = 0.85f)) 
-                                            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), shape = RoundedCornerShape(20.dp)) 
-                                            .clickable { showQuizOverlay = true }, 
-                                        contentAlignment = Alignment.Center 
-                                    ) { 
-                                        Row( 
-                                            verticalAlignment = Alignment.CenterVertically, 
-                                            horizontalArrangement = Arrangement.Center 
-                                        ) { 
-                                            Icon( 
-                                                Icons.Filled.AutoAwesome, 
-                                                contentDescription = null, 
-                                                tint = BlossomColors.BlossomWhite, 
-                                                modifier = Modifier.size(18.dp) 
-                                            ) 
-                                            Spacer(modifier = Modifier.width(8.dp)) 
-                                            Text( 
-                                                text = "Take Comprehension Quiz (${story.questions.size})", 
-                                                fontSize = 15.sp, 
-                                                fontWeight = FontWeight.Bold, 
-                                                color = BlossomColors.BlossomWhite 
-                                            ) 
-                                        } 
-                                    } 
-                                } 
-                            } 
-                        } 
-                    } 
-                } 
-            } 
-        } else if (!isGeneratingStory) { 
-        
+
+        if (story == null && !isGeneratingStory) { 
             Box( 
                 modifier = Modifier 
-                    .fillMaxWidth()
+                    .fillMaxWidth() 
                     .padding(vertical = 32.dp), 
                 contentAlignment = Alignment.Center 
             ) { 
@@ -1093,26 +1363,26 @@ fun ReadingScreen(
                         Icons.Filled.School, 
                         contentDescription = null, 
                         tint = BlossomColors.SakuraRose, 
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                        modifier = Modifier.size(48.dp) 
+                    ) 
+                    Spacer(modifier = Modifier.height(12.dp)) 
                     Text( 
                         text = "No story generated yet", 
                         color = BlossomColors.TextSecondary, 
                         fontSize = 14.sp 
-                    )
+                    ) 
                     Text( 
                         text = "Pick your JLPT level and tap Generate Story above", 
                         color = BlossomColors.TextMuted, 
                         fontSize = 12.sp 
-                    )
+                    ) 
                 } 
             } 
         } 
-        
-        Spacer(modifier = Modifier.height(96.dp))
+
+        Spacer(modifier = Modifier.height(padding.calculateBottomPadding() + 32.dp)) 
     } 
-    
+    } 
     
     if (showHistorySheet) { 
         ModalBottomSheet( 
@@ -1123,8 +1393,8 @@ fun ReadingScreen(
         ) { 
             Column( 
                 modifier = Modifier 
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .fillMaxWidth() 
+                    .padding(horizontal = 20.dp, vertical = 12.dp) 
             ) { 
                 Row( 
                     modifier = Modifier.fillMaxWidth(), 
@@ -1132,11 +1402,11 @@ fun ReadingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween 
                 ) { 
                     Text( 
-                        text = "Reading History (${savedStories.size})", 
+                        text = "Stories History (${savedStories.size})", 
                         fontSize = 18.sp, 
                         fontWeight = FontWeight.Bold, 
                         color = BlossomColors.TextPrimary 
-                    )
+                    ) 
                     if (savedStories.isNotEmpty()) { 
                         TextButton( 
                             onClick = { 
@@ -1148,109 +1418,153 @@ fun ReadingScreen(
                     } 
                 } 
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp)) 
                 
                 if (savedStories.isEmpty()) { 
                     Box( 
                         modifier = Modifier 
-                            .fillMaxWidth()
+                            .fillMaxWidth() 
                             .padding(vertical = 40.dp), 
                         contentAlignment = Alignment.Center 
                     ) { 
-                        Text("No saved stories yet", color = BlossomColors.TextMuted, fontSize = 14.sp)
+                        Text("No saved stories yet", color = BlossomColors.TextMuted, fontSize = 14.sp) 
                     } 
                 } else { 
                     LazyColumn( 
                         modifier = Modifier 
-                            .fillMaxWidth()
+                            .fillMaxWidth() 
                             .weight(1f), 
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp) 
                     ) { 
-                        items(savedStories, key = { it.id }) { item ->
+                        items(savedStories, key = { it.id }) { item -> 
+                            val itemCoverFile = remember(item.id, wallpaperUpdateTrigger) { 
+                                val f = File(context.filesDir, "stories/images/${item.id}/cover.png") 
+                                if (f.exists()) f else null 
+                            } 
+                            val itemBitmap = remember(itemCoverFile) { 
+                                itemCoverFile?.let { f -> 
+                                    try { 
+                                        BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() 
+                                    } catch (e: Exception) { 
+                                        null 
+                                    } 
+                                } 
+                            } 
+
                             Card( 
-                                shape = RoundedCornerShape(14.dp), 
+                                shape = RoundedCornerShape(16.dp), 
                                 colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceElevated), 
                                 border = BorderStroke(1.dp, BlossomColors.CardBorder), 
                                 modifier = Modifier 
-                                    .fillMaxWidth()
+                                    .fillMaxWidth() 
+                                    .height(115.dp) 
                                     .clickable { 
                                         currentStory = item 
                                         coroutineScope.launch { 
-                                            historySheetState.hide()
+                                            historySheetState.hide() 
                                             showHistorySheet = false 
                                         } 
                                     } 
                             ) { 
-                                Row( 
-                                    modifier = Modifier 
-                                        .fillMaxWidth()
-                                        .padding(14.dp), 
-                                    verticalAlignment = Alignment.CenterVertically, 
-                                    horizontalArrangement = Arrangement.SpaceBetween 
-                                ) { 
-                                    Column(modifier = Modifier.weight(1f)) { 
-                                        Row(verticalAlignment = Alignment.CenterVertically) { 
-                                            Surface( 
-                                                shape = RoundedCornerShape(6.dp), 
-                                                color = BlossomColors.SakuraRoseContainer 
-                                            ) { 
-                                                Text( 
-                                                    text = item.jlptLevel, 
-                                                    fontSize = 10.sp, 
-                                                    fontWeight = FontWeight.Bold, 
-                                                    color = BlossomColors.SakuraRose, 
-                                                    maxLines = 1, 
-                                                    softWrap = false, 
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            } 
-                                            if (!item.theme.isNullOrBlank()) { 
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                val themeBadge = StoryThemes.getThemeBadgeColors(item.theme)
+                                Box(modifier = Modifier.fillMaxSize()) { 
+                                    if (itemBitmap != null) { 
+                                        Image( 
+                                            bitmap = itemBitmap, 
+                                            contentDescription = null, 
+                                            contentScale = ContentScale.Crop, 
+                                            modifier = Modifier.fillMaxSize() 
+                                        ) 
+                                        Box( 
+                                            modifier = Modifier 
+                                                .fillMaxSize() 
+                                                .background( 
+                                                    Brush.verticalGradient( 
+                                                        colors = listOf( 
+                                                            Color.Black.copy(alpha = 0.50f), 
+                                                            Color.Black.copy(alpha = 0.85f) 
+                                                        ) 
+                                                    ) 
+                                                ) 
+                                        ) 
+                                    } 
+
+                                    Row( 
+                                        modifier = Modifier 
+                                            .fillMaxSize() 
+                                            .padding(14.dp), 
+                                        verticalAlignment = Alignment.CenterVertically, 
+                                        horizontalArrangement = Arrangement.SpaceBetween 
+                                    ) { 
+                                        Column( 
+                                            modifier = Modifier 
+                                                .weight(1f) 
+                                                .fillMaxHeight(), 
+                                            verticalArrangement = Arrangement.SpaceBetween 
+                                        ) { 
+                                            Row(verticalAlignment = Alignment.CenterVertically) { 
                                                 Surface( 
                                                     shape = RoundedCornerShape(6.dp), 
-                                                    color = themeBadge.backgroundColor, 
-                                                    border = BorderStroke(1.dp, themeBadge.borderColor)
+                                                    color = BlossomColors.SakuraRoseContainer 
                                                 ) { 
                                                     Text( 
-                                                        text = StoryThemes.formatThemeName(item.theme), 
+                                                        text = item.jlptLevel, 
                                                         fontSize = 10.sp, 
                                                         fontWeight = FontWeight.Bold, 
-                                                        color = themeBadge.contentColor, 
+                                                        color = BlossomColors.SakuraRose, 
                                                         maxLines = 1, 
                                                         softWrap = false, 
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    )
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                                    ) 
                                                 } 
+                                                if (!item.theme.isNullOrBlank()) { 
+                                                    Spacer(modifier = Modifier.width(6.dp)) 
+                                                    val themeBadge = StoryThemes.getThemeBadgeColors(item.theme) 
+                                                    Surface( 
+                                                        shape = RoundedCornerShape(6.dp), 
+                                                        color = themeBadge.backgroundColor, 
+                                                        border = BorderStroke(1.dp, themeBadge.borderColor) 
+                                                    ) { 
+                                                        Text( 
+                                                            text = StoryThemes.formatThemeName(item.theme), 
+                                                            fontSize = 10.sp, 
+                                                            fontWeight = FontWeight.Bold, 
+                                                            color = themeBadge.contentColor, 
+                                                            maxLines = 1, 
+                                                            softWrap = false, 
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                                        ) 
+                                                    } 
+                                                } 
+                                                Spacer(modifier = Modifier.width(8.dp)) 
+                                                Text( 
+                                                    text = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(item.createdAt)), 
+                                                    fontSize = 11.sp, 
+                                                    color = if (itemBitmap != null) Color.White.copy(alpha = 0.75f) else BlossomColors.TextSecondary, 
+                                                    maxLines = 1, 
+                                                    softWrap = false 
+                                                ) 
                                             } 
-                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text( 
-                                                text = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(item.createdAt)), 
-                                                fontSize = 11.sp, 
-                                                color = BlossomColors.TextSecondary, 
-                                                maxLines = 1, 
-                                                softWrap = false 
-                                            )
+                                                text = item.title, 
+                                                fontWeight = FontWeight.SemiBold, 
+                                                fontSize = 15.sp, 
+                                                color = if (itemBitmap != null) Color.White else BlossomColors.TextPrimary, 
+                                                maxLines = 2, 
+                                                overflow = TextOverflow.Ellipsis 
+                                            ) 
                                         } 
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text( 
-                                            text = item.title, 
-                                            fontWeight = FontWeight.SemiBold, 
-                                            fontSize = 15.sp, 
-                                            color = BlossomColors.TextPrimary, 
-                                            maxLines = 1
-                                        )
-                                    } 
-                                    IconButton( 
-                                        onClick = { 
-                                            storyToDelete = item 
+                                        Spacer(modifier = Modifier.width(8.dp)) 
+                                        IconButton( 
+                                            onClick = { 
+                                                storyToDelete = item 
+                                            } 
+                                        ) { 
+                                            Icon( 
+                                                Icons.Filled.DeleteOutline, 
+                                                contentDescription = "Delete Story", 
+                                                tint = BlossomColors.BlossomRed 
+                                            ) 
                                         } 
-                                    ) { 
-                                        Icon( 
-                                            Icons.Filled.DeleteOutline, 
-                                            contentDescription = "Delete Story", 
-                                            tint = BlossomColors.BlossomRed 
-                                        )
                                     } 
                                 } 
                             } 
@@ -1282,7 +1596,7 @@ fun ReadingScreen(
                         ) 
                         Spacer(modifier = Modifier.width(10.dp)) 
                         Text( 
-                            text = "Clear Reading History?", 
+                            text = "Clear Stories History?", 
                             fontWeight = FontWeight.Bold, 
                             fontSize = 18.sp, 
                             color = BlossomColors.TextPrimary 
@@ -1290,7 +1604,7 @@ fun ReadingScreen(
                     } 
                     
                     Text( 
-                        text = "Are you sure you want to clear all reading history? This will permanently delete all saved stories.", 
+                        text = "Are you sure you want to clear all stories history? This will permanently delete all saved stories.", 
                         fontSize = 13.sp, 
                         color = BlossomColors.TextSecondary, 
                         lineHeight = 20.sp 
@@ -1500,6 +1814,44 @@ fun ReadingScreen(
         ComprehensionQuizOverlay( 
             questions = currentStory!!.questions, 
             onDismiss = { showQuizOverlay = false } 
+        ) 
+    } 
+    
+    if (showWallhavenPicker && currentStory != null) { 
+        val curStory = currentStory!! 
+        WallhavenImagePickerSheet( 
+            storyId = curStory.id, 
+            initialTitle = curStory.title, 
+            initialGenre = curStory.theme ?: "Anime", 
+            onDismiss = { showWallhavenPicker = false }, 
+            onImageSelected = { 
+                wallpaperUpdateTrigger++ 
+                showWallhavenPicker = false 
+            } 
+        ) 
+    } 
+    
+    if (quickJishoWord != null) { 
+        val wordText = quickJishoWord!! 
+        val existingItem = currentStory?.targetWordsData?.find { it.kanji == wordText || it.surface == wordText } 
+        val itemToDisplay = existingItem ?: StoryWordItem( 
+            kanji = wordText, 
+            reading = "", 
+            meaning = "" 
+        ) 
+        BlossomWordBottomSheet( 
+            wordItem = itemToDisplay, 
+            isBookmarked = false, 
+            showFurigana = showFurigana, 
+            onToggleFurigana = { 
+                showFurigana = !showFurigana 
+                prefs.showFuriganaInReader = showFurigana 
+            }, 
+            onToggleBookmark = {}, 
+            onPlayAudio = { 
+                quickJishoWord?.let { ttsHelper.speak(it) } 
+            }, 
+            onDismiss = { quickJishoWord = null } 
         ) 
     } 
 } 
