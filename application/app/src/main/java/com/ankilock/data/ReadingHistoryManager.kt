@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.ankilock.reading.FishAudioService
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File 
 
 class ReadingHistoryManager(private val context: Context) { 
     
@@ -69,6 +70,7 @@ class ReadingHistoryManager(private val context: Context) {
                 
                 val theme = obj.optString("theme", "").ifBlank { null } 
                 val topic = obj.optString("topic", "").ifBlank { null } 
+                val isPinned = obj.optBoolean("isPinned", false) 
                 
                 list.add( 
                     GeneratedStory( 
@@ -81,14 +83,18 @@ class ReadingHistoryManager(private val context: Context) {
                         targetWordsData = wordsData, 
                         questions = questions, 
                         theme = theme, 
-                        topic = topic 
+                        topic = topic, 
+                        isPinned = isPinned 
                     ) 
                 ) 
             } 
         } catch (e: Exception) { 
             e.printStackTrace() 
         } 
-        return list.sortedByDescending { it.createdAt } 
+        return list.sortedWith( 
+            compareByDescending<GeneratedStory> { it.isPinned } 
+                .thenByDescending { it.createdAt } 
+        ) 
     } 
     
     fun saveStory(story: GeneratedStory) { 
@@ -99,15 +105,87 @@ class ReadingHistoryManager(private val context: Context) {
         saveList(trimmed) 
     } 
     
+    fun togglePin(id: String): Boolean { 
+        val stories = getStories().map { story -> 
+            if (story.id == id) { 
+                story.copy(isPinned = !story.isPinned) 
+            } else { 
+                story 
+            } 
+        } 
+        saveList(stories) 
+        return stories.find { it.id == id }?.isPinned ?: false 
+    } 
+    
     fun deleteStory(id: String) { 
         val updated = getStories().filterNot { it.id == id } 
         saveList(updated) 
         FishAudioService.deleteAudioForStory(context, id) 
+        try { 
+            File(context.filesDir, "stories/images/$id").deleteRecursively() 
+        } catch (_: Exception) { 
+        } 
     } 
     
     fun clearAll() { 
         prefs.edit().remove(KEY_STORIES).apply() 
         FishAudioService.clearAllAudio(context) 
+        try { 
+            File(context.filesDir, "stories/images").deleteRecursively() 
+        } catch (_: Exception) { 
+        } 
+    } 
+    
+    fun getTotalStorageBytes(): Long { 
+        var total = 0L 
+        try { 
+            val jsonSize = prefs.getString(KEY_STORIES, null)?.toByteArray(Charsets.UTF_8)?.size?.toLong() ?: 0L 
+            total += jsonSize 
+            
+            val imagesDir = File(context.filesDir, "stories/images") 
+            if (imagesDir.exists()) { 
+                imagesDir.walkTopDown().forEach { file -> 
+                    if (file.isFile) total += file.length() 
+                } 
+            } 
+            
+            val audioDir = FishAudioService.getAudioDir(context) 
+            if (audioDir.exists()) { 
+                audioDir.walkTopDown().forEach { file -> 
+                    if (file.isFile) total += file.length() 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+        return total 
+    } 
+    
+    fun getAudioStorageBytes(): Long { 
+        var total = 0L 
+        try { 
+            val audioDir = FishAudioService.getAudioDir(context) 
+            if (audioDir.exists()) { 
+                audioDir.walkTopDown().forEach { file -> 
+                    if (file.isFile) total += file.length() 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+        return total 
+    } 
+    
+    fun formatStorageSize(bytes: Long): String { 
+        if (bytes <= 0L) return "0 KB" 
+        val kb = bytes / 1024.0 
+        if (kb < 1024.0) { 
+            return String.format(java.util.Locale.US, "%.1f KB", kb) 
+        } 
+        val mb = kb / 1024.0 
+        return String.format(java.util.Locale.US, "%.1f MB", mb) 
+    } 
+    
+    fun clearAudioCache(): Boolean { 
+        return FishAudioService.clearAllAudio(context) 
     } 
     
     private fun saveList(list: List<GeneratedStory>) { 
@@ -147,6 +225,7 @@ class ReadingHistoryManager(private val context: Context) {
                         qArray.put(qObj) 
                     } 
                     put("questions", qArray) 
+                    put("isPinned", story.isPinned) 
                     
                     if (story.theme != null) put("theme", story.theme) 
                     if (story.topic != null) put("topic", story.topic) 

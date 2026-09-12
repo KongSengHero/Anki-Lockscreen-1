@@ -38,7 +38,8 @@ data class GeneratedStory(
     val targetWordsData: List<StoryWordItem> = emptyList(), 
     val questions: List<StoryQuizQuestion> = emptyList(), 
     val theme: String? = null, 
-    val topic: String? = null 
+    val topic: String? = null, 
+    val isPinned: Boolean = false 
 ) 
 
 data class CardModel( 

@@ -58,6 +58,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
@@ -229,6 +231,12 @@ fun ReadingScreen(
     var savedStories by remember { mutableStateOf(historyManager.getStories()) } 
     var showClearAllConfirmation by remember { mutableStateOf(false) } 
     var storyToDelete by remember { mutableStateOf<GeneratedStory?>(null) } 
+    
+    LaunchedEffect(showHistorySheet) { 
+        if (showHistorySheet) { 
+            savedStories = historyManager.getStories() 
+        } 
+    } 
     
     val wordDetailSheetState = rememberModalBottomSheetState() 
     var selectedWordDetail by remember { mutableStateOf<AnkiVocabularyItem?>(null) } 
@@ -656,14 +664,17 @@ fun ReadingScreen(
                                             isNarrating = false 
                                             currentlyPlayingStoryId = story.id 
 
-                                            if (fishAudioApiKey.isNotBlank()) { 
+                                            val currentApiKey = prefs.fishAudioApiKey ?: fishAudioApiKey 
+                                            val currentVoiceId = prefs.fishAudioVoiceId 
+                                            val currentModel = prefs.fishAudioModel 
+                                            if (currentApiKey.isNotBlank()) { 
                                                 isSynthesizingAudio = true 
                                                 coroutineScope.launch { 
                                                     val narrationText = "${story.title}。\n\n${story.content}" 
                                                     val result = audioService.synthesizeStoryAudio( 
-                                                        apiKey = fishAudioApiKey, 
-                                                        voiceId = fishAudioVoiceId, 
-                                                        model = fishAudioModel, 
+                                                        apiKey = currentApiKey, 
+                                                        voiceId = currentVoiceId, 
+                                                        model = currentModel, 
                                                         storyId = story.id, 
                                                         text = narrationText 
                                                     ) 
@@ -1401,12 +1412,20 @@ fun ReadingScreen(
                     verticalAlignment = Alignment.CenterVertically, 
                     horizontalArrangement = Arrangement.SpaceBetween 
                 ) { 
-                    Text( 
-                        text = "Stories History (${savedStories.size})", 
-                        fontSize = 18.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = BlossomColors.TextPrimary 
-                    ) 
+                    Column { 
+                        Text( 
+                            text = "Stories History (${savedStories.size})", 
+                            fontSize = 18.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = BlossomColors.TextPrimary 
+                        ) 
+                        val totalStorageBytes = remember(savedStories) { historyManager.getTotalStorageBytes() } 
+                        Text( 
+                            text = "Storage: ${historyManager.formatStorageSize(totalStorageBytes)}", 
+                            fontSize = 12.sp, 
+                            color = BlossomColors.TextSecondary 
+                        ) 
+                    } 
                     if (savedStories.isNotEmpty()) { 
                         TextButton( 
                             onClick = { 
@@ -1502,6 +1521,35 @@ fun ReadingScreen(
                                             verticalArrangement = Arrangement.SpaceBetween 
                                         ) { 
                                             Row(verticalAlignment = Alignment.CenterVertically) { 
+                                                if (item.isPinned) { 
+                                                    Surface( 
+                                                        shape = RoundedCornerShape(6.dp), 
+                                                        color = BlossomColors.SakuraRose.copy(alpha = 0.20f), 
+                                                        border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.50f)) 
+                                                    ) { 
+                                                        Row( 
+                                                            verticalAlignment = Alignment.CenterVertically, 
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                                        ) { 
+                                                            Icon( 
+                                                                Icons.Filled.PushPin, 
+                                                                contentDescription = null, 
+                                                                tint = BlossomColors.SakuraRose, 
+                                                                modifier = Modifier.size(10.dp) 
+                                                            ) 
+                                                            Spacer(modifier = Modifier.width(3.dp)) 
+                                                            Text( 
+                                                                text = "Pinned", 
+                                                                fontSize = 9.5.sp, 
+                                                                fontWeight = FontWeight.Bold, 
+                                                                color = BlossomColors.SakuraRose, 
+                                                                maxLines = 1, 
+                                                                softWrap = false 
+                                                            ) 
+                                                        } 
+                                                    } 
+                                                    Spacer(modifier = Modifier.width(6.dp)) 
+                                                } 
                                                 Surface( 
                                                     shape = RoundedCornerShape(6.dp), 
                                                     color = BlossomColors.SakuraRoseContainer 
@@ -1554,16 +1602,30 @@ fun ReadingScreen(
                                             ) 
                                         } 
                                         Spacer(modifier = Modifier.width(8.dp)) 
-                                        IconButton( 
-                                            onClick = { 
-                                                storyToDelete = item 
+                                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                                            IconButton( 
+                                                onClick = { 
+                                                    historyManager.togglePin(item.id) 
+                                                    savedStories = historyManager.getStories() 
+                                                } 
+                                            ) { 
+                                                Icon( 
+                                                    if (item.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin, 
+                                                    contentDescription = if (item.isPinned) "Unpin Story" else "Pin Story", 
+                                                    tint = if (item.isPinned) BlossomColors.SakuraRose else (if (itemBitmap != null) Color.White.copy(alpha = 0.75f) else BlossomColors.TextSecondary) 
+                                                ) 
                                             } 
-                                        ) { 
-                                            Icon( 
-                                                Icons.Filled.DeleteOutline, 
-                                                contentDescription = "Delete Story", 
-                                                tint = BlossomColors.BlossomRed 
-                                            ) 
+                                            IconButton( 
+                                                onClick = { 
+                                                    storyToDelete = item 
+                                                } 
+                                            ) { 
+                                                Icon( 
+                                                    Icons.Filled.DeleteOutline, 
+                                                    contentDescription = "Delete Story", 
+                                                    tint = BlossomColors.BlossomRed 
+                                                ) 
+                                            } 
                                         } 
                                     } 
                                 } 

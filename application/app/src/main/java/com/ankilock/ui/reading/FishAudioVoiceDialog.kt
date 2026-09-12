@@ -1,9 +1,10 @@
 package com.ankilock.ui.reading 
 
-import android.content.Context 
+import android.graphics.BitmapFactory 
 import androidx.compose.foundation.BorderStroke 
-import androidx.compose.foundation.background 
+import androidx.compose.foundation.Image 
 import androidx.compose.foundation.clickable 
+import androidx.compose.foundation.horizontalScroll 
 import androidx.compose.foundation.layout.Arrangement 
 import androidx.compose.foundation.layout.Box 
 import androidx.compose.foundation.layout.Column 
@@ -25,7 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp 
 import androidx.compose.material.icons.filled.Check 
 import androidx.compose.material.icons.filled.Close 
+import androidx.compose.material.icons.filled.Favorite 
+import androidx.compose.material.icons.filled.FavoriteBorder 
 import androidx.compose.material.icons.filled.GraphicEq 
+import androidx.compose.material.icons.filled.Headphones 
 import androidx.compose.material.icons.filled.Search 
 import androidx.compose.material.icons.filled.Stop 
 import androidx.compose.material3.BottomSheetDefaults 
@@ -45,12 +49,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect 
 import androidx.compose.runtime.getValue 
 import androidx.compose.runtime.mutableStateOf 
+import androidx.compose.runtime.produceState 
 import androidx.compose.runtime.remember 
 import androidx.compose.runtime.rememberCoroutineScope 
 import androidx.compose.runtime.setValue 
 import androidx.compose.ui.Alignment 
 import androidx.compose.ui.Modifier 
+import androidx.compose.ui.draw.clip 
 import androidx.compose.ui.graphics.Color 
+import androidx.compose.ui.graphics.ImageBitmap 
+import androidx.compose.ui.graphics.asImageBitmap 
+import androidx.compose.ui.layout.ContentScale 
 import androidx.compose.ui.platform.LocalContext 
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController 
 import androidx.compose.ui.text.font.FontWeight 
@@ -62,7 +71,11 @@ import com.ankilock.data.FishAudioVoiceOption
 import com.ankilock.data.PreferencesManager 
 import com.ankilock.reading.FishAudioService 
 import com.ankilock.ui.blossom.BlossomColors 
+import kotlinx.coroutines.Dispatchers 
 import kotlinx.coroutines.launch 
+import kotlinx.coroutines.withContext 
+import java.net.HttpURLConnection 
+import java.net.URL 
 
 @OptIn(ExperimentalMaterial3Api::class) 
 @Composable 
@@ -76,11 +89,16 @@ fun FishAudioVoiceDialog(
     val context = LocalContext.current 
     val coroutineScope = rememberCoroutineScope() 
     val keyboardController = LocalSoftwareKeyboardController.current 
+    val prefs = remember { PreferencesManager(context) } 
     val audioService = remember { FishAudioService(context) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     
     val presets = PreferencesManager.PRESET_FISH_AUDIO_VOICES 
     val cleanCurrentId = PreferencesManager.extractVoiceId(currentVoiceId) 
+    
+    var favoriteIds by remember { mutableStateOf(prefs.favoriteFishAudioVoiceIds) } 
+    val filterChips = listOf("All", "Favorites", "Female", "Male", "Neutral", "Young", "Middle-aged", "Anime", "Narrator") 
+    var selectedFilter by remember { mutableStateOf("All") } 
     
     var searchQuery by remember { mutableStateOf("") } 
     var isSearching by remember { mutableStateOf(false) } 
@@ -109,6 +127,11 @@ fun FishAudioVoiceDialog(
             onSelectVoice(id, name) 
             onDismiss() 
         } 
+    } 
+    
+    fun handleToggleFavorite(id: String) { 
+        prefs.toggleFavoriteVoice(id) 
+        favoriteIds = prefs.favoriteFishAudioVoiceIds 
     } 
     
     fun handlePreview(voiceId: String) { 
@@ -150,30 +173,45 @@ fun FishAudioVoiceDialog(
         } 
     } 
     
-    fun performSearch() { 
+    fun performSearch(tagFilter: String? = if (selectedFilter in listOf("All", "Favorites")) null else selectedFilter) { 
         val q = searchQuery.trim() 
-        if (q.isBlank()) return 
-        if (apiKey.isBlank()) { 
-            searchError = "Please enter Fish Audio API key to search public voices" 
-            return 
-        } 
         keyboardController?.hide() 
         isSearching = true 
         searchError = null 
         hasSearched = true 
         
         coroutineScope.launch { 
-            val res = audioService.searchVoices(apiKey = apiKey, query = q) 
+            val res = audioService.searchVoices( 
+                apiKey = apiKey, 
+                query = q, 
+                tag = tagFilter, 
+                sortBy = "score", 
+                pageSize = 20 
+            ) 
             isSearching = false 
             res.onSuccess { list -> 
                 searchResults = list 
                 if (list.isEmpty()) { 
-                    searchError = "No public voices found matching \"$q\"" 
+                    searchError = if (q.isNotBlank()) "No public voices found matching \"$q\"" else "No public voices found" 
                 } 
             }.onFailure { err -> 
                 searchError = err.message ?: "Search request failed" 
             } 
         } 
+    } 
+    
+    val displayedPresets = presets.filter { preset -> 
+        when (selectedFilter) { 
+            "All" -> true 
+            "Favorites" -> favoriteIds.contains(preset.id) 
+            else -> preset.tags.any { it.contains(selectedFilter, ignoreCase = true) } || preset.tag.contains(selectedFilter, ignoreCase = true) 
+        } 
+    } 
+    
+    val displayedSearchResults = if (selectedFilter == "Favorites") { 
+        searchResults.filter { favoriteIds.contains(it.id) } 
+    } else { 
+        searchResults 
     } 
     
     ModalBottomSheet( 
@@ -305,6 +343,54 @@ fun FishAudioVoiceDialog(
                     modifier = Modifier.fillMaxWidth() 
                 ) 
                 
+                Row( 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .horizontalScroll(rememberScrollState()), 
+                    horizontalArrangement = Arrangement.spacedBy(8.dp) 
+                ) { 
+                    filterChips.forEach { chip -> 
+                        val isChipSelected = selectedFilter == chip 
+                        Surface( 
+                            onClick = { 
+                                selectedFilter = chip 
+                                if (hasSearched || searchQuery.isNotBlank()) { 
+                                    performSearch(tagFilter = if (chip in listOf("All", "Favorites")) null else chip) 
+                                } 
+                            }, 
+                            shape = RoundedCornerShape(20.dp), 
+                            color = if (isChipSelected) BlossomColors.SakuraRose else BlossomColors.SurfaceElevated, 
+                            border = BorderStroke( 
+                                1.dp, 
+                                if (isChipSelected) BlossomColors.SakuraRose else BlossomColors.CardBorderSubtle 
+                            ) 
+                        ) { 
+                            Row( 
+                                verticalAlignment = Alignment.CenterVertically, 
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp) 
+                            ) { 
+                                if (chip == "Favorites") { 
+                                    Icon( 
+                                        Icons.Filled.Favorite, 
+                                        contentDescription = null, 
+                                        tint = if (isChipSelected) Color.White else BlossomColors.SakuraRose, 
+                                        modifier = Modifier.size(12.dp) 
+                                    ) 
+                                    Spacer(modifier = Modifier.width(4.dp)) 
+                                } 
+                                Text( 
+                                    text = chip, 
+                                    fontSize = 12.sp, 
+                                    fontWeight = if (isChipSelected) FontWeight.Bold else FontWeight.Medium, 
+                                    color = if (isChipSelected) Color.White else BlossomColors.TextSecondary, 
+                                    maxLines = 1, 
+                                    softWrap = false 
+                                ) 
+                            } 
+                        } 
+                    } 
+                } 
+                
                 if (hasSearched) { 
                     Row( 
                         modifier = Modifier.fillMaxWidth(), 
@@ -312,7 +398,7 @@ fun FishAudioVoiceDialog(
                         horizontalArrangement = Arrangement.SpaceBetween 
                     ) { 
                         Text( 
-                            text = "Search Results (${searchResults.size})", 
+                            text = "Search Results (${displayedSearchResults.size})", 
                             fontSize = 13.sp, 
                             fontWeight = FontWeight.SemiBold, 
                             color = BlossomColors.SakuraRose 
@@ -339,14 +425,17 @@ fun FishAudioVoiceDialog(
                         ) 
                     } 
                     
-                    searchResults.forEach { voice -> 
+                    displayedSearchResults.forEach { voice -> 
                         val isSelected = cleanCurrentId.equals(voice.id, ignoreCase = true) 
+                        val isFav = favoriteIds.contains(voice.id) 
                         VoiceOptionCard( 
                             voice = voice, 
                             isSelected = isSelected, 
+                            isFavorite = isFav, 
                             isGenerating = (isGeneratingPreview && previewVoiceId == voice.id), 
                             isPlaying = (isPlayingAudio && previewVoiceId == voice.id), 
                             onSelect = { handleSelect(voice.id, voice.name) }, 
+                            onToggleFavorite = { handleToggleFavorite(voice.id) }, 
                             onPreview = { handlePreview(voice.id) } 
                         ) 
                     } 
@@ -354,21 +443,39 @@ fun FishAudioVoiceDialog(
                     Spacer(modifier = Modifier.height(6.dp)) 
                 } 
                 
-                Text( 
-                    text = "Recommended Japanese Presets", 
-                    fontSize = 13.sp, 
-                    fontWeight = FontWeight.SemiBold, 
-                    color = BlossomColors.TextPrimary 
-                ) 
+                Row( 
+                    modifier = Modifier.fillMaxWidth(), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.SpaceBetween 
+                ) { 
+                    Text( 
+                        text = if (selectedFilter == "Favorites") "Favorite Voices (${displayedPresets.size})" else "Recommended Japanese Presets (${displayedPresets.size})", 
+                        fontSize = 13.sp, 
+                        fontWeight = FontWeight.SemiBold, 
+                        color = BlossomColors.TextPrimary 
+                    ) 
+                } 
                 
-                presets.forEach { preset -> 
+                if (displayedPresets.isEmpty() && selectedFilter == "Favorites" && !hasSearched) { 
+                    Text( 
+                        text = "No favorite voices saved yet. Tap the heart icon on any voice to save it here!", 
+                        fontSize = 12.sp, 
+                        color = BlossomColors.TextMuted, 
+                        modifier = Modifier.padding(vertical = 8.dp) 
+                    ) 
+                } 
+                
+                displayedPresets.forEach { preset -> 
                     val isSelected = cleanCurrentId.equals(preset.id, ignoreCase = true) 
+                    val isFav = favoriteIds.contains(preset.id) 
                     VoiceOptionCard( 
                         voice = preset, 
                         isSelected = isSelected, 
+                        isFavorite = isFav, 
                         isGenerating = (isGeneratingPreview && previewVoiceId == preset.id), 
                         isPlaying = (isPlayingAudio && previewVoiceId == preset.id), 
                         onSelect = { handleSelect(preset.id, preset.name) }, 
+                        onToggleFavorite = { handleToggleFavorite(preset.id) }, 
                         onPreview = { handlePreview(preset.id) } 
                     ) 
                 } 
@@ -448,55 +555,125 @@ fun FishAudioVoiceDialog(
 } 
 
 @Composable 
+private fun AsyncVoiceAvatar( 
+    avatarUrl: String, 
+    name: String, 
+    modifier: Modifier = Modifier 
+) { 
+    val imageState = produceState<ImageBitmap?>(initialValue = null, key1 = avatarUrl) { 
+        if (avatarUrl.isBlank()) { 
+            value = null 
+            return@produceState 
+        } 
+        value = withContext(Dispatchers.IO) { 
+            try { 
+                val conn = URL(avatarUrl).openConnection() as HttpURLConnection 
+                conn.setRequestProperty("User-Agent", "AnkiLock-Blossom/1.0") 
+                conn.connectTimeout = 6000 
+                conn.readTimeout = 10000 
+                conn.instanceFollowRedirects = true 
+                conn.inputStream.use { stream -> 
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap() 
+                } 
+            } catch (_: Exception) { 
+                null 
+            } 
+        } 
+    } 
+    
+    val bmp = imageState.value 
+    if (bmp != null) { 
+        Image( 
+            bitmap = bmp, 
+            contentDescription = name, 
+            contentScale = ContentScale.Crop, 
+            modifier = modifier.clip(RoundedCornerShape(12.dp)) 
+        ) 
+    } else { 
+        Surface( 
+            shape = RoundedCornerShape(12.dp), 
+            color = BlossomColors.SakuraRose.copy(alpha = 0.15f), 
+            border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.30f)), 
+            modifier = modifier 
+        ) { 
+            Box(contentAlignment = Alignment.Center) { 
+                Text( 
+                    text = name.take(1).uppercase(), 
+                    fontSize = 18.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    color = BlossomColors.SakuraRose 
+                ) 
+            } 
+        } 
+    } 
+} 
+
+private fun formatMetricCount(count: Int): String { 
+    if (count <= 0) return "0" 
+    if (count < 1000) return count.toString() 
+    if (count < 1000000) { 
+        val k = count / 1000.0 
+        return String.format(java.util.Locale.US, "%.1fk", k) 
+    } 
+    val m = count / 1000000.0 
+    return String.format(java.util.Locale.US, "%.1fM", m) 
+} 
+
+@Composable 
 private fun VoiceOptionCard( 
     voice: FishAudioVoiceOption, 
     isSelected: Boolean, 
+    isFavorite: Boolean, 
     isGenerating: Boolean, 
     isPlaying: Boolean, 
     onSelect: () -> Unit, 
+    onToggleFavorite: () -> Unit, 
     onPreview: () -> Unit 
 ) { 
     Surface( 
         onClick = onSelect, 
-        shape = RoundedCornerShape(14.dp), 
-        color = if (isSelected) BlossomColors.SakuraRoseContainer.copy(alpha = 0.5f) else BlossomColors.SurfaceElevated, 
+        shape = RoundedCornerShape(16.dp), 
+        color = if (isSelected) BlossomColors.SakuraRoseContainer.copy(alpha = 0.45f) else BlossomColors.SurfaceElevated, 
         border = BorderStroke( 
             1.dp, 
-            if (isSelected) BlossomColors.SakuraRose.copy(alpha = 0.55f) else BlossomColors.CardBorderSubtle 
+            if (isSelected) BlossomColors.SakuraRose.copy(alpha = 0.60f) else BlossomColors.CardBorderSubtle 
         ), 
         modifier = Modifier.fillMaxWidth() 
     ) { 
         Row( 
             modifier = Modifier 
                 .fillMaxWidth() 
-                .padding(horizontal = 14.dp, vertical = 12.dp), 
-            verticalAlignment = Alignment.CenterVertically, 
-            horizontalArrangement = Arrangement.SpaceBetween 
+                .padding(12.dp), 
+            verticalAlignment = Alignment.CenterVertically 
         ) { 
+            AsyncVoiceAvatar( 
+                avatarUrl = voice.avatarUrl, 
+                name = voice.name, 
+                modifier = Modifier.size(54.dp) 
+            ) 
+            
+            Spacer(modifier = Modifier.width(12.dp)) 
+            
             Column(modifier = Modifier.weight(1f)) { 
                 Row(verticalAlignment = Alignment.CenterVertically) { 
                     Text( 
                         text = voice.name, 
                         fontSize = 14.5.sp, 
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold, 
+                        fontWeight = FontWeight.Bold, 
                         color = if (isSelected) BlossomColors.SakuraRose else BlossomColors.TextPrimary, 
                         maxLines = 1, 
-                        overflow = TextOverflow.Ellipsis 
+                        overflow = TextOverflow.Ellipsis, 
+                        modifier = Modifier.weight(1f, fill = false) 
                     ) 
-                    if (voice.tag.isNotBlank()) { 
+                    if (voice.author.isNotBlank()) { 
                         Spacer(modifier = Modifier.width(6.dp)) 
-                        Surface( 
-                            shape = RoundedCornerShape(6.dp), 
-                            color = if (isSelected) BlossomColors.SakuraRose.copy(alpha = 0.20f) else BlossomColors.SurfaceCard2 
-                        ) { 
-                            Text( 
-                                text = voice.tag, 
-                                fontSize = 10.5.sp, 
-                                fontWeight = FontWeight.Medium, 
-                                color = if (isSelected) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
-                            ) 
-                        } 
+                        Text( 
+                            text = "by ${voice.author}", 
+                            fontSize = 11.sp, 
+                            color = BlossomColors.TextMuted, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis 
+                        ) 
                     } 
                 } 
                 
@@ -509,20 +686,96 @@ private fun VoiceOptionCard(
                         maxLines = 2, 
                         overflow = TextOverflow.Ellipsis 
                     ) 
-                } else if (voice.author.isNotBlank()) { 
-                    Spacer(modifier = Modifier.height(3.dp)) 
-                    Text( 
-                        text = "by ${voice.author}", 
-                        fontSize = 11.5.sp, 
-                        color = BlossomColors.TextMuted, 
-                        maxLines = 1 
-                    ) 
+                } 
+                
+                Spacer(modifier = Modifier.height(6.dp)) 
+                
+                Row( 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.spacedBy(8.dp) 
+                ) { 
+                    val displayTags = voice.tags.filter { it.isNotBlank() }.take(2) 
+                    if (displayTags.isNotEmpty()) { 
+                        for (t in displayTags) { 
+                            Surface( 
+                                shape = RoundedCornerShape(6.dp), 
+                                color = BlossomColors.SurfaceCard2 
+                            ) { 
+                                Text( 
+                                    text = t, 
+                                    fontSize = 9.5.sp, 
+                                    color = BlossomColors.TextSecondary, 
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                ) 
+                            } 
+                        } 
+                    } else if (voice.tag.isNotBlank()) { 
+                        Surface( 
+                            shape = RoundedCornerShape(6.dp), 
+                            color = BlossomColors.SurfaceCard2 
+                        ) { 
+                            Text( 
+                                text = voice.tag.substringBefore(" •"), 
+                                fontSize = 9.5.sp, 
+                                color = BlossomColors.TextSecondary, 
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                            ) 
+                        } 
+                    } 
+                    
+                    if (voice.taskCount > 0) { 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Icon( 
+                                Icons.Filled.Headphones, 
+                                contentDescription = null, 
+                                tint = BlossomColors.TextMuted, 
+                                modifier = Modifier.size(11.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(3.dp)) 
+                            Text( 
+                                text = formatMetricCount(voice.taskCount), 
+                                fontSize = 10.sp, 
+                                color = BlossomColors.TextMuted 
+                            ) 
+                        } 
+                    } 
+                    
+                    if (voice.likeCount > 0) { 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Icon( 
+                                Icons.Filled.Favorite, 
+                                contentDescription = null, 
+                                tint = BlossomColors.SakuraRose.copy(alpha = 0.8f), 
+                                modifier = Modifier.size(11.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(3.dp)) 
+                            Text( 
+                                text = formatMetricCount(voice.likeCount), 
+                                fontSize = 10.sp, 
+                                color = BlossomColors.TextMuted 
+                            ) 
+                        } 
+                    } 
                 } 
             } 
             
-            Spacer(modifier = Modifier.width(10.dp)) 
+            Spacer(modifier = Modifier.width(8.dp)) 
             
             Row(verticalAlignment = Alignment.CenterVertically) { 
+                IconButton( 
+                    onClick = onToggleFavorite, 
+                    modifier = Modifier.size(30.dp) 
+                ) { 
+                    Icon( 
+                        if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, 
+                        contentDescription = "Favorite", 
+                        tint = if (isFavorite) BlossomColors.SakuraRose else BlossomColors.TextMuted, 
+                        modifier = Modifier.size(17.dp) 
+                    ) 
+                } 
+                
+                Spacer(modifier = Modifier.width(4.dp)) 
+                
                 Surface( 
                     shape = CircleShape, 
                     color = if (isPlaying) BlossomColors.SakuraRose else BlossomColors.SurfaceCard1, 
@@ -543,12 +796,12 @@ private fun VoiceOptionCard(
                 } 
                 
                 if (isSelected) { 
-                    Spacer(modifier = Modifier.width(10.dp)) 
+                    Spacer(modifier = Modifier.width(6.dp)) 
                     Icon( 
                         Icons.Filled.Check, 
                         contentDescription = "Selected", 
                         tint = BlossomColors.SakuraRose, 
-                        modifier = Modifier.size(20.dp) 
+                        modifier = Modifier.size(18.dp) 
                     ) 
                 } 
             } 

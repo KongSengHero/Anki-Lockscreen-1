@@ -68,17 +68,39 @@ class FishAudioService(private val context: Context) {
         } 
     } 
     
-    suspend fun searchVoices(apiKey: String, query: String): Result<List<FishAudioVoiceOption>> = withContext(Dispatchers.IO) { 
-        if (apiKey.isBlank()) { 
-            return@withContext Result.failure(IllegalArgumentException("Fish Audio API key is required to search")) 
+    private val auditionPhrases = listOf( 
+        "こんにちは、日本語の練習をしましょう。", 
+        "今日はどんな物語を読みますか？楽しみにしています。", 
+        "昔々、ある所におじいさんとおばあさんが住んでいました。", 
+        "ゆっくり、自分のペースで勉強していきましょうね。", 
+        "今日も一日、お疲れ様でした。明日も頑張りましょう！", 
+        "風が心地よく吹いて、とても穏やかな午後ですね。", 
+        "本を開くと、新しい世界が広がっていきます。" 
+    ) 
+    
+    suspend fun searchVoices( 
+        apiKey: String = "", 
+        query: String = "", 
+        tag: String? = null, 
+        sortBy: String = "score", 
+        pageSize: Int = 20 
+    ): Result<List<FishAudioVoiceOption>> = withContext(Dispatchers.IO) { 
+        val params = mutableListOf<String>() 
+        if (query.isNotBlank()) { 
+            params.add("title=${URLEncoder.encode(query.trim(), "UTF-8")}") 
         } 
-        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8") 
-        val url = "https://api.fish.audio/model?title=$encodedQuery&page_size=15" 
-        val request = Request.Builder() 
-            .url(url) 
-            .header("Authorization", "Bearer ${apiKey.trim()}") 
-            .get() 
-            .build() 
+        if (!tag.isNullOrBlank() && !tag.equals("all", ignoreCase = true) && !tag.equals("favorites", ignoreCase = true)) { 
+            params.add("tag=${URLEncoder.encode(tag.trim().lowercase(), "UTF-8")}") 
+        } 
+        params.add("sort_by=$sortBy") 
+        params.add("page_size=$pageSize") 
+        val url = "https://api.fish.audio/model?" + params.joinToString("&") 
+        
+        val reqBuilder = Request.Builder().url(url).get() 
+        if (apiKey.isNotBlank()) { 
+            reqBuilder.header("Authorization", "Bearer ${apiKey.trim()}") 
+        } 
+        val request = reqBuilder.build() 
         
         try { 
             client.newCall(request).execute().use { response -> 
@@ -101,15 +123,44 @@ class FishAudioService(private val context: Context) {
                     val id = item.optString("_id", "").ifBlank { item.optString("id", "") } 
                     if (id.isBlank()) continue 
                     val title = item.optString("title", "").ifBlank { item.optString("name", "Voice Model") } 
-                    val author = item.optJSONObject("author")?.optString("nickname", "") ?: "" 
+                    val authorObj = item.optJSONObject("author") 
+                    val author = authorObj?.optString("nickname", "") ?: "" 
+                    val authorAvatar = authorObj?.optString("avatar", "") ?: "" 
                     val desc = item.optString("description", "") 
+                    val coverImage = item.optString("cover_image", "") 
+                    val rawAvatar = coverImage.ifBlank { authorAvatar } 
+                    val avatarUrl = if (rawAvatar.isNotBlank()) { 
+                        if (rawAvatar.startsWith("http://") || rawAvatar.startsWith("https://")) { 
+                            rawAvatar 
+                        } else { 
+                            "https://public-platform.r2.fish.audio/cdn-cgi/image/width=96,format=webp/${rawAvatar.removePrefix("/")}" 
+                        } 
+                    } else "" 
+                    val likeCount = item.optInt("like_count", 0) 
+                    val taskCount = item.optInt("task_count", 0) 
+                    val tagsJson = item.optJSONArray("tags") 
+                    val tagsList = mutableListOf<String>() 
+                    if (tagsJson != null) { 
+                        for (t in 0 until tagsJson.length()) { 
+                            val tagStr = tagsJson.optString(t, "") 
+                            if (tagStr.isNotBlank()) tagsList.add(tagStr) 
+                        } 
+                    } 
+                    val samplesArray = item.optJSONArray("samples") 
+                    val sampleAudioUrl = samplesArray?.optJSONObject(0)?.optString("audio", "") ?: "" 
+                    val primaryTag = tagsList.firstOrNull { it.isNotBlank() } ?: "Community" 
                     list.add( 
                         FishAudioVoiceOption( 
                             id = id, 
                             name = title, 
                             author = author, 
                             description = desc, 
-                            tag = "Community" 
+                            tag = primaryTag, 
+                            avatarUrl = avatarUrl, 
+                            likeCount = likeCount, 
+                            taskCount = taskCount, 
+                            tags = tagsList, 
+                            sampleAudioUrl = sampleAudioUrl 
                         ) 
                     ) 
                 } 
@@ -125,12 +176,14 @@ class FishAudioService(private val context: Context) {
         voiceId: String, 
         model: String = PreferencesManager.DEFAULT_FISH_AUDIO_MODEL 
     ): Result<File> = withContext(Dispatchers.IO) { 
+        val phrase = auditionPhrases.random() 
+        val phraseKey = Math.abs(phrase.hashCode() % 1000) 
         synthesizeStoryAudio( 
             apiKey = apiKey, 
             voiceId = voiceId, 
             model = model, 
-            storyId = "preview_${PreferencesManager.extractVoiceId(voiceId)}", 
-            text = "こんにちは、日本語の練習をしましょう。" 
+            storyId = "preview_${PreferencesManager.extractVoiceId(voiceId)}_$phraseKey", 
+            text = phrase 
         ) 
     } 
     
@@ -152,7 +205,7 @@ class FishAudioService(private val context: Context) {
             return@withContext Result.failure(IllegalArgumentException("Text cannot be empty")) 
         } 
         
-        val audioFile = getAudioFile(context, storyId) 
+        val audioFile = getAudioFile(context, storyId, cleanVoiceId) 
         if (audioFile.exists() && audioFile.length() > 0) { 
             return@withContext Result.success(audioFile) 
         } 
@@ -304,14 +357,27 @@ class FishAudioService(private val context: Context) {
             return File(context.cacheDir, "story_audio") 
         } 
         
-        fun getAudioFile(context: Context, storyId: String): File { 
+        fun getAudioFile(context: Context, storyId: String, voiceId: String? = null): File { 
             val safeId = storyId.replace(Regex("[^a-zA-Z0-9_-]"), "_") 
-            return File(getAudioDir(context), "story_${safeId}.mp3") 
+            val cleanVoice = if (!voiceId.isNullOrBlank()) { 
+                "_" + PreferencesManager.extractVoiceId(voiceId).take(12) 
+            } else "" 
+            return File(getAudioDir(context), "story_${safeId}${cleanVoice}.mp3") 
         } 
         
         fun deleteAudioForStory(context: Context, storyId: String): Boolean { 
-            val file = getAudioFile(context, storyId) 
-            return if (file.exists()) file.delete() else false 
+            val safeId = storyId.replace(Regex("[^a-zA-Z0-9_-]"), "_") 
+            val prefix = "story_${safeId}" 
+            val dir = getAudioDir(context) 
+            var deletedAny = false 
+            if (dir.exists() && dir.isDirectory) { 
+                dir.listFiles()?.forEach { file -> 
+                    if (file.name.startsWith(prefix) && file.name.endsWith(".mp3")) { 
+                        if (file.delete()) deletedAny = true 
+                    } 
+                } 
+            } 
+            return deletedAny 
         } 
         
         fun clearAllAudio(context: Context): Boolean { 

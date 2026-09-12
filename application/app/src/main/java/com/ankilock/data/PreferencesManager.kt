@@ -20,7 +20,12 @@ data class FishAudioVoiceOption(
     val name: String, 
     val author: String = "", 
     val description: String = "", 
-    val tag: String = "" 
+    val tag: String = "", 
+    val avatarUrl: String = "", 
+    val likeCount: Int = 0, 
+    val taskCount: Int = 0, 
+    val tags: List<String> = emptyList(), 
+    val sampleAudioUrl: String = "" 
 ) 
     
 class PreferencesManager(context: Context) { 
@@ -178,6 +183,29 @@ class PreferencesManager(context: Context) {
     var fishAudioModel: String 
         get() = prefs.getString(KEY_FISH_AUDIO_MODEL, DEFAULT_FISH_AUDIO_MODEL) ?: DEFAULT_FISH_AUDIO_MODEL 
         set(value) = prefs.edit().putString(KEY_FISH_AUDIO_MODEL, value.trim()).apply() 
+    
+    var favoriteFishAudioVoiceIds: Set<String> 
+        get() = prefs.getStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, emptySet()) ?: emptySet() 
+        set(value) = prefs.edit().putStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, value).apply() 
+    
+    fun toggleFavoriteVoice(voiceId: String): Boolean { 
+        val cleanId = extractVoiceId(voiceId) 
+        val current = favoriteFishAudioVoiceIds.toMutableSet() 
+        val isFav = if (current.contains(cleanId)) { 
+            current.remove(cleanId) 
+            false 
+        } else { 
+            current.add(cleanId) 
+            true 
+        } 
+        favoriteFishAudioVoiceIds = current 
+        return isFav 
+    } 
+    
+    fun isVoiceFavorite(voiceId: String): Boolean { 
+        val cleanId = extractVoiceId(voiceId) 
+        return favoriteFishAudioVoiceIds.contains(cleanId) 
+    } 
     
     var disabledStoryThemes: Set<String> 
         get() = prefs.getStringSet(KEY_DISABLED_STORY_THEMES, emptySet()) ?: emptySet() 
@@ -542,28 +570,44 @@ class PreferencesManager(context: Context) {
                 name = "Yuna", 
                 author = "Official", 
                 description = "Gentle storyteller with balanced, clear Japanese pronunciation.", 
-                tag = "Default • Recommended" 
+                tag = "Default • Recommended", 
+                avatarUrl = "https://public-platform.r2.fish.audio/cdn-cgi/image/width=96,format=webp/coverimage/5b09815a54a04395bf6ad642d57ce12a", 
+                likeCount = 1860, 
+                taskCount = 451000, 
+                tags = listOf("female", "young", "storytelling", "gentle", "Japanese") 
             ), 
             FishAudioVoiceOption( 
-                id = "1952e5ebf8c24f6cb65f12e84d43ae68", 
+                id = "5161d41404314212af1254556477c17d", 
                 name = "Sakura", 
-                author = "Community", 
+                author = "比留間大地", 
                 description = "Soft, expressive anime-style voice great for emotive dialogues.", 
-                tag = "Anime Style" 
+                tag = "Anime Style", 
+                avatarUrl = "https://public-platform.r2.fish.audio/cdn-cgi/image/width=96,format=webp/coverimage/5161d41404314212af1254556477c17d", 
+                likeCount = 1868, 
+                taskCount = 451741, 
+                tags = listOf("female", "young", "anime", "bright", "Japanese") 
             ), 
             FishAudioVoiceOption( 
-                id = "8f8605eb803848b6b1580228de684674", 
+                id = "4bc1d3d1fa60415f989b8e0b99f333e1", 
                 name = "Kenji", 
-                author = "Community", 
+                author = "amaillo", 
                 description = "Calm, steady and deep male narrator voice for classic stories.", 
-                tag = "Male Narrator" 
+                tag = "Male Narrator", 
+                avatarUrl = "https://public-platform.r2.fish.audio/cdn-cgi/image/width=96,format=webp/coverimage/4bc1d3d1fa60415f989b8e0b99f333e1", 
+                likeCount = 251, 
+                taskCount = 31403, 
+                tags = listOf("male", "young", "narrator", "calm", "Japanese") 
             ), 
             FishAudioVoiceOption( 
-                id = "800a744bbec9449884607ff9ec988ec7", 
+                id = "df5c6c19dca944918dcbd6f1368fd02f", 
                 name = "Aoi", 
                 author = "Community", 
                 description = "Natural conversation pacing and clear modern phrasing.", 
-                tag = "Conversational" 
+                tag = "Conversational", 
+                avatarUrl = "https://public-platform.r2.fish.audio/cdn-cgi/image/width=96,format=webp/coverimage/df5c6c19dca944918dcbd6f1368fd02f", 
+                likeCount = 146, 
+                taskCount = 24878, 
+                tags = listOf("female", "young", "conversational", "soft", "Japanese") 
             ) 
         ) 
         
@@ -603,6 +647,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_FISH_AUDIO_VOICE_ID = "fish_audio_voice_id" 
         private const val KEY_FISH_AUDIO_VOICE_NAME = "fish_audio_voice_name" 
         private const val KEY_FISH_AUDIO_MODEL = "fish_audio_model" 
+        private const val KEY_FAVORITE_FISH_AUDIO_VOICES = "favorite_fish_audio_voices" 
         private const val KEY_LAST_READ_STORY_ID = "last_read_story_id" 
         private const val KEY_READING_BACKGROUND_IMAGE_URI = "reading_background_image_uri" 
         private const val KEY_DISABLED_STORY_THEMES = "disabled_story_themes" 
