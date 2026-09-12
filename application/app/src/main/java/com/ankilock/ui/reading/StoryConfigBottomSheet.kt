@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,9 +41,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -113,16 +121,48 @@ fun StoryConfigBottomSheet(
     } 
     
     var selectedTab by remember { mutableIntStateOf(if (prefs.isCustomThemeModeActive) 1 else 0) } 
+    var isCustomActive by remember { mutableStateOf(prefs.isCustomThemeModeActive) } 
     var disabledThemes by remember { mutableStateOf(prefs.disabledStoryThemes.toMutableSet()) } 
     var disabledTopics by remember { mutableStateOf(prefs.disabledStoryTopics.toMutableSet()) } 
     val expandedThemes = remember { mutableStateOf(mutableSetOf<String>()) } 
+    var themeSearchQuery by remember { mutableStateOf("") } 
     
-    var isCustomActive by remember { mutableStateOf(prefs.isCustomThemeModeActive) } 
     var selectedCustomTheme by remember { 
         mutableStateOf(prefs.customStoryTheme ?: StoryThemes.ALL_THEMES.first()) 
     } 
     var selectedCustomTopic by remember { 
         mutableStateOf(prefs.customStoryTopic) 
+    } 
+    
+    val filteredThemes = remember(themeSearchQuery) { 
+        if (themeSearchQuery.isBlank()) { 
+            StoryThemes.ALL_THEMES 
+        } else { 
+            val q = themeSearchQuery.trim().lowercase() 
+            StoryThemes.ALL_THEMES.filter { key -> 
+                key.lowercase().contains(q) || 
+                StoryThemes.formatThemeName(key).lowercase().contains(q) || 
+                (StoryThemes.CATEGORIES[key]?.any { it.lowercase().contains(q) } == true) 
+            } 
+        } 
+    } 
+    
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return Offset(0f, available.y) 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
     } 
     
     ModalBottomSheet( 
@@ -170,9 +210,9 @@ fun StoryConfigBottomSheet(
                             color = BlossomColors.TextPrimary 
                         ) 
                         Text( 
-                            text = if (isCustomActive) "Custom Mode Locked" else "Randomizer Active", 
+                            text = if (selectedTab == 1) "Custom Mode Active" else "Randomizer Active", 
                             fontSize = 12.sp, 
-                            color = if (isCustomActive) BlossomColors.WisteriaViolet else BlossomColors.SakuraRose, 
+                            color = if (selectedTab == 1) BlossomColors.WisteriaViolet else BlossomColors.SakuraRose, 
                             fontWeight = FontWeight.Medium 
                         ) 
                     } 
@@ -194,6 +234,7 @@ fun StoryConfigBottomSheet(
             Column( 
                 modifier = Modifier 
                     .weight(1f) 
+                    .nestedScroll(noBounceNestedScroll) 
                     .verticalScroll(rememberScrollState()), 
                 verticalArrangement = Arrangement.spacedBy(16.dp) 
             ) { 
@@ -396,7 +437,45 @@ fun StoryConfigBottomSheet(
                             lineHeight = 16.sp 
                         ) 
                         
-                        StoryThemes.ALL_THEMES.forEach { themeKey -> 
+                        OutlinedTextField( 
+                            value = themeSearchQuery, 
+                            onValueChange = { themeSearchQuery = it }, 
+                            placeholder = { Text("Search themes & topics...", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                            leadingIcon = { 
+                                Icon(Icons.Default.Search, contentDescription = null, tint = BlossomColors.TextSecondary, modifier = Modifier.size(16.dp)) 
+                            }, 
+                            trailingIcon = { 
+                                if (themeSearchQuery.isNotEmpty()) { 
+                                    IconButton(onClick = { themeSearchQuery = "" }) { 
+                                        Icon(Icons.Filled.Close, contentDescription = "Clear", tint = BlossomColors.TextSecondary, modifier = Modifier.size(16.dp)) 
+                                    } 
+                                } 
+                            }, 
+                            singleLine = true, 
+                            colors = OutlinedTextFieldDefaults.colors( 
+                                focusedContainerColor = BlossomColors.SurfaceElevated, 
+                                unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                                focusedTextColor = BlossomColors.TextPrimary, 
+                                unfocusedTextColor = BlossomColors.TextPrimary, 
+                                focusedBorderColor = BlossomColors.SakuraRose, 
+                                unfocusedBorderColor = BlossomColors.CardBorder 
+                            ), 
+                            shape = RoundedCornerShape(12.dp), 
+                            modifier = Modifier.fillMaxWidth() 
+                        ) 
+                        
+                        if (filteredThemes.isEmpty()) { 
+                            Box( 
+                                modifier = Modifier 
+                                    .fillMaxWidth() 
+                                    .padding(vertical = 16.dp), 
+                                contentAlignment = Alignment.Center 
+                            ) { 
+                                Text("No themes match your search", color = BlossomColors.TextMuted, fontSize = 13.sp) 
+                            } 
+                        } 
+                        
+                        filteredThemes.forEach { themeKey -> 
                             val isThemeEnabled = themeKey !in disabledThemes 
                             val isExpanded = themeKey in expandedThemes.value 
                             val topics = StoryThemes.CATEGORIES[themeKey] ?: emptyList() 
@@ -579,6 +658,8 @@ fun StoryConfigBottomSheet(
                                     OutlinedButton( 
                                         onClick = { 
                                             isCustomActive = false 
+                                            prefs.isCustomThemeModeActive = false 
+                                            selectedTab = 0 
                                             selectedCustomTopic = null 
                                             Toast.makeText(context, "Switched back to Randomizer", Toast.LENGTH_SHORT).show() 
                                         }, 
@@ -592,6 +673,33 @@ fun StoryConfigBottomSheet(
                                 } 
                             } 
                         } 
+                        
+                        OutlinedTextField( 
+                            value = themeSearchQuery, 
+                            onValueChange = { themeSearchQuery = it }, 
+                            placeholder = { Text("Search themes & topics...", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                            leadingIcon = { 
+                                Icon(Icons.Default.Search, contentDescription = null, tint = BlossomColors.TextSecondary, modifier = Modifier.size(16.dp)) 
+                            }, 
+                            trailingIcon = { 
+                                if (themeSearchQuery.isNotEmpty()) { 
+                                    IconButton(onClick = { themeSearchQuery = "" }) { 
+                                        Icon(Icons.Filled.Close, contentDescription = "Clear", tint = BlossomColors.TextSecondary, modifier = Modifier.size(16.dp)) 
+                                    } 
+                                } 
+                            }, 
+                            singleLine = true, 
+                            colors = OutlinedTextFieldDefaults.colors( 
+                                focusedContainerColor = BlossomColors.SurfaceElevated, 
+                                unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                                focusedTextColor = BlossomColors.TextPrimary, 
+                                unfocusedTextColor = BlossomColors.TextPrimary, 
+                                focusedBorderColor = BlossomColors.SakuraRose, 
+                                unfocusedBorderColor = BlossomColors.CardBorder 
+                            ), 
+                            shape = RoundedCornerShape(12.dp), 
+                            modifier = Modifier.fillMaxWidth() 
+                        ) 
                         
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { 
                             Text( 
@@ -607,7 +715,7 @@ fun StoryConfigBottomSheet(
                                     .horizontalScroll(rememberScrollState()), 
                                 horizontalArrangement = Arrangement.spacedBy(8.dp) 
                             ) { 
-                                StoryThemes.ALL_THEMES.forEach { themeKey -> 
+                                filteredThemes.forEach { themeKey -> 
                                     val isSelected = themeKey == selectedCustomTheme 
                                     val style = StoryThemes.getThemeBadgeColors(themeKey) 
                                     
@@ -733,27 +841,6 @@ fun StoryConfigBottomSheet(
                                 } 
                             } 
                         } 
-                        
-                        Button( 
-                            onClick = { 
-                                isCustomActive = true 
-                                Toast.makeText(context, "Custom story locked for ${StoryThemes.formatThemeName(selectedCustomTheme)}", Toast.LENGTH_SHORT).show() 
-                            }, 
-                            modifier = Modifier 
-                                .fillMaxWidth() 
-                                .height(44.dp), 
-                            shape = RoundedCornerShape(12.dp), 
-                            colors = ButtonDefaults.buttonColors( 
-                                containerColor = badgeColors.contentColor, 
-                                contentColor = Color.Black 
-                            ) 
-                        ) { 
-                            Text( 
-                                text = "Lock Custom Story Theme", 
-                                fontWeight = FontWeight.Bold, 
-                                fontSize = 13.5.sp 
-                            ) 
-                        } 
                     } 
                 } 
             } 
@@ -767,7 +854,7 @@ fun StoryConfigBottomSheet(
                     prefs.storyConnectingWordsCount = selectedWordsCount 
                     prefs.disabledStoryThemes = disabledThemes 
                     prefs.disabledStoryTopics = disabledTopics 
-                    if (isCustomActive) { 
+                    if (selectedTab == 1) { 
                         prefs.isCustomThemeModeActive = true 
                         prefs.customStoryTheme = selectedCustomTheme 
                         prefs.customStoryTopic = selectedCustomTopic 

@@ -215,6 +215,8 @@ fun ReadingScreen(
     val historySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     var showHistorySheet by remember { mutableStateOf(false) } 
     var savedStories by remember { mutableStateOf(historyManager.getStories()) } 
+    var showClearAllConfirmation by remember { mutableStateOf(false) } 
+    var storyToDelete by remember { mutableStateOf<GeneratedStory?>(null) } 
     
     val wordDetailSheetState = rememberModalBottomSheetState() 
     var selectedWordDetail by remember { mutableStateOf<AnkiVocabularyItem?>(null) } 
@@ -1138,11 +1140,10 @@ fun ReadingScreen(
                     if (savedStories.isNotEmpty()) { 
                         TextButton( 
                             onClick = { 
-                                historyManager.clearAll()
-                                savedStories = emptyList()
+                                showClearAllConfirmation = true 
                             } 
                         ) { 
-                            Text("Clear All", color = BlossomColors.BlossomRed, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                            Text("Clear All", color = BlossomColors.BlossomRed, fontSize = 13.sp, maxLines = 1, softWrap = false) 
                         } 
                     } 
                 } 
@@ -1242,11 +1243,7 @@ fun ReadingScreen(
                                     } 
                                     IconButton( 
                                         onClick = { 
-                                            historyManager.deleteStory(item.id)
-                                            savedStories = historyManager.getStories()
-                                            if (currentStory?.id == item.id) { 
-                                                currentStory = savedStories.firstOrNull()
-                                            } 
+                                            storyToDelete = item 
                                         } 
                                     ) { 
                                         Icon( 
@@ -1264,6 +1261,151 @@ fun ReadingScreen(
         } 
     } 
     
+    if (showClearAllConfirmation) { 
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showClearAllConfirmation = false }) { 
+            Card( 
+                shape = RoundedCornerShape(20.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column( 
+                    modifier = Modifier.padding(22.dp), 
+                    verticalArrangement = Arrangement.spacedBy(14.dp) 
+                ) { 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Icon( 
+                            Icons.Filled.DeleteOutline, 
+                            contentDescription = null, 
+                            tint = BlossomColors.BlossomRed, 
+                            modifier = Modifier.size(24.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
+                        Text( 
+                            text = "Clear Reading History?", 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 18.sp, 
+                            color = BlossomColors.TextPrimary 
+                        ) 
+                    } 
+                    
+                    Text( 
+                        text = "Are you sure you want to clear all reading history? This will permanently delete all saved stories.", 
+                        fontSize = 13.sp, 
+                        color = BlossomColors.TextSecondary, 
+                        lineHeight = 20.sp 
+                    ) 
+                    
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                    ) { 
+                        OutlinedButton( 
+                            onClick = { showClearAllConfirmation = false }, 
+                            shape = RoundedCornerShape(12.dp), 
+                            border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                            modifier = Modifier.weight(1f), 
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp) 
+                        ) { 
+                            Text("Cancel", color = BlossomColors.TextSecondary, maxLines = 1, softWrap = false) 
+                        } 
+                        
+                        Button( 
+                            onClick = { 
+                                historyManager.clearAll() 
+                                savedStories = emptyList() 
+                                showClearAllConfirmation = false 
+                            }, 
+                            shape = RoundedCornerShape(12.dp), 
+                            colors = ButtonDefaults.buttonColors( 
+                                containerColor = BlossomColors.BlossomRed, 
+                                contentColor = BlossomColors.BlossomWhite 
+                            ), 
+                            modifier = Modifier.weight(1f), 
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp) 
+                        ) { 
+                            Text("Clear All", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+    } 
+    
+    if (storyToDelete != null) { 
+        val targetStory = storyToDelete!! 
+        androidx.compose.ui.window.Dialog(onDismissRequest = { storyToDelete = null }) { 
+            Card( 
+                shape = RoundedCornerShape(20.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column( 
+                    modifier = Modifier.padding(22.dp), 
+                    verticalArrangement = Arrangement.spacedBy(14.dp) 
+                ) { 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        Icon( 
+                            Icons.Filled.DeleteOutline, 
+                            contentDescription = null, 
+                            tint = BlossomColors.BlossomRed, 
+                            modifier = Modifier.size(24.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(10.dp)) 
+                        Text( 
+                            text = "Delete Story?", 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 18.sp, 
+                            color = BlossomColors.TextPrimary 
+                        ) 
+                    } 
+                    
+                    Text( 
+                        text = "Are you sure you want to delete \"${targetStory.title}\"? This action cannot be undone.", 
+                        fontSize = 13.sp, 
+                        color = BlossomColors.TextSecondary, 
+                        lineHeight = 20.sp 
+                    ) 
+                    
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                    ) { 
+                        OutlinedButton( 
+                            onClick = { storyToDelete = null }, 
+                            shape = RoundedCornerShape(12.dp), 
+                            border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                            modifier = Modifier.weight(1f), 
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp) 
+                        ) { 
+                            Text("Cancel", color = BlossomColors.TextSecondary, maxLines = 1, softWrap = false) 
+                        } 
+                        
+                        Button( 
+                            onClick = { 
+                                historyManager.deleteStory(targetStory.id) 
+                                savedStories = historyManager.getStories() 
+                                if (currentStory?.id == targetStory.id) { 
+                                    currentStory = savedStories.firstOrNull() 
+                                } 
+                                storyToDelete = null 
+                            }, 
+                            shape = RoundedCornerShape(12.dp), 
+                            colors = ButtonDefaults.buttonColors( 
+                                containerColor = BlossomColors.BlossomRed, 
+                                contentColor = BlossomColors.BlossomWhite 
+                            ), 
+                            modifier = Modifier.weight(1f), 
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp) 
+                        ) { 
+                            Text("Delete", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+    } 
     
     if (selectedWordDetail != null) { 
         WordDetailBottomSheet( 

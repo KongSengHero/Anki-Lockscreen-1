@@ -94,11 +94,8 @@ fun AiKeyConfigDialog(
     var isTestSuccess by remember { mutableStateOf(false) } 
     
     var showModelDialog by remember { mutableStateOf(false) } 
-    var showFishAudioDialog by remember { mutableStateOf(false) } 
     var fishAudioApiKey by remember { mutableStateOf(prefs.fishAudioApiKey ?: "") } 
-    var fishAudioVoiceId by remember { mutableStateOf(prefs.fishAudioVoiceId) } 
-    var fishAudioVoiceName by remember { mutableStateOf(prefs.fishAudioVoiceName) } 
-    var fishAudioModel by remember { mutableStateOf(prefs.fishAudioModel) } 
+    var isFishAudioKeyVisible by remember { mutableStateOf(false) } 
     
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     ModalBottomSheet( 
@@ -264,73 +261,9 @@ fun AiKeyConfigDialog(
             } 
             
             Spacer(modifier = Modifier.height(14.dp)) 
-            Text( 
-                "Audio Narration (Fish Audio)", 
-                fontSize = 13.sp, 
-                fontWeight = FontWeight.SemiBold, 
-                color = BlossomColors.TextPrimary 
-            ) 
-            Spacer(modifier = Modifier.height(6.dp)) 
-            Surface( 
-                onClick = { showFishAudioDialog = true }, 
-                shape = RoundedCornerShape(12.dp), 
-                color = BlossomColors.SurfaceElevated, 
-                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                modifier = Modifier.fillMaxWidth() 
-            ) { 
-                Row( 
-                    modifier = Modifier 
-                        .fillMaxWidth() 
-                        .padding(horizontal = 14.dp, vertical = 12.dp), 
-                    verticalAlignment = Alignment.CenterVertically, 
-                    horizontalArrangement = Arrangement.SpaceBetween 
-                ) { 
-                    Row( 
-                        verticalAlignment = Alignment.CenterVertically, 
-                        modifier = Modifier.weight(1f, fill = false) 
-                    ) { 
-                        Icon( 
-                            Icons.Filled.GraphicEq, 
-                            contentDescription = null, 
-                            tint = BlossomColors.SakuraRose, 
-                            modifier = Modifier.size(18.dp) 
-                        ) 
-                        Spacer(modifier = Modifier.width(10.dp)) 
-                        val voiceLabel = fishAudioVoiceName?.takeIf { it.isNotBlank() } 
-                            ?: if (fishAudioVoiceId.isNotBlank()) "Voice: ${fishAudioVoiceId.take(12)}..." else "Fish Audio Voice" 
-                        Text( 
-                            text = "Fish Audio: $voiceLabel", 
-                            fontSize = 13.sp, 
-                            fontWeight = FontWeight.Medium, 
-                            color = BlossomColors.TextPrimary, 
-                            maxLines = 1, 
-                            overflow = TextOverflow.Ellipsis 
-                        ) 
-                    } 
-                    Spacer(modifier = Modifier.width(6.dp)) 
-                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                        Text( 
-                            text = if (fishAudioApiKey.isNotBlank()) "Key Active" else "Setup Key", 
-                            fontSize = 12.sp, 
-                            fontWeight = FontWeight.Medium, 
-                            color = if (fishAudioApiKey.isNotBlank()) BlossomColors.SakuraRose else BlossomColors.BlossomRed, 
-                            maxLines = 1, 
-                            softWrap = false 
-                        ) 
-                        Icon( 
-                            Icons.Filled.ArrowDropDown, 
-                            contentDescription = null, 
-                            tint = BlossomColors.TextSecondary, 
-                            modifier = Modifier.size(18.dp) 
-                        ) 
-                    } 
-                } 
-            } 
-            
-            Spacer(modifier = Modifier.height(14.dp)) 
             
             Text( 
-                "API Key", 
+                "Gemini API Key", 
                 fontSize = 13.sp, 
                 fontWeight = FontWeight.SemiBold, 
                 color = BlossomColors.TextPrimary 
@@ -345,7 +278,7 @@ fun AiKeyConfigDialog(
                 trailingIcon = { 
                     IconButton(onClick = { isKeyVisible = !isKeyVisible }) { 
                         Icon( 
-                            if (isKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, 
+                            if (isKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
                             contentDescription = "Toggle Visibility", 
                             tint = BlossomColors.TextSecondary 
                         ) 
@@ -364,7 +297,6 @@ fun AiKeyConfigDialog(
             ) 
             
             if (selectedProvider == "gemini") { 
-                Spacer(modifier = Modifier.height(8.dp)) 
                 Surface( 
                     shape = RoundedCornerShape(8.dp), 
                     color = BlossomColors.SurfaceElevated, 
@@ -473,6 +405,78 @@ fun AiKeyConfigDialog(
                 } 
             } 
             
+            Spacer(modifier = Modifier.height(14.dp)) 
+            
+            Text( 
+                "Fish Audio API Key (Optional Narration Key)", 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.SemiBold, 
+                color = BlossomColors.TextPrimary 
+            ) 
+            Spacer(modifier = Modifier.height(6.dp)) 
+            
+            OutlinedTextField( 
+                value = fishAudioApiKey, 
+                onValueChange = { fishAudioApiKey = it }, 
+                placeholder = { Text("Optional - add key for Fish Audio TTS", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                singleLine = true, 
+                visualTransformation = if (isFishAudioKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
+                trailingIcon = { 
+                    IconButton(onClick = { isFishAudioKeyVisible = !isFishAudioKeyVisible }) { 
+                        Icon( 
+                            if (isFishAudioKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                            contentDescription = null, 
+                            tint = BlossomColors.TextSecondary 
+                        ) 
+                    } 
+                }, 
+                colors = OutlinedTextFieldDefaults.colors( 
+                    focusedContainerColor = BlossomColors.SurfaceElevated, 
+                    unfocusedContainerColor = BlossomColors.SurfaceElevated, 
+                    focusedTextColor = BlossomColors.TextPrimary, 
+                    unfocusedTextColor = BlossomColors.TextPrimary, 
+                    focusedBorderColor = BlossomColors.SakuraRose, 
+                    unfocusedBorderColor = BlossomColors.CardBorder 
+                ), 
+                shape = RoundedCornerShape(12.dp), 
+                modifier = Modifier.fillMaxWidth() 
+            ) 
+            
+            Surface( 
+                shape = RoundedCornerShape(8.dp), 
+                color = BlossomColors.SurfaceElevated, 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier 
+                    .fillMaxWidth() 
+                    .padding(top = 6.dp) 
+                    .clickable { 
+                        try { 
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://fish.audio")) 
+                            context.startActivity(intent) 
+                        } catch (_: Exception) { 
+                        } 
+                    } 
+            ) { 
+                Row( 
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), 
+                    verticalAlignment = Alignment.CenterVertically 
+                ) { 
+                    Text( 
+                        "Get Fish Audio Key (fish.audio)", 
+                        fontSize = 11.sp, 
+                        color = BlossomColors.SakuraRose, 
+                        fontWeight = FontWeight.Medium, 
+                        modifier = Modifier.weight(1f) 
+                    ) 
+                    Icon( 
+                        Icons.AutoMirrored.Filled.OpenInNew, 
+                        contentDescription = null, 
+                        tint = BlossomColors.SakuraRose, 
+                        modifier = Modifier.size(13.dp) 
+                    ) 
+                } 
+            } 
+            
             if (testResult != null) { 
                 Spacer(modifier = Modifier.height(10.dp)) 
                 Surface( 
@@ -547,6 +551,7 @@ fun AiKeyConfigDialog(
                         prefs.aiProvider = selectedProvider 
                         prefs.aiModel = selectedModel 
                         prefs.wallhavenApiKey = wallhavenKeyText.trim() 
+                        prefs.fishAudioApiKey = fishAudioApiKey.trim() 
                         onSaved() 
                     }, 
                     shape = RoundedCornerShape(12.dp), 
@@ -568,27 +573,6 @@ fun AiKeyConfigDialog(
                 showModelDialog = false 
             }, 
             onDismiss = { showModelDialog = false } 
-        ) 
-    } 
-    
-    if (showFishAudioDialog) { 
-        FishAudioDialog( 
-            currentApiKey = fishAudioApiKey, 
-            currentVoiceId = fishAudioVoiceId, 
-            currentVoiceName = fishAudioVoiceName, 
-            currentModel = fishAudioModel, 
-            onSave = { key, voice, voiceName, model -> 
-                prefs.fishAudioApiKey = key 
-                prefs.fishAudioVoiceId = voice 
-                prefs.fishAudioVoiceName = voiceName 
-                prefs.fishAudioModel = model 
-                fishAudioApiKey = key 
-                fishAudioVoiceId = voice 
-                fishAudioVoiceName = voiceName 
-                fishAudioModel = model 
-                showFishAudioDialog = false 
-            }, 
-            onDismiss = { showFishAudioDialog = false } 
         ) 
     } 
 } 

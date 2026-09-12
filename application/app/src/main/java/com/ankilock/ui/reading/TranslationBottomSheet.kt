@@ -43,11 +43,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankilock.translation.TranslationResult
@@ -66,9 +70,27 @@ fun TranslationBottomSheet(
     val context = LocalContext.current 
     val clipboardManager = LocalClipboardManager.current 
     val scope = rememberCoroutineScope() 
-    val translatorService = remember { TranslatorService() } 
+    val translatorService = remember(context) { TranslatorService(context) } 
     val ttsHelper = remember { JapaneseTtsHelper(context) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return Offset(0f, available.y) 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
 
     fun dismissWithAnimation() { 
         scope.launch { 
@@ -171,6 +193,7 @@ fun TranslationBottomSheet(
                 modifier = Modifier 
                     .fillMaxWidth() 
                     .weight(1f) 
+                    .nestedScroll(noBounceNestedScroll) 
                     .verticalScroll(rememberScrollState()) 
                     .padding(vertical = 8.dp) 
             ) { 
@@ -281,7 +304,7 @@ fun TranslationBottomSheet(
                 shape = RoundedCornerShape(12.dp), 
                 colors = ButtonDefaults.buttonColors( 
                     containerColor = BlossomColors.SakuraRose, 
-                    contentColor = Color.White 
+                    contentColor = BlossomColors.BlossomWhite 
                 ), 
                 modifier = Modifier 
                     .fillMaxWidth() 
