@@ -360,6 +360,41 @@ class FishAudioService(private val context: Context) {
         } 
     } 
     
+    fun pauseAudio() { 
+        try { 
+            mediaPlayer?.let { mp -> 
+                if (mp.isPlaying) { 
+                    mp.pause() 
+                    mainHandler.post { 
+                        onPlaybackStateCallback?.invoke(false) 
+                    } 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+    } 
+    
+    fun resumeAudio() { 
+        try { 
+            mediaPlayer?.let { mp -> 
+                if (!mp.isPlaying) { 
+                    mp.start() 
+                    mainHandler.post { 
+                        onPlaybackStateCallback?.invoke(true) 
+                    } 
+                } 
+            } 
+        } catch (_: Exception) { 
+        } 
+    } 
+    
+    fun seekTo(positionMs: Int) { 
+        try { 
+            mediaPlayer?.seekTo(positionMs) 
+        } catch (_: Exception) { 
+        } 
+    } 
+    
     fun getCurrentPositionMs(): Int { 
         return try { 
             mediaPlayer?.currentPosition ?: 0 

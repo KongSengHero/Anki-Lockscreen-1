@@ -32,6 +32,7 @@ data class GeneratedStory(
     val id: String = UUID.randomUUID().toString(), 
     val title: String, 
     val content: String, 
+    val furiganaContent: String? = null, 
     val jlptLevel: String, 
     val createdAt: Long = System.currentTimeMillis(), 
     val targetWords: List<String> = emptyList(), 

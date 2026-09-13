@@ -257,14 +257,14 @@ fun JishoScreen(
                             ) { 
                                 Surface( 
                                     shape = BlossomShapes.Pill, 
-                                    color = Color.Black.copy(alpha = 0.50f), 
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)) 
+                                    color = BlossomColors.SurfaceElevated, 
+                                    border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
                                 ) { 
                                     Text( 
                                         text = "RECENT SEARCHES", 
                                         fontSize = 10.5.sp, 
                                         fontWeight = FontWeight.Bold, 
-                                        color = Color(0xFFE2E8F0), 
+                                        color = BlossomColors.TextSecondary, 
                                         letterSpacing = 0.8.sp, 
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp) 
                                     ) 
@@ -278,8 +278,8 @@ fun JishoScreen(
                                 ) { 
                                     Surface( 
                                         shape = BlossomShapes.Pill, 
-                                        color = Color.Black.copy(alpha = 0.40f), 
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)) 
+                                        color = BlossomColors.SurfaceElevated, 
+                                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
                                     ) { 
                                         Text( 
                                             text = "Clear", 
@@ -300,8 +300,8 @@ fun JishoScreen(
                                 recentSearches.forEach { term -> 
                                     Surface( 
                                         shape = BlossomShapes.SquircleSmall, 
-                                        color = Color.Black.copy(alpha = 0.55f), 
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)), 
+                                        color = BlossomColors.SurfaceCard1, 
+                                        border = BorderStroke(1.dp, BlossomColors.CardBorder), 
                                         modifier = Modifier.clickable { 
                                             query = term 
                                             keyboardController?.hide() 
@@ -315,14 +315,14 @@ fun JishoScreen(
                                             Icon( 
                                                 imageVector = Icons.Default.History, 
                                                 contentDescription = null, 
-                                                tint = Color(0xFF94A3B8), 
+                                                tint = BlossomColors.TextSecondary, 
                                                 modifier = Modifier.size(13.dp) 
                                             ) 
                                             Spacer(modifier = Modifier.width(6.dp)) 
                                             Text( 
                                                 text = term, 
                                                 fontSize = 12.5.sp, 
-                                                color = Color(0xFFF1F5F9) 
+                                                color = BlossomColors.TextPrimary 
                                             ) 
                                         } 
                                     } 
@@ -335,15 +335,15 @@ fun JishoScreen(
                     item { 
                         Surface( 
                             shape = BlossomShapes.Pill, 
-                            color = Color.Black.copy(alpha = 0.50f), 
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)), 
+                            color = BlossomColors.SurfaceElevated, 
+                            border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
                             modifier = Modifier.padding(top = 4.dp, bottom = 6.dp) 
                         ) { 
                             Text( 
                                 text = "SUGGESTED EXPLORATIONS", 
                                 fontSize = 10.5.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = Color(0xFFE2E8F0), 
+                                color = BlossomColors.TextSecondary, 
                                 letterSpacing = 0.8.sp, 
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp) 
                             ) 
@@ -362,8 +362,8 @@ fun JishoScreen(
                             suggested.forEach { term -> 
                                 Surface( 
                                     shape = BlossomShapes.SquircleSmall, 
-                                    color = Color.Black.copy(alpha = 0.55f), 
-                                    border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.50f)), 
+                                    color = BlossomColors.SurfaceCard1, 
+                                    border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.45f)), 
                                     modifier = Modifier.clickable { 
                                         query = term 
                                         keyboardController?.hide() 
@@ -374,7 +374,7 @@ fun JishoScreen(
                                         text = term, 
                                         fontSize = 12.5.sp, 
                                         fontWeight = FontWeight.SemiBold, 
-                                        color = Color(0xFFA7F3D0), 
+                                        color = BlossomColors.MatchaSage, 
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp) 
                                     ) 
                                 } 

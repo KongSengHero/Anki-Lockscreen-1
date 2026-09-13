@@ -51,9 +51,9 @@ class GeminiStoryService {
         val wordPromptList = if (selectedWords.isNotEmpty()) { 
             selectedWords.joinToString(", ") { item -> 
                 val word = item.displayWord 
-                val reading = if (item.reading.isNotBlank() && item.reading != word) " (${item.reading})" else "" 
-                val meaning = if (item.meaning.isNotBlank()) " [${item.meaning.take(30)}]" else "" 
-                "$word$reading$meaning" 
+                val reading = if (item.reading.isNotBlank() && item.reading != word) " (読み: ${item.reading})" else "" 
+                val contextMeaning = if (item.meaning.isNotBlank()) " {reference: ${item.meaning.take(35)}}" else "" 
+                "$word$reading$contextMeaning" 
             } 
         } else { 
             "" 
@@ -117,7 +117,7 @@ class GeminiStoryService {
             
             val generationConfig = JSONObject().apply { 
                 put("temperature", 0.7) 
-                put("maxOutputTokens", 2048) 
+                put("maxOutputTokens", 4096) 
                 put("responseMimeType", "application/json") 
             } 
             put("generationConfig", generationConfig) 
@@ -176,6 +176,7 @@ class GeminiStoryService {
             val json = JSONObject(clean) 
             val title = json.optString("title", "日本語の物語 ($jlptLevel)").ifBlank { "日本語の物語 ($jlptLevel)" } 
             val storyContent = json.optString("storyJapanese", "").ifBlank { json.optString("content", rawText) } 
+            val furiganaContent = json.optString("storyFurigana", "").ifBlank { null } 
             
             val qArray = json.optJSONArray("questions") 
             val questions = mutableListOf<StoryQuizQuestion>() 
@@ -207,6 +208,7 @@ class GeminiStoryService {
                 id = UUID.randomUUID().toString(), 
                 title = title, 
                 content = storyContent, 
+                furiganaContent = furiganaContent, 
                 jlptLevel = jlptLevel, 
                 createdAt = System.currentTimeMillis(), 
                 targetWords = targetWords, 
@@ -296,11 +298,15 @@ class GeminiStoryService {
             [Target Vocabulary from Learner's Flashcards to Naturally Integrate]
             The learner has studied the following target words from their Anki deck. Actively prioritize weaving these specific words into the story so the reader encounters their learned vocabulary in real context:
             $wordPromptList
+
+            CRITICAL VOCABULARY USAGE RULES:
+            - Incorporate these words strictly as natural Japanese text in the story.
+            - NEVER insert English translations, English brackets, or English words next to or instead of the target Japanese word (e.g. NEVER write "公園 [park]" or "友達 (friend)" or English words). The story must be 100% Japanese.
             """.trimIndent() 
         } else { 
             """
             [Target Vocabulary]
-            No specific flashcard vocabulary constraints. Freely choose natural and creative Japanese vocabulary strictly appropriate for JLPT $jlptLevel learners. You have complete creative freedom.
+            No specific flashcard vocabulary constraints. Freely choose natural and creative Japanese vocabulary strictly appropriate for JLPT $jlptLevel learners. You have complete creative freedom. The story must be 100% Japanese.
             """.trimIndent() 
         } 
         
@@ -367,12 +373,16 @@ class GeminiStoryService {
             [Requirements]
             $req1
             $req2
-            3. Do NOT use romaji. Do NOT use ruby/furigana brackets like [ふりがな]. Standard Japanese characters only.
+            3. Standard Japanese Characters & Furigana:
+               - "storyJapanese": Clean standard Japanese text with natural paragraph breaks, WITHOUT romaji and WITHOUT ruby brackets. This is used for audio narration.
+               - "storyFurigana": The exact same story text with ruby reading brackets for EVERY kanji or kanji compound without exception (e.g. "友[とも]達[だち]と公[こう]園[えん]で会[あ]いました。"). Every single kanji must have [reading] brackets with its accurate hiragana reading.
+               - ZERO English in story text: The story in both "storyJapanese" and "storyFurigana" must be 100% Japanese. Never insert English definitions, English annotations, or English brackets into the story.
             $req4
             5. Return ONLY valid JSON with this exact schema (no markdown formatting, no code blocks):
             {
               "title": "Story Title in Japanese",
-              "storyJapanese": "Full Japanese story text with natural paragraph breaks.",
+              "storyJapanese": "Full Japanese story text with natural paragraph breaks without ruby brackets.",
+              "storyFurigana": "Exact same story with ruby brackets for every kanji, e.g. 友[とも]達[だち]と公[こう]園[えん]で会[あ]いました。",
               "questions": [
                 {
                   "id": 1,

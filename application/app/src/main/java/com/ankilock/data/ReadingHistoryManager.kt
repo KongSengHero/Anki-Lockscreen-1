@@ -72,11 +72,14 @@ class ReadingHistoryManager(private val context: Context) {
                 val topic = obj.optString("topic", "").ifBlank { null } 
                 val isPinned = obj.optBoolean("isPinned", false) 
                 
+                val furiganaContent = obj.optString("furiganaContent", "").ifBlank { null } 
+                
                 list.add( 
                     GeneratedStory( 
                         id = obj.optString("id", ""), 
                         title = obj.optString("title", ""), 
                         content = obj.optString("content", ""), 
+                        furiganaContent = furiganaContent, 
                         jlptLevel = obj.optString("jlptLevel", "N5"), 
                         createdAt = obj.optLong("createdAt", System.currentTimeMillis()), 
                         targetWords = words, 
@@ -254,6 +257,7 @@ class ReadingHistoryManager(private val context: Context) {
                     put("questions", qArray) 
                     put("isPinned", story.isPinned) 
                     
+                    if (story.furiganaContent != null) put("furiganaContent", story.furiganaContent) 
                     if (story.theme != null) put("theme", story.theme) 
                     if (story.topic != null) put("topic", story.topic) 
                 } 

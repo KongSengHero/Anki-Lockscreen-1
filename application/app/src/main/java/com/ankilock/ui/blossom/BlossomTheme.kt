@@ -229,18 +229,18 @@ object BlossomColors {
         currentTheme = theme 
         when (theme) { 
             AppTheme.LIGHT -> { 
-                SakuraRose = Color(0xFFD84A65) 
-                SakuraRoseLip = Color(0xFFB52B44) 
+                SakuraRose = Color(0xFFE56984) 
+                SakuraRoseLip = Color(0xFFC44862) 
                 SakuraRoseContainer = Color(0xFFFFF0F3) 
     
-                SlateBlue = Color(0xFFD84A65) 
-                SlateBlueLip = Color(0xFFB52B44) 
+                SlateBlue = Color(0xFFE56984) 
+                SlateBlueLip = Color(0xFFC44862) 
                 SlateBlueContainer = Color(0xFFFFF0F3) 
     
-                ElectricBlue = Color(0xFFD84A65) 
-                ElectricBlueLip = Color(0xFFB52B44) 
-                BlossomBlue = Color(0xFFD84A65) 
-                BlossomBlueLip = Color(0xFFB52B44) 
+                ElectricBlue = Color(0xFFE56984) 
+                ElectricBlueLip = Color(0xFFC44862) 
+                BlossomBlue = Color(0xFFE56984) 
+                BlossomBlueLip = Color(0xFFC44862) 
     
                 MatchaSage = Color(0xFF2E7D4E) 
                 MatchaSageLip = Color(0xFF205C37) 
@@ -254,8 +254,8 @@ object BlossomColors {
                 WisteriaVioletLip = Color(0xFF5B3C7E) 
                 WisteriaVioletContainer = Color(0xFFF3EDFA) 
     
-                MutedRose = Color(0xFFD84A65) 
-                MutedRoseLip = Color(0xFFB52B44) 
+                MutedRose = Color(0xFFE56984) 
+                MutedRoseLip = Color(0xFFC44862) 
                 MutedRoseContainer = Color(0xFFFFF0F3) 
     
                 MutedMatcha = Color(0xFF2E7D4E) 

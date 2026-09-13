@@ -1,6 +1,8 @@
 package com.ankilock.data
     
 import androidx.compose.ui.graphics.Color
+import com.ankilock.ui.blossom.AppTheme 
+import com.ankilock.ui.blossom.BlossomColors 
 
 data class ThemeBadgeStyle( 
     val backgroundColor: Color, 
@@ -121,20 +123,28 @@ object StoryThemes {
             "Two rival kingdoms and an unlikely alliance" 
         ), 
         "Comedy" to listOf( 
-            "A case of mistaken identity", 
-            "An awkward first date", 
-            "A workplace mishap that spirals out of control", 
-            "A wedding where everything goes wrong", 
-            "Getting stuck somewhere with an annoying acquaintance", 
-            "A misunderstanding that escalates absurdly" 
+            "Pretending to understand Japanese slang in front of cool teens", 
+            "A disastrous first attempt at making sushi at home", 
+            "Accidentally joining a competitive dodgeball club", 
+            "Mistaking a costume festival for a normal day", 
+            "A runaway robot vacuum that escapes into the neighborhood", 
+            "Two shy people both trying desperately to pay the bill", 
+            "Practicing a confident speech only to say the completely wrong word", 
+            "A cat that behaves like a corporate CEO", 
+            "Getting locked inside a shopping mall overnight", 
+            "An epic battle against a stubborn mosquito before sleep" 
         ), 
         "Nostalgic" to listOf( 
-            "Childhood summer memories", 
-            "Looking through old photographs", 
-            "Revisiting a hometown after years away", 
-            "An old friend group reminiscing", 
-            "Finding an old diary or letter", 
-            "A childhood tradition remembered as an adult" 
+            "Summer festival (Matsuri) memories from ten years ago", 
+            "The taste of childhood shaved ice (Kakigori) on a hot day", 
+            "Hearing the cicadas on the last day of summer vacation", 
+            "An old cassette tape found in an attic", 
+            "Walking past one's elementary school at dusk", 
+            "The sound of the evening chime (Gojinohanashi) echoing through town", 
+            "Finding an old handwritten letter in a textbook", 
+            "Drinking ramune by the riverbank in high school uniform", 
+            "The scent of tatami mats in a grandparents' summer house", 
+            "A faded polaroid photograph of old friends who lost touch" 
         ) 
     ) 
     
@@ -151,17 +161,76 @@ object StoryThemes {
         disabledThemes: Set<String> = emptySet(), 
         disabledTopics: Set<String> = emptySet() 
     ): Pair<String, String> { 
-        val eligibleThemes = ALL_THEMES.filter { it !in disabledThemes }.ifEmpty { ALL_THEMES } 
-        val theme = eligibleThemes.random() 
+        val availableThemes = ALL_THEMES.filter { it !in disabledThemes }.ifEmpty { ALL_THEMES } 
+        val theme = availableThemes.random() 
         
         val allTopicsForTheme = CATEGORIES[theme] ?: emptyList() 
-        val eligibleTopics = allTopicsForTheme.filter { it !in disabledTopics }.ifEmpty { allTopicsForTheme } 
-        val topic = if (eligibleTopics.isNotEmpty()) eligibleTopics.random() else "A memorable event" 
+        val availableTopics = allTopicsForTheme.filter { it !in disabledTopics }.ifEmpty { allTopicsForTheme } 
+        val topic = if (availableTopics.isNotEmpty()) availableTopics.random() else "A memorable event" 
         
         return Pair(theme, topic) 
     } 
     
-    fun getThemeBadgeColors(themeKey: String): ThemeBadgeStyle { 
+    fun getThemeBadgeColors(themeKey: String, isDark: Boolean = BlossomColors.currentTheme != AppTheme.LIGHT): ThemeBadgeStyle { 
+        if (!isDark) { 
+            return when (themeKey) { 
+                "Happy" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFFFF3E0), 
+                    contentColor = Color(0xFFE65100), 
+                    borderColor = Color(0xFFFFCC80) 
+                ) 
+                "Sad" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFE3F2FD), 
+                    contentColor = Color(0xFF1565C0), 
+                    borderColor = Color(0xFF90CAF9) 
+                ) 
+                "SliceOfLife" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFE8F5E9), 
+                    contentColor = Color(0xFF2E7D32), 
+                    borderColor = Color(0xFFA5D6A7) 
+                ) 
+                "Mystery" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFF3E5F5), 
+                    contentColor = Color(0xFF7B1FA2), 
+                    borderColor = Color(0xFFCE93D8) 
+                ) 
+                "Horror" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFFFEBEE), 
+                    contentColor = Color(0xFFC62828), 
+                    borderColor = Color(0xFFEF9A9A) 
+                ) 
+                "Adventure" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFFFF8E1), 
+                    contentColor = Color(0xFFEF6C00), 
+                    borderColor = Color(0xFFFFE082) 
+                ) 
+                "Inspirational" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFE0F7FA), 
+                    contentColor = Color(0xFF00838F), 
+                    borderColor = Color(0xFF80DEEA) 
+                ) 
+                "Fantasy" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFEDE7F6), 
+                    contentColor = Color(0xFF512DA8), 
+                    borderColor = Color(0xFFB39DDB) 
+                ) 
+                "Comedy" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFFFFDE7), 
+                    contentColor = Color(0xFFF57F17), 
+                    borderColor = Color(0xFFFFF59D) 
+                ) 
+                "Nostalgic" -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFEFEBE9), 
+                    contentColor = Color(0xFF4E342E), 
+                    borderColor = Color(0xFFD7CCC8) 
+                ) 
+                else -> ThemeBadgeStyle( 
+                    backgroundColor = Color(0xFFECEFF1), 
+                    contentColor = Color(0xFF37474F), 
+                    borderColor = Color(0xFFCFD8DC) 
+                ) 
+            } 
+        } 
         return when (themeKey) { 
             "Happy" -> ThemeBadgeStyle( 
                 backgroundColor = Color(0xFF33261D), 

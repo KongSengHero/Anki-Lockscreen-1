@@ -109,6 +109,17 @@ fun Story3DButton(
                 } 
             ) 
     ) { 
+        val actualBorderColor = if (borderColor.red >= faceColor.red && borderColor.green >= faceColor.green && borderColor.blue >= faceColor.blue) { 
+            faceColor.copy( 
+                red = (faceColor.red * 0.72f).coerceIn(0f, 1f), 
+                green = (faceColor.green * 0.72f).coerceIn(0f, 1f), 
+                blue = (faceColor.blue * 0.72f).coerceIn(0f, 1f), 
+                alpha = 1f 
+            ) 
+        } else { 
+            borderColor 
+        } 
+        
         Box( 
             modifier = Modifier 
                 .fillMaxSize() 
@@ -117,7 +128,7 @@ fun Story3DButton(
                 .background(if (enabled) faceColor else faceColor.copy(alpha = 0.6f)) 
                 .border( 
                     width = borderWidth, 
-                    color = if (enabled) borderColor else borderColor.copy(alpha = 0.5f), 
+                    color = if (enabled) actualBorderColor else actualBorderColor.copy(alpha = 0.5f), 
                     shape = shape 
                 ), 
             contentAlignment = Alignment.Center, 

@@ -13,10 +13,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext 
 import kotlinx.coroutines.delay 
 import kotlinx.coroutines.launch 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.LinearEasing 
+import androidx.compose.animation.core.RepeatMode 
+import androidx.compose.animation.core.Spring 
+import androidx.compose.animation.core.animateDpAsState 
+import androidx.compose.animation.core.animateFloat 
+import androidx.compose.animation.core.animateFloatAsState 
+import androidx.compose.animation.core.infiniteRepeatable 
+import androidx.compose.animation.core.rememberInfiniteTransition 
+import androidx.compose.animation.core.spring 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,13 +76,17 @@ fun Modifier.squircleLiquidGlass(
         Color(0xFF161922).copy(alpha = darkBaseAlpha) 
     } 
     
-    return this 
-        .shadow( 
+    val shadowModifier = if (shadowElevation > 0.dp) { 
+        Modifier.shadow( 
             elevation = shadowElevation, 
             shape = shape, 
             ambientColor = Color.Black.copy(alpha = 0.35f), 
             spotColor = Color.Black.copy(alpha = 0.50f) 
         ) 
+    } else Modifier 
+    
+    val baseModifier = this 
+        .then(shadowModifier) 
         .clip(shape) 
         .background(finalBg) 
         .border( 
@@ -93,7 +103,9 @@ fun Modifier.squircleLiquidGlass(
             ), 
             shape = shape 
         ) 
-        .drawWithContent { 
+        
+    return if (specularAlpha > 0f || hasTopGloss) { 
+        baseModifier.drawWithContent { 
             drawContent() 
             val cr = androidx.compose.ui.geometry.CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()) 
             if (specularAlpha > 0f) { 
@@ -128,6 +140,9 @@ fun Modifier.squircleLiquidGlass(
                 ) 
             } 
         } 
+    } else { 
+        baseModifier 
+    } 
 } 
     
 @Composable
@@ -175,6 +190,7 @@ fun Squircle3DButton(
     borderBrush: Brush? = null, 
     progressFraction: Float? = null, 
     progressColor: Color? = null, 
+    hasSweepingShine: Boolean = false, 
     shape: Shape = BlossomShapes.SquircleMedium, 
     depth: Dp = 3.dp, 
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 8.dp), 
@@ -189,16 +205,22 @@ fun Squircle3DButton(
     var isManuallyPressed by remember { mutableStateOf(false) } 
     
     val defaultBorderColor = containerColor.copy( 
-        red = (containerColor.red + (1f - containerColor.red) * 0.35f).coerceIn(0f, 1f), 
-        green = (containerColor.green + (1f - containerColor.green) * 0.35f).coerceIn(0f, 1f), 
-        blue = (containerColor.blue + (1f - containerColor.blue) * 0.35f).coerceIn(0f, 1f), 
-        alpha = (containerColor.alpha + 0.15f).coerceIn(0f, 1f) 
+        red = (containerColor.red * 0.72f).coerceIn(0f, 1f), 
+        green = (containerColor.green * 0.72f).coerceIn(0f, 1f), 
+        blue = (containerColor.blue * 0.72f).coerceIn(0f, 1f), 
+        alpha = 1f 
     ) 
     val effectiveBorderColor = when { 
         borderBrush is androidx.compose.ui.graphics.SolidColor -> borderBrush.value 
         else -> defaultBorderColor 
     } 
-    val actualBevelColor = bevelColor ?: effectiveBorderColor 
+    val defaultBevelColor = containerColor.copy( 
+        red = (containerColor.red * 0.58f).coerceIn(0f, 1f), 
+        green = (containerColor.green * 0.58f).coerceIn(0f, 1f), 
+        blue = (containerColor.blue * 0.58f).coerceIn(0f, 1f), 
+        alpha = 1f 
+    ) 
+    val actualBevelColor = bevelColor ?: defaultBevelColor 
     
     val isVisualPressed = (isPressed || isManuallyPressed) && enabled 
     val currentOffset by animateDpAsState( 
@@ -250,6 +272,8 @@ fun Squircle3DButton(
                 .then( 
                     if (bevelBrush != null) { 
                         Modifier.background(bevelBrush) 
+                    } else if (borderBrush != null && borderBrush !is androidx.compose.ui.graphics.SolidColor) { 
+                        Modifier.background(borderBrush) 
                     } else { 
                         Modifier.background(if (enabled) actualBevelColor else actualBevelColor.copy(alpha = 0.35f)) 
                     } 
@@ -259,12 +283,13 @@ fun Squircle3DButton(
         val faceBrush = containerBrush ?: if (enabled) { 
             Brush.verticalGradient( 
                 colors = listOf( 
-                    containerColor.copy(alpha = 1f), 
                     containerColor.copy( 
-                        red = (containerColor.red * 0.90f).coerceIn(0f, 1f), 
-                        green = (containerColor.green * 0.90f).coerceIn(0f, 1f), 
-                        blue = (containerColor.blue * 0.90f).coerceIn(0f, 1f) 
-                    ) 
+                        red = (containerColor.red + (1f - containerColor.red) * 0.16f).coerceIn(0f, 1f), 
+                        green = (containerColor.green + (1f - containerColor.green) * 0.16f).coerceIn(0f, 1f), 
+                        blue = (containerColor.blue + (1f - containerColor.blue) * 0.16f).coerceIn(0f, 1f), 
+                        alpha = 1f 
+                    ), 
+                    containerColor.copy(alpha = 1f) 
                 ) 
             ) 
         } else { 
@@ -302,6 +327,41 @@ fun Squircle3DButton(
                 ) 
             } 
             
+            if (hasSweepingShine && enabled) { 
+                val infiniteTransition = rememberInfiniteTransition(label = "sweepingShine") 
+                val shineTranslate by infiniteTransition.animateFloat( 
+                    initialValue = -1.2f, 
+                    targetValue = 2.4f, 
+                    animationSpec = infiniteRepeatable( 
+                        animation = tween(durationMillis = 4000, easing = LinearEasing), 
+                        repeatMode = RepeatMode.Restart 
+                    ), 
+                    label = "shineTranslate" 
+                ) 
+                Box( 
+                    modifier = Modifier 
+                        .matchParentSize() 
+                        .clip(shape) 
+                        .drawWithContent { 
+                            drawContent() 
+                            val width = size.width 
+                            val height = size.height 
+                            val xOffset = width * shineTranslate 
+                            drawRect( 
+                                brush = Brush.linearGradient( 
+                                    0.0f to Color.Transparent, 
+                                    0.40f to Color.White.copy(alpha = 0.02f), 
+                                    0.50f to Color.White.copy(alpha = 0.38f), 
+                                    0.60f to Color.White.copy(alpha = 0.02f), 
+                                    1.0f to Color.Transparent, 
+                                    start = Offset(xOffset - width * 0.35f, 0f), 
+                                    end = Offset(xOffset + width * 0.35f, height) 
+                                ) 
+                            ) 
+                        } 
+                ) 
+            } 
+            
             overlayContent?.invoke(this) 
             
             Box( 
@@ -335,6 +395,7 @@ fun Squircle3DButton(
     borderBrush: Brush? = null, 
     progressFraction: Float? = null, 
     progressColor: Color? = null, 
+    hasSweepingShine: Boolean = false, 
     shape: Shape = BlossomShapes.SquircleMedium, 
     depth: Dp = 3.dp, 
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 8.dp), 
@@ -352,6 +413,7 @@ fun Squircle3DButton(
         borderBrush = borderBrush, 
         progressFraction = progressFraction, 
         progressColor = progressColor, 
+        hasSweepingShine = hasSweepingShine, 
         shape = shape, 
         depth = depth, 
         contentPadding = contentPadding, 
