@@ -57,14 +57,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier 
 import androidx.compose.ui.draw.clip 
 import androidx.compose.ui.graphics.Color 
+import androidx.compose.ui.geometry.Offset 
 import androidx.compose.ui.graphics.ImageBitmap 
 import androidx.compose.ui.graphics.asImageBitmap 
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection 
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource 
+import androidx.compose.ui.input.nestedscroll.nestedScroll 
 import androidx.compose.ui.layout.ContentScale 
 import androidx.compose.ui.platform.LocalContext 
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController 
 import androidx.compose.ui.text.font.FontWeight 
 import androidx.compose.ui.text.input.ImeAction 
 import androidx.compose.ui.text.style.TextOverflow 
+import androidx.compose.ui.unit.Velocity 
 import androidx.compose.ui.unit.dp 
 import androidx.compose.ui.unit.sp 
 import com.ankilock.data.FishAudioVoiceOption 
@@ -97,9 +102,16 @@ fun FishAudioVoiceDialog(
     val cleanCurrentId = PreferencesManager.extractVoiceId(currentVoiceId) 
     
     var favoriteIds by remember { mutableStateOf(prefs.favoriteFishAudioVoiceIds) } 
+    var customVoices by remember { mutableStateOf(prefs.getSavedCustomVoices()) } 
+    val allVoices = remember(customVoices, favoriteIds) { 
+        val cleanCustom = customVoices.map { it.copy(id = PreferencesManager.extractVoiceId(it.id).lowercase().trim()) } 
+        val cleanPresets = presets.map { it.copy(id = PreferencesManager.extractVoiceId(it.id).lowercase().trim()) } 
+        (cleanPresets + cleanCustom).distinctBy { it.id } 
+    } 
     val filterChips = listOf("All", "Favorites", "Female", "Male", "Neutral", "Young", "Middle-aged", "Anime", "Narrator") 
     var selectedFilter by remember { mutableStateOf("All") } 
     
+    val searchCache = remember { mutableMapOf<String, List<FishAudioVoiceOption>>() } 
     var searchQuery by remember { mutableStateOf("") } 
     var isSearching by remember { mutableStateOf(false) } 
     var searchResults by remember { mutableStateOf<List<FishAudioVoiceOption>>(emptyList()) } 
@@ -108,6 +120,24 @@ fun FishAudioVoiceDialog(
     
     var customInput by remember { mutableStateOf("") } 
     var showCustomSection by remember { mutableStateOf(false) } 
+    
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
     
     var previewVoiceId by remember { mutableStateOf<String?>(null) } 
     var isGeneratingPreview by remember { mutableStateOf(false) } 
@@ -129,9 +159,10 @@ fun FishAudioVoiceDialog(
         } 
     } 
     
-    fun handleToggleFavorite(id: String) { 
-        prefs.toggleFavoriteVoice(id) 
+    fun handleToggleFavorite(voice: FishAudioVoiceOption) { 
+        prefs.toggleFavoriteVoice(voice) 
         favoriteIds = prefs.favoriteFishAudioVoiceIds 
+        customVoices = prefs.getSavedCustomVoices() 
     } 
     
     fun handlePreview(voiceId: String) { 
@@ -180,6 +211,17 @@ fun FishAudioVoiceDialog(
         searchError = null 
         hasSearched = true 
         
+        val cacheKey = "$q|${tagFilter ?: ""}" 
+        val cached = searchCache[cacheKey] 
+        if (cached != null) { 
+            searchResults = cached 
+            isSearching = false 
+            if (cached.isEmpty()) { 
+                searchError = if (q.isNotBlank()) "No public voices found matching \"$q\"" else "No public voices found" 
+            } 
+            return 
+        } 
+        
         coroutineScope.launch { 
             val res = audioService.searchVoices( 
                 apiKey = apiKey, 
@@ -190,6 +232,7 @@ fun FishAudioVoiceDialog(
             ) 
             isSearching = false 
             res.onSuccess { list -> 
+                searchCache[cacheKey] = list 
                 searchResults = list 
                 if (list.isEmpty()) { 
                     searchError = if (q.isNotBlank()) "No public voices found matching \"$q\"" else "No public voices found" 
@@ -200,16 +243,20 @@ fun FishAudioVoiceDialog(
         } 
     } 
     
-    val displayedPresets = presets.filter { preset -> 
+    val displayedPresets = allVoices.filter { voice -> 
+        val cleanId = PreferencesManager.extractVoiceId(voice.id).lowercase().trim() 
         when (selectedFilter) { 
             "All" -> true 
-            "Favorites" -> favoriteIds.contains(preset.id) 
-            else -> preset.tags.any { it.contains(selectedFilter, ignoreCase = true) } || preset.tag.contains(selectedFilter, ignoreCase = true) 
+            "Favorites" -> favoriteIds.contains(cleanId) 
+            else -> voice.tags.any { it.contains(selectedFilter, ignoreCase = true) } || voice.tag.contains(selectedFilter, ignoreCase = true) 
         } 
     } 
     
     val displayedSearchResults = if (selectedFilter == "Favorites") { 
-        searchResults.filter { favoriteIds.contains(it.id) } 
+        searchResults.filter { 
+            val cleanId = PreferencesManager.extractVoiceId(it.id).lowercase().trim() 
+            favoriteIds.contains(cleanId) 
+        } 
     } else { 
         searchResults 
     } 
@@ -312,6 +359,7 @@ fun FishAudioVoiceDialog(
             Column( 
                 modifier = Modifier 
                     .fillMaxWidth() 
+                    .nestedScroll(noBounceNestedScroll) 
                     .verticalScroll(rememberScrollState()), 
                 verticalArrangement = Arrangement.spacedBy(14.dp) 
             ) { 
@@ -412,6 +460,8 @@ fun FishAudioVoiceDialog(
                                 hasSearched = false 
                                 searchQuery = "" 
                                 searchError = null 
+                                customVoices = prefs.getSavedCustomVoices() 
+                                favoriteIds = prefs.favoriteFishAudioVoiceIds 
                             } 
                         ) 
                     } 
@@ -426,8 +476,9 @@ fun FishAudioVoiceDialog(
                     } 
                     
                     displayedSearchResults.forEach { voice -> 
-                        val isSelected = cleanCurrentId.equals(voice.id, ignoreCase = true) 
-                        val isFav = favoriteIds.contains(voice.id) 
+                        val cleanVoiceId = PreferencesManager.extractVoiceId(voice.id).lowercase().trim() 
+                        val isSelected = cleanCurrentId.lowercase().trim() == cleanVoiceId 
+                        val isFav = favoriteIds.contains(cleanVoiceId) 
                         VoiceOptionCard( 
                             voice = voice, 
                             isSelected = isSelected, 
@@ -435,7 +486,7 @@ fun FishAudioVoiceDialog(
                             isGenerating = (isGeneratingPreview && previewVoiceId == voice.id), 
                             isPlaying = (isPlayingAudio && previewVoiceId == voice.id), 
                             onSelect = { handleSelect(voice.id, voice.name) }, 
-                            onToggleFavorite = { handleToggleFavorite(voice.id) }, 
+                            onToggleFavorite = { handleToggleFavorite(voice) }, 
                             onPreview = { handlePreview(voice.id) } 
                         ) 
                     } 
@@ -466,8 +517,9 @@ fun FishAudioVoiceDialog(
                 } 
                 
                 displayedPresets.forEach { preset -> 
-                    val isSelected = cleanCurrentId.equals(preset.id, ignoreCase = true) 
-                    val isFav = favoriteIds.contains(preset.id) 
+                    val cleanPresetId = PreferencesManager.extractVoiceId(preset.id).lowercase().trim() 
+                    val isSelected = cleanCurrentId.lowercase().trim() == cleanPresetId 
+                    val isFav = favoriteIds.contains(cleanPresetId) 
                     VoiceOptionCard( 
                         voice = preset, 
                         isSelected = isSelected, 
@@ -475,7 +527,7 @@ fun FishAudioVoiceDialog(
                         isGenerating = (isGeneratingPreview && previewVoiceId == preset.id), 
                         isPlaying = (isPlayingAudio && previewVoiceId == preset.id), 
                         onSelect = { handleSelect(preset.id, preset.name) }, 
-                        onToggleFavorite = { handleToggleFavorite(preset.id) }, 
+                        onToggleFavorite = { handleToggleFavorite(preset) }, 
                         onPreview = { handlePreview(preset.id) } 
                     ) 
                 } 

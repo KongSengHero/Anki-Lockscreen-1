@@ -138,6 +138,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import com.ankilock.anki.AnkiDroidHelper
 import com.ankilock.ui.cards.DeckCarouselCard
 import com.ankilock.ui.components.Squircle3DButton
@@ -1039,7 +1040,7 @@ class MainActivity : ComponentActivity() {
             ) { 
                 QuickAccessHubTile( 
                     icon = Icons.Filled.Layers, 
-                    title = "Lockscreen Style", 
+                    title = "Lockscreen Config", 
                     subtitle = if (isMusicPlayerStyle) "Music Player" else "Classic Card", 
                     accentColor = BlossomColors.WisteriaViolet, 
                     containerColor = BlossomColors.WisteriaVioletContainer, 
@@ -1048,7 +1049,7 @@ class MainActivity : ComponentActivity() {
                 ) 
                 QuickAccessHubTile( 
                     icon = Icons.Filled.SmartToy, 
-                    title = "AI Story Config", 
+                    title = "API Config", 
                     subtitle = "API Keys & Models", 
                     accentColor = BlossomColors.MatchaSage, 
                     containerColor = BlossomColors.MatchaSageContainer, 
@@ -1060,6 +1061,24 @@ class MainActivity : ComponentActivity() {
             Spacer(modifier = Modifier.height(108.dp)) 
         } 
         
+        val noBounceNestedScroll = remember { 
+            object : NestedScrollConnection { 
+                override fun onPostScroll( 
+                    consumed: Offset, 
+                    available: Offset, 
+                    source: NestedScrollSource 
+                ): Offset { 
+                    return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+                } 
+                override suspend fun onPostFling( 
+                    consumed: Velocity, 
+                    available: Velocity 
+                ): Velocity { 
+                    return Velocity(0f, available.y) 
+                } 
+            } 
+        } 
+        
         if (showBackgroundsSheet) { 
             ModalBottomSheet( 
                 onDismissRequest = { showBackgroundsSheet = false }, 
@@ -1069,9 +1088,10 @@ class MainActivity : ComponentActivity() {
                 Column( 
                     modifier = Modifier 
                         .fillMaxWidth() 
+                        .nestedScroll(noBounceNestedScroll) 
+                        .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp) 
-                        .verticalScroll(rememberScrollState()), 
+                        .padding(bottom = 36.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1215,9 +1235,10 @@ class MainActivity : ComponentActivity() {
                 Column( 
                     modifier = Modifier 
                         .fillMaxWidth() 
+                        .nestedScroll(noBounceNestedScroll) 
+                        .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp) 
-                        .verticalScroll(rememberScrollState()), 
+                        .padding(bottom = 36.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1246,20 +1267,6 @@ class MainActivity : ComponentActivity() {
                             CardSessionManager.refresh(this@MainActivity) 
                         } 
                     } 
-                    
-                    ModernIntervalCard( 
-                        updateInterval, 
-                        snoozeDuration, 
-                        onUpdateSelect = { minutes -> 
-                            updateInterval = minutes 
-                            prefs.updateIntervalMinutes = minutes 
-                            if (isEnabled) DueCountWorker.schedule(this@MainActivity, minutes.toLong()) 
-                        }, 
-                        onSnoozeSelect = { minutes -> 
-                            snoozeDuration = minutes 
-                            prefs.snoozeDurationMinutes = minutes 
-                        } 
-                    ) 
                 } 
             } 
         } 
@@ -1273,9 +1280,10 @@ class MainActivity : ComponentActivity() {
                 Column( 
                     modifier = Modifier 
                         .fillMaxWidth() 
+                        .nestedScroll(noBounceNestedScroll) 
+                        .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp) 
-                        .verticalScroll(rememberScrollState()), 
+                        .padding(bottom = 36.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1283,7 +1291,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth() 
                     ) { 
                         Text( 
-                            "Lockscreen Style", 
+                            "Lockscreen Configuration", 
                             fontSize = 18.sp, 
                             fontWeight = FontWeight.Bold, 
                             color = BlossomColors.TextPrimary 
@@ -1307,6 +1315,20 @@ class MainActivity : ComponentActivity() {
                             if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
                         } 
                     } 
+                    
+                    ModernIntervalCard( 
+                        updateInterval, 
+                        snoozeDuration, 
+                        onUpdateSelect = { minutes -> 
+                            updateInterval = minutes 
+                            prefs.updateIntervalMinutes = minutes 
+                            if (isEnabled) DueCountWorker.schedule(this@MainActivity, minutes.toLong()) 
+                        }, 
+                        onSnoozeSelect = { minutes -> 
+                            snoozeDuration = minutes 
+                            prefs.snoozeDurationMinutes = minutes 
+                        } 
+                    ) 
                 } 
             } 
         } 
@@ -1724,7 +1746,6 @@ class MainActivity : ComponentActivity() {
                     Squircle3DButton( 
                         onClick = onPickNewImage, 
                         containerColor = BlossomColors.WisteriaViolet, 
-                        bevelColor = BlossomColors.WisteriaVioletLip, 
                         modifier = Modifier.fillMaxWidth() 
                     ) { 
                         Row( 
@@ -1967,7 +1988,6 @@ class MainActivity : ComponentActivity() {
                     Squircle3DButton( 
                         onClick = onPickNewImage, 
                         containerColor = BlossomColors.SlateBlue, 
-                        bevelColor = BlossomColors.SlateBlueLip, 
                         modifier = Modifier.fillMaxWidth() 
                     ) { 
                         Row( 

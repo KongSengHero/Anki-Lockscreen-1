@@ -155,7 +155,7 @@ fun StoryConfigBottomSheet(
                 available: Offset, 
                 source: NestedScrollSource 
             ): Offset { 
-                return Offset(0f, available.y) 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
             } 
             override suspend fun onPostFling( 
                 consumed: Velocity, 

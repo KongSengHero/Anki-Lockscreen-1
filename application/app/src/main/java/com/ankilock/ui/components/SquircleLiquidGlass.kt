@@ -188,11 +188,17 @@ fun Squircle3DButton(
     val isPressed by interactionSource.collectIsPressedAsState() 
     var isManuallyPressed by remember { mutableStateOf(false) } 
     
-    val actualBevelColor = bevelColor ?: containerColor.copy( 
-        red = (containerColor.red * 0.65f).coerceIn(0f, 1f), 
-        green = (containerColor.green * 0.65f).coerceIn(0f, 1f), 
-        blue = (containerColor.blue * 0.65f).coerceIn(0f, 1f) 
+    val defaultBorderColor = containerColor.copy( 
+        red = (containerColor.red + (1f - containerColor.red) * 0.35f).coerceIn(0f, 1f), 
+        green = (containerColor.green + (1f - containerColor.green) * 0.35f).coerceIn(0f, 1f), 
+        blue = (containerColor.blue + (1f - containerColor.blue) * 0.35f).coerceIn(0f, 1f), 
+        alpha = (containerColor.alpha + 0.15f).coerceIn(0f, 1f) 
     ) 
+    val effectiveBorderColor = when { 
+        borderBrush is androidx.compose.ui.graphics.SolidColor -> borderBrush.value 
+        else -> defaultBorderColor 
+    } 
+    val actualBevelColor = bevelColor ?: effectiveBorderColor 
     
     val isVisualPressed = (isPressed || isManuallyPressed) && enabled 
     val currentOffset by animateDpAsState( 
@@ -239,7 +245,7 @@ fun Squircle3DButton(
         Box( 
             modifier = Modifier 
                 .matchParentSize() 
-                .offset(y = depth) 
+                .padding(top = depth) 
                 .clip(shape) 
                 .then( 
                     if (bevelBrush != null) { 
@@ -270,6 +276,7 @@ fun Squircle3DButton(
         Box( 
             modifier = Modifier 
                 .matchParentSize() 
+                .padding(bottom = depth) 
                 .offset(y = currentOffset) 
                 .clip(shape) 
                 .background(faceBrush) 
@@ -279,7 +286,7 @@ fun Squircle3DButton(
                     } else { 
                         Modifier.border( 
                             width = 1.dp, 
-                            color = Color.White.copy(alpha = if (enabled) 0.25f else 0.08f), 
+                            color = if (enabled) effectiveBorderColor else effectiveBorderColor.copy(alpha = 0.35f), 
                             shape = shape 
                         ) 
                     } 
@@ -389,11 +396,7 @@ fun Squircle3DCard(
         modifier = modifier, 
         enabled = enabled, 
         containerColor = containerColor, 
-        bevelColor = bevelColor ?: containerColor.copy( 
-            red = (containerColor.red * 0.70f).coerceIn(0f, 1f), 
-            green = (containerColor.green * 0.70f).coerceIn(0f, 1f), 
-            blue = (containerColor.blue * 0.70f).coerceIn(0f, 1f) 
-        ), 
+        bevelColor = bevelColor, 
         borderBrush = borderBrush, 
         shape = shape, 
         depth = depth, 

@@ -4,12 +4,12 @@ import android.content.Context
 import com.ankilock.anki.JapaneseFieldParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONArray
-import java.io.IOException
-import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
+import okhttp3.FormBody 
+import okhttp3.OkHttpClient 
+import okhttp3.Request 
+import org.json.JSONArray 
+import java.io.IOException 
+import java.util.concurrent.TimeUnit 
 
 data class TranslationResult( 
     val sourceText: String, 
@@ -38,13 +38,19 @@ class TranslatorService(
         } 
 
         try { 
-            val encoded = URLEncoder.encode(trimmed, "UTF-8") 
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=en&dt=t&dt=rm&q=$encoded" 
+            val formBody = FormBody.Builder() 
+                .add("client", "gtx") 
+                .add("sl", "ja") 
+                .add("tl", "en") 
+                .add("dt", "t") 
+                .add("dt", "rm") 
+                .add("q", trimmed) 
+                .build() 
 
             val request = Request.Builder() 
-                .url(url) 
+                .url("https://translate.googleapis.com/translate_a/single") 
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36") 
-                .get() 
+                .post(formBody) 
                 .build() 
 
             val response = client.newCall(request).execute() 
@@ -85,6 +91,10 @@ class TranslatorService(
             } 
 
             val finalTranslation = translationSb.toString().trim() 
+            if (finalTranslation.isBlank()) { 
+                return@withContext Result.failure(IOException("No translation returned")) 
+            } 
+
             val finalRomaji = extractedRomaji?.trim()?.ifBlank { null } 
                 ?: JapaneseFieldParser.kanaToRomaji(trimmed).ifBlank { "" } 
 
@@ -99,18 +109,7 @@ class TranslatorService(
             if (cached != null && cached.translatedText.isNotBlank()) { 
                 return@withContext Result.success(cached) 
             } 
-            val fallbackRomaji = JapaneseFieldParser.kanaToRomaji(trimmed) 
-            if (fallbackRomaji.isNotBlank()) { 
-                Result.success( 
-                    TranslationResult( 
-                        sourceText = trimmed, 
-                        translatedText = "(Translation unavailable offline)", 
-                        romaji = fallbackRomaji 
-                    ) 
-                ) 
-            } else { 
-                Result.failure(e) 
-            } 
+            Result.failure(e) 
         } 
     } 
 

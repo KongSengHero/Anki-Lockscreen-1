@@ -63,13 +63,15 @@ import com.ankilock.ui.components.Squircle3DButton
 @Composable
 fun ComprehensionQuizOverlay( 
     questions: List<StoryQuizQuestion>, 
+    userAnswers: MutableMap<Int, Int> = remember { mutableStateMapOf<Int, Int>() }, 
+    currentIndex: Int = 0, 
+    onCurrentIndexChange: (Int) -> Unit = {}, 
+    isQuizCompleted: Boolean = false, 
+    onQuizCompletedChange: (Boolean) -> Unit = {}, 
     onDismiss: () -> Unit 
 ) { 
     if (questions.isEmpty()) return 
     
-    var currentIndex by remember { mutableIntStateOf(0) } 
-    val userAnswers = remember { mutableStateMapOf<Int, Int>() } 
-    var isQuizCompleted by remember { mutableStateOf(false) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     
     ModalBottomSheet( 
@@ -127,8 +129,8 @@ fun ComprehensionQuizOverlay(
                 IconButton( 
                     onClick = { 
                         userAnswers.clear() 
-                        currentIndex = 0 
-                        isQuizCompleted = false 
+                        onCurrentIndexChange(0) 
+                        onQuizCompletedChange(false) 
                     }, 
                     modifier = Modifier 
                         .size(38.dp) 
@@ -146,7 +148,7 @@ fun ComprehensionQuizOverlay(
             
             Spacer(modifier = Modifier.height(10.dp)) 
             
-            val progress = if (isQuizCompleted) 1f else (currentIndex.toFloat() / questions.size) 
+            val progress = if (isQuizCompleted) 1f else (0.10f + 0.90f * (currentIndex.toFloat() / questions.size.coerceAtLeast(1))) 
             LinearProgressIndicator( 
                 progress = { progress }, 
                 modifier = Modifier 
@@ -318,8 +320,8 @@ fun ComprehensionQuizOverlay(
                             Squircle3DButton( 
                                 onClick = { 
                                     userAnswers.clear() 
-                                    currentIndex = 0 
-                                    isQuizCompleted = false 
+                                    onCurrentIndexChange(0) 
+                                    onQuizCompletedChange(false) 
                                 }, 
                                 modifier = Modifier 
                                     .weight(1f) 
@@ -392,7 +394,7 @@ fun ComprehensionQuizOverlay(
                                     val isSelected = selectedOpt == optIdx 
                                     
                                     val bgColor = if (isSelected) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard1 
-                                    val borderColor = if (isSelected) BlossomColors.SakuraRose else BlossomColors.CardBorderSubtle 
+                                    val borderColor = if (isSelected) BlossomColors.SakuraRose else Color.White.copy(alpha = 0.22f) 
                                     val textColor = if (isSelected) BlossomColors.TextPrimary else BlossomColors.TextSecondary 
                                     
                                     Surface( 
@@ -457,7 +459,7 @@ fun ComprehensionQuizOverlay(
                             if (currentIndex > 0) { 
                                 Squircle3DButton( 
                                     onClick = { 
-                                        currentIndex-- 
+                                        onCurrentIndexChange(currentIndex - 1) 
                                     }, 
                                     modifier = Modifier 
                                         .weight(1f) 
@@ -490,9 +492,9 @@ fun ComprehensionQuizOverlay(
                             Squircle3DButton( 
                                 onClick = { 
                                     if (!isFinalQuestion) { 
-                                        currentIndex++ 
+                                        onCurrentIndexChange(currentIndex + 1) 
                                     } else { 
-                                        isQuizCompleted = true 
+                                        onQuizCompletedChange(true) 
                                     } 
                                 }, 
                                 enabled = hasAnsweredCurrent, 

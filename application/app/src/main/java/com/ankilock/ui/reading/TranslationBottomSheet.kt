@@ -82,7 +82,7 @@ fun TranslationBottomSheet(
                 available: Offset, 
                 source: NestedScrollSource 
             ): Offset { 
-                return Offset(0f, available.y) 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
             } 
             override suspend fun onPostFling( 
                 consumed: Velocity, 
@@ -120,6 +120,7 @@ fun TranslationBottomSheet(
         } 
         isLoading = true 
         errorMsg = null 
+        result = null 
         scope.launch { 
             val res = translatorService.translate(sourceText) 
             res.onSuccess { 

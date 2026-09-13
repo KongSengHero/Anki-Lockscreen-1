@@ -1,7 +1,9 @@
 package com.ankilock.data
     
-import android.content.Context
-import android.content.SharedPreferences
+import android.content.Context 
+import android.content.SharedPreferences 
+import org.json.JSONArray 
+import org.json.JSONObject 
     
 data class GeminiModelOption( 
     val id: String, 
@@ -185,11 +187,24 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_FISH_AUDIO_MODEL, value.trim()).apply() 
     
     var favoriteFishAudioVoiceIds: Set<String> 
-        get() = prefs.getStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, emptySet()) ?: emptySet() 
-        set(value) = prefs.edit().putStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, value).apply() 
+        get() { 
+            val raw = prefs.getString(KEY_FAVORITE_FISH_AUDIO_VOICES + "_str", null) 
+            if (raw != null) { 
+                return raw.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet() 
+            } 
+            val oldSet = prefs.getStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, emptySet()) ?: emptySet() 
+            return oldSet.map { extractVoiceId(it).lowercase().trim() }.filter { it.isNotBlank() }.toSet() 
+        } 
+        set(value) { 
+            val cleanSet = value.map { extractVoiceId(it).lowercase().trim() }.filter { it.isNotBlank() }.toSet() 
+            prefs.edit() 
+                .putString(KEY_FAVORITE_FISH_AUDIO_VOICES + "_str", cleanSet.joinToString(",")) 
+                .putStringSet(KEY_FAVORITE_FISH_AUDIO_VOICES, HashSet(cleanSet)) 
+                .commit() 
+        } 
     
     fun toggleFavoriteVoice(voiceId: String): Boolean { 
-        val cleanId = extractVoiceId(voiceId) 
+        val cleanId = extractVoiceId(voiceId).lowercase().trim() 
         val current = favoriteFishAudioVoiceIds.toMutableSet() 
         val isFav = if (current.contains(cleanId)) { 
             current.remove(cleanId) 
@@ -202,8 +217,114 @@ class PreferencesManager(context: Context) {
         return isFav 
     } 
     
+    fun toggleFavoriteVoice(voice: FishAudioVoiceOption): Boolean { 
+        val cleanId = extractVoiceId(voice.id).lowercase().trim() 
+        val current = favoriteFishAudioVoiceIds.toMutableSet() 
+        val isFav = if (current.contains(cleanId)) { 
+            current.remove(cleanId) 
+            removeCustomVoice(cleanId) 
+            false 
+        } else { 
+            current.add(cleanId) 
+            saveCustomVoice(voice.copy(id = cleanId)) 
+            true 
+        } 
+        favoriteFishAudioVoiceIds = current 
+        return isFav 
+    } 
+    
+    fun getSavedCustomVoices(): List<FishAudioVoiceOption> { 
+        val jsonStr = prefs.getString(KEY_SAVED_CUSTOM_VOICES, null) ?: return emptyList() 
+        return try { 
+            val jsonArray = JSONArray(jsonStr) 
+            val list = mutableListOf<FishAudioVoiceOption>() 
+            for (i in 0 until jsonArray.length()) { 
+                val obj = jsonArray.getJSONObject(i) 
+                val tagsArr = obj.optJSONArray("tags") 
+                val tagsList = mutableListOf<String>() 
+                if (tagsArr != null) { 
+                    for (t in 0 until tagsArr.length()) { 
+                        tagsList.add(tagsArr.getString(t)) 
+                    } 
+                } 
+                val rawId = obj.optString("id", "") 
+                val cleanId = extractVoiceId(rawId).lowercase().trim() 
+                list.add( 
+                    FishAudioVoiceOption( 
+                        id = cleanId, 
+                        name = obj.optString("name", ""), 
+                        author = obj.optString("author", ""), 
+                        description = obj.optString("description", ""), 
+                        tag = obj.optString("tag", ""), 
+                        avatarUrl = obj.optString("avatarUrl", ""), 
+                        likeCount = obj.optInt("likeCount", 0), 
+                        taskCount = obj.optInt("taskCount", 0), 
+                        tags = tagsList, 
+                        sampleAudioUrl = obj.optString("sampleAudioUrl", "") 
+                    ) 
+                ) 
+            } 
+            list 
+        } catch (_: Exception) { 
+            emptyList() 
+        } 
+    } 
+
+    fun saveCustomVoice(voice: FishAudioVoiceOption) { 
+        val cleanId = extractVoiceId(voice.id).lowercase().trim() 
+        val normalizedVoice = voice.copy(id = cleanId) 
+        val current = getSavedCustomVoices().toMutableList() 
+        current.removeAll { extractVoiceId(it.id).equals(cleanId, ignoreCase = true) } 
+        current.add(0, normalizedVoice) 
+        val jsonArray = JSONArray() 
+        for (v in current) { 
+            val vCleanId = extractVoiceId(v.id).lowercase().trim() 
+            val obj = JSONObject().apply { 
+                put("id", vCleanId) 
+                put("name", v.name) 
+                put("author", v.author) 
+                put("description", v.description) 
+                put("tag", v.tag) 
+                put("avatarUrl", v.avatarUrl) 
+                put("likeCount", v.likeCount) 
+                put("taskCount", v.taskCount) 
+                put("sampleAudioUrl", v.sampleAudioUrl) 
+                val tagsArr = JSONArray() 
+                v.tags.forEach { tagsArr.put(it) } 
+                put("tags", tagsArr) 
+            } 
+            jsonArray.put(obj) 
+        } 
+        prefs.edit().putString(KEY_SAVED_CUSTOM_VOICES, jsonArray.toString()).commit() 
+    } 
+
+    fun removeCustomVoice(voiceId: String) { 
+        val cleanId = extractVoiceId(voiceId).lowercase().trim() 
+        val current = getSavedCustomVoices().filterNot { extractVoiceId(it.id).equals(cleanId, ignoreCase = true) } 
+        val jsonArray = JSONArray() 
+        for (v in current) { 
+            val vCleanId = extractVoiceId(v.id).lowercase().trim() 
+            val obj = JSONObject().apply { 
+                put("id", vCleanId) 
+                put("name", v.name) 
+                put("author", v.author) 
+                put("description", v.description) 
+                put("tag", v.tag) 
+                put("avatarUrl", v.avatarUrl) 
+                put("likeCount", v.likeCount) 
+                put("taskCount", v.taskCount) 
+                put("sampleAudioUrl", v.sampleAudioUrl) 
+                val tagsArr = JSONArray() 
+                v.tags.forEach { tagsArr.put(it) } 
+                put("tags", tagsArr) 
+            } 
+            jsonArray.put(obj) 
+        } 
+        prefs.edit().putString(KEY_SAVED_CUSTOM_VOICES, jsonArray.toString()).commit() 
+    } 
+
     fun isVoiceFavorite(voiceId: String): Boolean { 
-        val cleanId = extractVoiceId(voiceId) 
+        val cleanId = extractVoiceId(voiceId).lowercase().trim() 
         return favoriteFishAudioVoiceIds.contains(cleanId) 
     } 
     
@@ -648,6 +769,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_FISH_AUDIO_VOICE_NAME = "fish_audio_voice_name" 
         private const val KEY_FISH_AUDIO_MODEL = "fish_audio_model" 
         private const val KEY_FAVORITE_FISH_AUDIO_VOICES = "favorite_fish_audio_voices" 
+        private const val KEY_SAVED_CUSTOM_VOICES = "saved_custom_voices" 
         private const val KEY_LAST_READ_STORY_ID = "last_read_story_id" 
         private const val KEY_READING_BACKGROUND_IMAGE_URI = "reading_background_image_uri" 
         private const val KEY_DISABLED_STORY_THEMES = "disabled_story_themes" 

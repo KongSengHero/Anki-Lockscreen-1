@@ -52,11 +52,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankilock.ai.AiServiceHelper
@@ -102,6 +107,24 @@ fun AiKeyConfigDialog(
     var fishAudioVoiceName by remember { mutableStateOf(prefs.fishAudioVoiceName ?: "") } 
     
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
+    
     ModalBottomSheet( 
         onDismissRequest = onDismiss, 
         sheetState = sheetState, 
@@ -110,9 +133,10 @@ fun AiKeyConfigDialog(
         Column( 
             modifier = Modifier 
                 .fillMaxWidth() 
-                .padding(horizontal = 22.dp) 
-                .padding(bottom = 36.dp) 
+                .nestedScroll(noBounceNestedScroll) 
                 .verticalScroll(rememberScrollState()) 
+                .padding(horizontal = 22.dp) 
+                .padding(bottom = 48.dp) 
         ) { 
             Row( 
                 verticalAlignment = Alignment.CenterVertically, 
@@ -134,7 +158,7 @@ fun AiKeyConfigDialog(
                 } 
                 Column { 
                     Text( 
-                        "AI Configuration", 
+                        "API Configuration", 
                         fontSize = 18.sp, 
                         fontWeight = FontWeight.Bold, 
                         color = BlossomColors.TextPrimary 
@@ -636,6 +660,8 @@ fun AiKeyConfigDialog(
                     Text("Save Key", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) 
                 } 
             } 
+            
+            Spacer(modifier = Modifier.height(16.dp)) 
         } 
     } 
     

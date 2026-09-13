@@ -75,7 +75,12 @@ import com.ankilock.ui.blossom.story.StoryTokenizer
 import com.ankilock.ui.study.WallhavenImagePickerSheet
 import com.ankilock.util.ImageBlurUtil
 import com.ankilock.util.JapaneseTtsHelper
+import androidx.compose.ui.geometry.Offset 
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection 
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource 
+import androidx.compose.ui.input.nestedscroll.nestedScroll 
+import androidx.compose.ui.unit.Velocity 
 import java.io.File
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -154,12 +159,24 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.text.SimpleDateFormat 
+import java.util.Date 
+import java.util.Locale 
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
+private data class ParagraphSentence( 
+    val globalIndex: Int, 
+    val text: String, 
+    val start: Int, 
+    val end: Int 
+) 
+
+private data class ParagraphItem( 
+    val text: String, 
+    val sentences: List<ParagraphSentence> 
+) 
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) 
+@Composable 
 fun ReadingScreen( 
     padding: PaddingValues, 
     prefs: PreferencesManager, 
@@ -215,9 +232,13 @@ fun ReadingScreen(
     var showInternetConsentDialog by remember { mutableStateOf(false) } 
     
     val userAnswers = remember { mutableStateMapOf<Int, Int>() } 
+    var quizCurrentIndex by remember { mutableIntStateOf(0) } 
+    var isQuizCompleted by remember { mutableStateOf(false) } 
     
     LaunchedEffect(currentStory?.id) { 
         userAnswers.clear() 
+        quizCurrentIndex = 0 
+        isQuizCompleted = false 
         showQuizOverlay = false 
         activeSentenceIndex = -1 
         if (currentlyPlayingStoryId != null && currentlyPlayingStoryId != currentStory?.id) { 
@@ -236,6 +257,24 @@ fun ReadingScreen(
     var savedStories by remember { mutableStateOf(historyManager.getStories()) } 
     var showClearAllConfirmation by remember { mutableStateOf(false) } 
     var storyToDelete by remember { mutableStateOf<GeneratedStory?>(null) } 
+    
+    val historyNoBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
     
     LaunchedEffect(showHistorySheet) { 
         if (showHistorySheet) { 
@@ -859,7 +898,35 @@ fun ReadingScreen(
                         } 
 
                         val storySentences = remember(story.content) { 
-                            story.content.split(Regex("(?<=[。！？\n])")).filter { it.isNotBlank() } 
+                            story.content.split(Regex("(?<=[。！？\n])")).map { it.trim() }.filter { it.isNotBlank() } 
+                        } 
+
+                        val paragraphList = remember(story.content, storySentences) { 
+                            val rawParas = story.content.split(Regex("\n+")).map { it.trim() }.filter { it.isNotBlank() } 
+                            var globalIdx = 0 
+                            rawParas.map { paraText -> 
+                                val sList = mutableListOf<ParagraphSentence>() 
+                                var searchPos = 0 
+                                while (globalIdx < storySentences.size) { 
+                                    val sText = storySentences[globalIdx] 
+                                    val idx = paraText.indexOf(sText, searchPos) 
+                                    if (idx != -1) { 
+                                        sList.add( 
+                                            ParagraphSentence( 
+                                                globalIndex = globalIdx, 
+                                                text = sText, 
+                                                start = idx, 
+                                                end = idx + sText.length 
+                                            ) 
+                                        ) 
+                                        searchPos = idx + sText.length 
+                                        globalIdx++ 
+                                    } else { 
+                                        break 
+                                    } 
+                                } 
+                                ParagraphItem(text = paraText, sentences = sList) 
+                            } 
                         } 
 
                         LaunchedEffect(isNarrating, currentlyPlayingStoryId, story.id) { 
@@ -968,29 +1035,18 @@ fun ReadingScreen(
                                                 } 
                                             } 
                                         } 
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
-                                            storySentences.forEachIndexed { sIdx, sentence -> 
-                                                val isSentenceActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == sIdx 
-                                                val tokens = remember(sentence, targetWordItems) { 
-                                                    StoryTokenizer.tokenizeToStoryTokens(sentence, targetWordItems) 
-                                                } 
-                                                Box( 
-                                                    modifier = Modifier 
-                                                        .fillMaxWidth() 
-                                                        .clip(RoundedCornerShape(8.dp)) 
-                                                        .background(if (isSentenceActive) BlossomColors.SakuraRose.copy(alpha = 0.20f) else Color.Transparent) 
-                                                        .border( 
-                                                            if (isSentenceActive) BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)) 
-                                                            else BorderStroke(0.dp, Color.Transparent), 
-                                                            shape = RoundedCornerShape(8.dp) 
-                                                        ) 
-                                                        .padding(horizontal = 6.dp, vertical = 4.dp) 
+                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
+                                            paragraphList.forEach { para -> 
+                                                FlowRow( 
+                                                    modifier = Modifier.fillMaxWidth(), 
+                                                    horizontalArrangement = Arrangement.Start, 
+                                                    verticalArrangement = Arrangement.Center 
                                                 ) { 
-                                                    FlowRow( 
-                                                        modifier = Modifier.fillMaxWidth(), 
-                                                        horizontalArrangement = Arrangement.Start, 
-                                                        verticalArrangement = Arrangement.Center 
-                                                    ) { 
+                                                    para.sentences.forEach { sItem -> 
+                                                        val isSentenceActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == sItem.globalIndex 
+                                                        val tokens = remember(sItem.text, targetWordItems) { 
+                                                            StoryTokenizer.tokenizeToStoryTokens(sItem.text, targetWordItems) 
+                                                        } 
                                                         tokens.forEach { token -> 
                                                             val isTarget = highlightWords && ( 
                                                                 token.isTarget || 
@@ -1015,6 +1071,7 @@ fun ReadingScreen(
                                                                 token = token, 
                                                                 showPronunciation = true, 
                                                                 pronunciationType = "japanese", 
+                                                                isAudioHighlighted = isSentenceActive, 
                                                                 isSelected = isTarget, 
                                                                 onClick = { 
                                                                     if (token.surface.isNotBlank()) { 
@@ -1040,57 +1097,44 @@ fun ReadingScreen(
                                             } 
                                         } 
                                     } else { 
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
-                                            storySentences.forEachIndexed { sIdx, sentence -> 
-                                                val isSentenceActive = isNarrating && currentlyPlayingStoryId == story.id && activeSentenceIndex == sIdx 
-                                                val annotatedSentence = remember(sentence, targetVocabWords, BlossomColors.currentTheme) { 
-                                                    if (targetVocabWords.isNotEmpty()) { 
-                                                        buildHighlightedStoryText( 
-                                                            content = sentence, 
-                                                            vocabWords = targetVocabWords 
-                                                        ) 
-                                                    } else { 
-                                                        AnnotatedString(sentence) 
-                                                    } 
+                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
+                                            paragraphList.forEach { para -> 
+                                                val activeSent = if (isNarrating && currentlyPlayingStoryId == story.id) { 
+                                                    para.sentences.find { it.globalIndex == activeSentenceIndex } 
+                                                } else null 
+                                                val activeRange = activeSent?.let { Pair(it.start, it.end) } 
+                                                val annotatedParagraph = remember(para.text, targetVocabWords, activeRange, BlossomColors.currentTheme) { 
+                                                    buildHighlightedStoryText( 
+                                                        content = para.text, 
+                                                        vocabWords = targetVocabWords, 
+                                                        activeSentenceRange = activeRange 
+                                                    ) 
                                                 } 
                                                 var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
-                                                Box( 
-                                                    modifier = Modifier 
-                                                        .fillMaxWidth() 
-                                                        .clip(RoundedCornerShape(8.dp)) 
-                                                        .background(if (isSentenceActive) BlossomColors.SakuraRose.copy(alpha = 0.20f) else Color.Transparent) 
-                                                        .border( 
-                                                            if (isSentenceActive) BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)) 
-                                                            else BorderStroke(0.dp, Color.Transparent), 
-                                                            shape = RoundedCornerShape(8.dp) 
-                                                        ) 
-                                                        .padding(horizontal = 6.dp, vertical = 4.dp) 
-                                                ) { 
-                                                    Text( 
-                                                        text = annotatedSentence, 
-                                                        fontSize = 17.sp, 
-                                                        color = BlossomColors.TextPrimary, 
-                                                        lineHeight = 30.sp, 
-                                                        letterSpacing = 0.5.sp, 
-                                                        onTextLayout = { textLayoutResult = it }, 
-                                                        modifier = Modifier.pointerInput(targetVocabWords) { 
-                                                            if (targetVocabWords.isNotEmpty()) { 
-                                                                detectTapGestures { offset -> 
-                                                                    textLayoutResult?.let { layout -> 
-                                                                        val position = layout.getOffsetForPosition(offset) 
-                                                                        annotatedSentence.getStringAnnotations(tag = "WORD", start = position, end = position) 
-                                                                            .firstOrNull()?.let { annotation -> 
-                                                                                val word = targetVocabWords.find { it.displayWord == annotation.item } 
-                                                                                if (word != null) { 
-                                                                                    selectedWordDetail = word 
-                                                                                } 
+                                                Text( 
+                                                    text = annotatedParagraph, 
+                                                    fontSize = 17.sp, 
+                                                    color = BlossomColors.TextPrimary, 
+                                                    lineHeight = 28.sp, 
+                                                    letterSpacing = 0.5.sp, 
+                                                    onTextLayout = { textLayoutResult = it }, 
+                                                    modifier = Modifier.pointerInput(targetVocabWords, activeRange) { 
+                                                        if (targetVocabWords.isNotEmpty()) { 
+                                                            detectTapGestures { offset -> 
+                                                                textLayoutResult?.let { layout -> 
+                                                                    val position = layout.getOffsetForPosition(offset) 
+                                                                    annotatedParagraph.getStringAnnotations(tag = "WORD", start = position, end = position) 
+                                                                        .firstOrNull()?.let { annotation -> 
+                                                                            val word = targetVocabWords.find { it.displayWord == annotation.item } 
+                                                                            if (word != null) { 
+                                                                                selectedWordDetail = word 
                                                                             } 
-                                                                    } 
+                                                                        } 
                                                                 } 
                                                             } 
                                                         } 
-                                                    ) 
-                                                } 
+                                                    } 
+                                                ) 
                                             } 
                                         } 
                                     } 
@@ -1426,7 +1470,8 @@ fun ReadingScreen(
                     LazyColumn( 
                         modifier = Modifier 
                             .fillMaxWidth() 
-                            .weight(1f), 
+                            .weight(1f) 
+                            .nestedScroll(historyNoBounceNestedScroll), 
                         verticalArrangement = Arrangement.spacedBy(10.dp) 
                     ) { 
                         items(savedStories, key = { it.id }) { item -> 
@@ -1856,6 +1901,11 @@ fun ReadingScreen(
     if (showQuizOverlay && currentStory != null) { 
         ComprehensionQuizOverlay( 
             questions = currentStory!!.questions, 
+            userAnswers = userAnswers, 
+            currentIndex = quizCurrentIndex, 
+            onCurrentIndexChange = { quizCurrentIndex = it }, 
+            isQuizCompleted = isQuizCompleted, 
+            onQuizCompletedChange = { isQuizCompleted = it }, 
             onDismiss = { showQuizOverlay = false } 
         ) 
     } 
@@ -1899,32 +1949,46 @@ fun ReadingScreen(
     } 
 } 
 
-
 private fun buildHighlightedStoryText( 
     content: String, 
-    vocabWords: List<AnkiVocabularyItem> 
+    vocabWords: List<AnkiVocabularyItem>, 
+    activeSentenceRange: Pair<Int, Int>? = null 
 ): AnnotatedString { 
-    if (vocabWords.isEmpty() || content.isEmpty()) { 
-        return AnnotatedString(content)
+    if (content.isEmpty()) { 
+        return AnnotatedString(content) 
     } 
     
+    if (vocabWords.isEmpty()) { 
+        return buildAnnotatedString { 
+            append(content) 
+            if (activeSentenceRange != null) { 
+                addStyle( 
+                    style = SpanStyle( 
+                        background = BlossomColors.SakuraRose.copy(alpha = 0.28f) 
+                    ), 
+                    start = activeSentenceRange.first.coerceIn(0, content.length), 
+                    end = activeSentenceRange.second.coerceIn(0, content.length) 
+                ) 
+            } 
+        } 
+    } 
     
     val validWords = vocabWords 
         .filter { it.displayWord.isNotBlank() && (it.displayWord.length >= 2 || it.kanji.isNotBlank()) } 
         .distinctBy { it.displayWord } 
         .sortedByDescending { it.displayWord.length } 
         
-    data class RangeMatch(val start: Int, val end: Int, val item: AnkiVocabularyItem)
-    val matches = mutableListOf<RangeMatch>()
-    val occupied = BooleanArray(content.length)
+    data class RangeMatch(val start: Int, val end: Int, val item: AnkiVocabularyItem) 
+    val matches = mutableListOf<RangeMatch>() 
+    val occupied = BooleanArray(content.length) 
     
     for (item in validWords) { 
-        val word = item.displayWord
-        var searchFrom = 0
+        val word = item.displayWord 
+        var searchFrom = 0 
         while (searchFrom < content.length) { 
-            val idx = content.indexOf(word, searchFrom)
-            if (idx == -1) break
-            val endIdx = idx + word.length
+            val idx = content.indexOf(word, searchFrom) 
+            if (idx == -1) break 
+            val endIdx = idx + word.length 
             var isFree = true 
             for (i in idx until endIdx) { 
                 if (occupied[i]) { 
@@ -1936,16 +2000,25 @@ private fun buildHighlightedStoryText(
                 for (i in idx until endIdx) { 
                     occupied[i] = true 
                 } 
-                matches.add(RangeMatch(idx, endIdx, item))
+                matches.add(RangeMatch(idx, endIdx, item)) 
             } 
-            searchFrom = idx + 1
+            searchFrom = idx + 1 
         } 
     } 
     
     matches.sortBy { it.start } 
     
     return buildAnnotatedString { 
-        append(content)
+        append(content) 
+        if (activeSentenceRange != null) { 
+            addStyle( 
+                style = SpanStyle( 
+                    background = BlossomColors.SakuraRose.copy(alpha = 0.28f) 
+                ), 
+                start = activeSentenceRange.first.coerceIn(0, content.length), 
+                end = activeSentenceRange.second.coerceIn(0, content.length) 
+            ) 
+        } 
         for (match in matches) { 
             addStyle( 
                 style = SpanStyle( 
@@ -1955,17 +2028,16 @@ private fun buildHighlightedStoryText(
                 ), 
                 start = match.start, 
                 end = match.end 
-            )
+            ) 
             addStringAnnotation( 
                 tag = "WORD", 
                 annotation = match.item.displayWord, 
                 start = match.start, 
                 end = match.end 
-            )
+            ) 
         } 
     } 
 } 
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

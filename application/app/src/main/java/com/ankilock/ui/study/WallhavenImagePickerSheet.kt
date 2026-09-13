@@ -75,6 +75,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -83,6 +86,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -125,6 +129,24 @@ fun WallhavenImagePickerSheet(
     val coroutineScope = rememberCoroutineScope() 
     val keyboardController = LocalSoftwareKeyboardController.current 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+            override suspend fun onPostFling( 
+                consumed: Velocity, 
+                available: Velocity 
+            ): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
     
     var apiKeyText by remember { mutableStateOf(prefs.wallhavenApiKey) } 
     var isApiKeyEditing by remember { mutableStateOf(false) } 
@@ -523,7 +545,9 @@ fun WallhavenImagePickerSheet(
                             horizontalArrangement = Arrangement.spacedBy(10.dp), 
                             verticalItemSpacing = 10.dp, 
                             contentPadding = PaddingValues(bottom = 24.dp), 
-                            modifier = Modifier.fillMaxSize() 
+                            modifier = Modifier 
+                                .fillMaxSize() 
+                                .nestedScroll(noBounceNestedScroll) 
                         ) { 
                             items(results, key = { it.id }) { item -> 
                                 val rawRatio = item.ratio.toFloatOrNull() ?: 1f 
