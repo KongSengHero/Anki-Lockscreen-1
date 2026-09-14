@@ -36,8 +36,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -691,18 +695,29 @@ fun ReadingScreen(
             } 
         } 
 
-        Column( 
-            modifier = Modifier 
-                .fillMaxSize() 
-                .padding(padding) 
-                .verticalScroll(rememberScrollState()) 
-                .padding(horizontal = 16.dp, vertical = 10.dp), 
-            verticalArrangement = Arrangement.spacedBy(16.dp) 
+        CustomSelectionContainer( 
+            onTranslate = { selectedText -> 
+                translateTargetText = selectedText 
+                showTranslationSheet = true 
+            }, 
+            onJisho = { selectedWord -> 
+                quickJishoWord = selectedWord 
+            } 
         ) { 
-        Box( 
-            modifier = Modifier 
-                .fillMaxWidth() 
-                .squircleLiquidGlass( 
+            SelectionContainer { 
+                Column( 
+                    modifier = Modifier 
+                        .fillMaxSize() 
+                        .padding(padding) 
+                        .verticalScroll(rememberScrollState()) 
+                        .padding(horizontal = 16.dp, vertical = 10.dp), 
+                    verticalArrangement = Arrangement.spacedBy(16.dp) 
+                ) { 
+                    DisableSelection { 
+                        Box( 
+                            modifier = Modifier 
+                                .fillMaxWidth() 
+                                .squircleLiquidGlass( 
                     shape = BlossomShapes.SquircleLarge, 
                     cornerRadius = 20.dp, 
                     backgroundColor = if (coverBitmap != null) { 
@@ -901,6 +916,7 @@ fun ReadingScreen(
                 } 
             } 
         } 
+    } 
 
         if (story != null) { 
             Box( 
@@ -920,6 +936,7 @@ fun ReadingScreen(
                     ) 
             ) { 
                 Column(modifier = Modifier.padding(22.dp)) { 
+                    DisableSelection { 
                         Row( 
                             modifier = Modifier.fillMaxWidth(), 
                             verticalAlignment = Alignment.CenterVertically, 
@@ -1049,7 +1066,9 @@ fun ReadingScreen(
                                 } 
                             } 
                         } 
+                    } 
 
+                    DisableSelection { 
                         AnimatedVisibility( 
                             visible = (isNarrating || isAudioPaused || isSynthesizingAudio) && currentlyPlayingStoryId == story.id, 
                             enter = fadeIn() + expandVertically(), 
@@ -1149,14 +1168,14 @@ fun ReadingScreen(
                                             Surface( 
                                                 shape = CircleShape, 
                                                 color = BlossomColors.SakuraRose, 
-                                                modifier = Modifier.size(28.dp) 
+                                                modifier = Modifier.fillMaxSize() 
                                             ) { 
                                                 Box(contentAlignment = Alignment.Center) { 
                                                     Icon( 
                                                         imageVector = if (isNarrating) Icons.Filled.Pause else Icons.Filled.PlayArrow, 
-                                                        contentDescription = if (isNarrating) "Pause" else "Resume", 
+                                                        contentDescription = if (isNarrating) "Pause" else "Play", 
                                                         tint = BlossomColors.BlossomWhite, 
-                                                        modifier = Modifier.size(16.dp) 
+                                                        modifier = Modifier.size(18.dp) 
                                                     ) 
                                                 } 
                                             } 
@@ -1190,6 +1209,7 @@ fun ReadingScreen(
                                 } 
                             } 
                         } 
+                    } 
 
                         val targetWordItems = remember(story.targetWords, story.targetWordsData, vocabSummary?.words) { 
                             if (story.targetWordsData.isNotEmpty()) { 
@@ -1294,18 +1314,8 @@ fun ReadingScreen(
 
                         Spacer(modifier = Modifier.height(16.dp)) 
 
-                        CustomSelectionContainer( 
-                            onTranslate = { selectedText -> 
-                                translateTargetText = selectedText 
-                                showTranslationSheet = true 
-                            }, 
-                            onJisho = { selectedWord -> 
-                                quickJishoWord = selectedWord 
-                            } 
-                        ) { 
-                            Column { 
-                                val isTitleActive = (isNarrating || isAudioPaused) && currentlyPlayingStoryId == story.id && activeSentenceIndex == -1 
-                                Text( 
+                        val isTitleActive = (isNarrating || isAudioPaused) && currentlyPlayingStoryId == story.id && activeSentenceIndex == -1 
+                        Text( 
                                     text = story.title, 
                                     fontSize = 22.sp, 
                                     fontWeight = FontWeight.Bold, 
@@ -1345,64 +1355,65 @@ fun ReadingScreen(
                                 } 
 
                                 if (!showFurigana) { 
-                                    SelectionContainer { 
-                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
-                                            precomputedParagraphTokens.forEach { para -> 
-                                                val paraText = remember(para) { para.sentences.joinToString("") { it.plainText } } 
-                                                val activeSent = if ((isNarrating || isAudioPaused) && currentlyPlayingStoryId == story.id) { 
-                                                    para.sentences.find { it.globalIndex == activeSentenceIndex } 
-                                                } else null 
-                                                val activeRange = remember(activeSent, paraText) { 
-                                                    activeSent?.let { sent -> 
-                                                        val start = paraText.indexOf(sent.plainText) 
-                                                        if (start != -1) Pair(start, start + sent.plainText.length) else null 
-                                                    } 
+                                    val isSelectionActive = LocalSelectionActive.current 
+                                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
+                                        precomputedParagraphTokens.forEach { para -> 
+                                            val paraText = remember(para) { para.sentences.joinToString("") { it.plainText } } 
+                                            val activeSent = if ((isNarrating || isAudioPaused) && currentlyPlayingStoryId == story.id) { 
+                                                para.sentences.find { it.globalIndex == activeSentenceIndex } 
+                                            } else null 
+                                            val activeRange = remember(activeSent, paraText) { 
+                                                activeSent?.let { sent -> 
+                                                    val start = paraText.indexOf(sent.plainText) 
+                                                    if (start != -1) Pair(start, start + sent.plainText.length) else null 
                                                 } 
-                                                val annotatedParagraph = remember(paraText, targetVocabWords, activeRange, BlossomColors.currentTheme) { 
-                                                    buildHighlightedStoryText( 
-                                                        content = paraText, 
-                                                        vocabWords = targetVocabWords, 
-                                                        activeSentenceRange = activeRange 
-                                                    ) 
-                                                } 
-                                                var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
-                                                Text( 
-                                                    text = annotatedParagraph, 
-                                                    fontSize = 17.sp, 
-                                                    color = BlossomColors.TextPrimary, 
-                                                    lineHeight = 28.sp, 
-                                                    letterSpacing = 0.5.sp, 
-                                                    onTextLayout = { textLayoutResult = it }, 
-                                                    modifier = Modifier.pointerInput(targetVocabWords, activeRange) { 
-                                                        detectTapGestures { offset -> 
-                                                            textLayoutResult?.let { layout -> 
-                                                                val position = layout.getOffsetForPosition(offset) 
-                                                                val wordAnnotation = annotatedParagraph.getStringAnnotations(tag = "WORD", start = position, end = position).firstOrNull() 
-                                                                if (wordAnnotation != null) { 
-                                                                    val word = targetVocabWords.find { it.displayWord == wordAnnotation.item } 
-                                                                    if (word != null) { 
-                                                                        selectedWordDetail = word 
-                                                                    } 
-                                                                } else { 
-                                                                    var cum = 0 
-                                                                    for (sent in para.sentences) { 
-                                                                        val sLen = sent.plainText.length 
-                                                                        if (position in cum..(cum + sLen)) { 
-                                                                            seekToSentence(sent.globalIndex) 
-                                                                            break 
+                                            } 
+                                            val annotatedParagraph = remember(paraText, targetVocabWords, activeRange, BlossomColors.currentTheme) { 
+                                                buildHighlightedStoryText( 
+                                                    content = paraText, 
+                                                    vocabWords = targetVocabWords, 
+                                                    activeSentenceRange = activeRange 
+                                                ) 
+                                            } 
+                                            var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) } 
+                                            Text( 
+                                                text = annotatedParagraph, 
+                                                fontSize = 17.sp, 
+                                                color = BlossomColors.TextPrimary, 
+                                                lineHeight = 28.sp, 
+                                                letterSpacing = 0.5.sp, 
+                                                onTextLayout = { textLayoutResult = it }, 
+                                                modifier = Modifier.pointerInput(targetVocabWords, isSelectionActive) { 
+                                                    awaitEachGesture { 
+                                                        val down = awaitFirstDown(requireUnconsumed = false) 
+                                                        val up = waitForUpOrCancellation() 
+                                                        if (up != null && !up.isConsumed) { 
+                                                            val diff = up.position - down.position 
+                                                            val isTap = (diff.x * diff.x + diff.y * diff.y) < (viewConfiguration.touchSlop * viewConfiguration.touchSlop) 
+                                                            if (isTap) { 
+                                                                if (!isSelectionActive) { 
+                                                                    textLayoutResult?.let { layout -> 
+                                                                        val position = layout.getOffsetForPosition(up.position) 
+                                                                        val wordAnnotation = annotatedParagraph.getStringAnnotations(tag = "WORD", start = position, end = position).firstOrNull() 
+                                                                        if (wordAnnotation != null) { 
+                                                                            val word = targetVocabWords.find { it.displayWord == wordAnnotation.item } 
+                                                                            if (word != null) { 
+                                                                                up.consume() 
+                                                                                selectedWordDetail = word 
+                                                                            } 
                                                                         } 
-                                                                        cum += sLen 
                                                                     } 
                                                                 } 
                                                             } 
                                                         } 
                                                     } 
-                                                ) 
-                                            } 
+                                                } 
+                                            ) 
                                         } 
                                     } 
                                 } else { 
-                                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
+                                    DisableSelection { 
+                                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { 
                                         precomputedParagraphTokens.forEach { para -> 
                                             FlowRow( 
                                                 modifier = Modifier.fillMaxWidth(), 
@@ -1443,8 +1454,10 @@ fun ReadingScreen(
                                         } 
                                     } 
                                 } 
+                                } 
                                 
-                                if (story.targetWords.isNotEmpty()) { 
+                                DisableSelection { 
+                                    if (story.targetWords.isNotEmpty()) { 
                                     Spacer(modifier = Modifier.height(20.dp)) 
                                     Surface( 
                                         shape = RoundedCornerShape(14.dp), 
@@ -1555,7 +1568,6 @@ fun ReadingScreen(
                                 } 
                             } 
                         } 
-                    } 
         
         if (generationError != null) { 
             Card( 
@@ -1730,7 +1742,9 @@ fun ReadingScreen(
         } 
 
         Spacer(modifier = Modifier.height(padding.calculateBottomPadding() + 32.dp)) 
-    } 
+                } 
+            } 
+        } 
     } 
     
     if (showHistorySheet) { 
