@@ -340,9 +340,9 @@ class GeminiStoryService {
         } 
         
         val req1 = if (!theme.isNullOrBlank() && !topic.isNullOrBlank()) { 
-            "1. Write a natural, compelling story in Japanese ($lengthRange) centered on the given theme and topic premise." 
+            "1. Write a natural, compelling story in Japanese ($lengthRange) centered on the given theme and topic premise with logical cause-and-effect and believable character actions." 
         } else { 
-            "1. Write a natural, compelling story in Japanese ($lengthRange)." 
+            "1. Write a natural, compelling story in Japanese ($lengthRange) with logical cause-and-effect and believable character actions." 
         } 
         
         val req2 = if (wordPromptList.isNotBlank()) { 
@@ -375,7 +375,9 @@ class GeminiStoryService {
             $req2
             3. Standard Japanese Characters & Furigana:
                - "storyJapanese": Clean standard Japanese text with natural paragraph breaks, WITHOUT romaji and WITHOUT ruby brackets. This is used for audio narration.
-               - "storyFurigana": The exact same story text with ruby reading brackets for EVERY kanji or kanji compound without exception (e.g. "友[とも]達[だち]と公[こう]園[えん]で会[あ]いました。"). Every single kanji must have [reading] brackets with its accurate hiragana reading.
+               - "storyFurigana": The exact same story text with ruby reading brackets for EVERY kanji or kanji compound without exception (e.g. "友[とも]達[だち]と公[こう]園[えん]で会[あ]いました。").
+                 * Full Kanji Stem Readings: The ruby bracket must contain the COMPLETE reading of the kanji before okurigana. NEVER truncate stem readings into single syllables:
+                   Correct: 疲[つか]れる / 疲[つか]れ (NEVER write 疲[つ]れ), 忙[いそが]しい (NEVER 忙[い]しい), 楽[たの]しい (NEVER 楽[た]しい), 暖[あたた]かい (NEVER 暖[あ]かい), 驚[おどろ]く (NEVER 驚[お]く), 届[とど]く (NEVER 届[と]く), 静[しず]か (NEVER 静[し]か), 幸[しあわ]せ (NEVER 幸[し]せ).
                - ZERO English in story text: The story in both "storyJapanese" and "storyFurigana" must be 100% Japanese. Never insert English definitions, English annotations, or English brackets into the story.
             $req4
             5. Return ONLY valid JSON with this exact schema (no markdown formatting, no code blocks):

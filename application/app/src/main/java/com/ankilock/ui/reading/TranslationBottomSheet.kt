@@ -47,6 +47,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.clickable 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi 
+import androidx.compose.foundation.layout.FlowRow 
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -54,9 +57,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ankilock.data.StoryWordItem 
 import com.ankilock.translation.TranslationResult
 import com.ankilock.translation.TranslatorService
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.blossom.story.RubySegment 
+import com.ankilock.ui.blossom.story.StoryTokenizer 
 import com.ankilock.ui.components.Squircle3DButton
 import com.ankilock.util.JapaneseTtsHelper
 import kotlinx.coroutines.launch
@@ -65,6 +71,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun TranslationBottomSheet( 
     sourceText: String, 
+    furiganaSource: String? = null, 
+    targetWords: List<StoryWordItem> = emptyList(), 
     onDismiss: () -> Unit, 
     onNavigateToJisho: (String) -> Unit = {} 
 ) { 
@@ -74,6 +82,33 @@ fun TranslationBottomSheet(
     val translatorService = remember(context) { TranslatorService(context) } 
     val ttsHelper = remember { JapaneseTtsHelper(context) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    
+    val rubySegments = remember(sourceText, furiganaSource, targetWords) { 
+        val clean = sourceText.trim() 
+        if (clean.isBlank()) { 
+            emptyList() 
+        } else if (!furiganaSource.isNullOrBlank() && furiganaSource.contains("[")) { 
+            StoryTokenizer.parseBracketSegments(furiganaSource) 
+        } else { 
+            val tokens = StoryTokenizer.tokenizeToStoryTokens(clean, targetWords) 
+            tokens.flatMap { it.segments } 
+        } 
+    } 
+    
+    val resolvedSegments = remember(rubySegments) { 
+        rubySegments.flatMap { segment -> 
+            if (segment.ruby.isNullOrBlank() && segment.text.any { StoryTokenizer.isKanji(it) }) { 
+                val fallback = StoryTokenizer.getKanjiReading(segment.text) 
+                if (!fallback.isNullOrBlank()) { 
+                    listOf(RubySegment(text = segment.text, ruby = fallback)) 
+                } else { 
+                    StoryTokenizer.resolveFallbackSegments(segment.text) 
+                } 
+            } else { 
+                listOf(segment) 
+            } 
+        } 
+    } 
     
     val noBounceNestedScroll = remember { 
         object : NestedScrollConnection { 
@@ -212,6 +247,83 @@ fun TranslationBottomSheet(
                             horizontalArrangement = Arrangement.SpaceBetween 
                         ) { 
                             Text( 
+                                text = "JAPANESE", 
+                                fontSize = 11.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = BlossomColors.TextMuted, 
+                                letterSpacing = 0.8.sp 
+                            ) 
+
+                            Row(verticalAlignment = Alignment.CenterVertically) { 
+                                IconButton( 
+                                    onClick = { 
+                                        ttsHelper.speak(sourceText) 
+                                    }, 
+                                    modifier = Modifier.size(24.dp) 
+                                ) { 
+                                    Icon( 
+                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
+                                        contentDescription = "Pronounce Japanese", 
+                                        tint = BlossomColors.SakuraRose, 
+                                        modifier = Modifier.size(16.dp) 
+                                    ) 
+                                } 
+
+                                Spacer(modifier = Modifier.width(6.dp)) 
+
+                                IconButton( 
+                                    onClick = { 
+                                        clipboardManager.setText(AnnotatedString(sourceText)) 
+                                        Toast.makeText(context, "Japanese copied", Toast.LENGTH_SHORT).show() 
+                                    }, 
+                                    modifier = Modifier.size(24.dp) 
+                                ) { 
+                                    Icon( 
+                                        imageVector = Icons.Default.ContentCopy, 
+                                        contentDescription = "Copy Japanese", 
+                                        tint = BlossomColors.TextMuted, 
+                                        modifier = Modifier.size(14.dp) 
+                                    ) 
+                                } 
+                            } 
+                        } 
+
+                        Spacer(modifier = Modifier.height(10.dp)) 
+
+                        JapaneseFuriganaDisplay( 
+                            segments = resolvedSegments, 
+                            onSegmentClick = { word -> 
+                                ttsHelper.speak(word) 
+                            } 
+                        ) 
+
+                        if (!isLoading && !result?.romaji.isNullOrBlank()) { 
+                            Spacer(modifier = Modifier.height(8.dp)) 
+                            Text( 
+                                text = result!!.romaji, 
+                                fontSize = 13.sp, 
+                                color = BlossomColors.TextSecondary, 
+                                fontWeight = FontWeight.Normal 
+                            ) 
+                        } 
+                    } 
+                } 
+
+                Spacer(modifier = Modifier.height(12.dp)) 
+
+                Surface( 
+                    shape = RoundedCornerShape(14.dp), 
+                    color = BlossomColors.SurfaceElevated, 
+                    border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                    modifier = Modifier.fillMaxWidth() 
+                ) { 
+                    Column(modifier = Modifier.padding(16.dp)) { 
+                        Row( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            horizontalArrangement = Arrangement.SpaceBetween 
+                        ) { 
+                            Text( 
                                 text = "ENGLISH TRANSLATION", 
                                 fontSize = 11.sp, 
                                 fontWeight = FontWeight.Bold, 
@@ -329,8 +441,61 @@ fun TranslationBottomSheet(
                     ) 
                 } 
             } 
-
+            
             Spacer(modifier = Modifier.height(16.dp)) 
+        } 
+    } 
+} 
+
+@OptIn(ExperimentalLayoutApi::class) 
+@Composable 
+private fun JapaneseFuriganaDisplay( 
+    segments: List<RubySegment>, 
+    onSegmentClick: ((String) -> Unit)? = null 
+) { 
+    val hasAnyRuby = segments.any { !it.ruby.isNullOrBlank() } 
+    
+    FlowRow( 
+        modifier = Modifier.fillMaxWidth(), 
+        horizontalArrangement = Arrangement.Start, 
+        verticalArrangement = Arrangement.spacedBy(4.dp) 
+    ) { 
+        segments.forEach { seg -> 
+            val ruby = seg.ruby?.trim()?.ifBlank { null } 
+            val isKanjiText = seg.text.any { StoryTokenizer.isKanji(it) } 
+            
+            Column( 
+                horizontalAlignment = Alignment.CenterHorizontally, 
+                verticalArrangement = Arrangement.Bottom, 
+                modifier = Modifier 
+                    .padding(horizontal = 1.dp) 
+                    .clickable(enabled = onSegmentClick != null) { 
+                        onSegmentClick?.invoke(seg.text) 
+                    } 
+            ) { 
+                if (hasAnyRuby) { 
+                    if (!ruby.isNullOrBlank()) { 
+                        Text( 
+                            text = ruby, 
+                            fontSize = 11.sp, 
+                            fontWeight = FontWeight.Medium, 
+                            color = BlossomColors.SakuraRose, 
+                            maxLines = 1, 
+                            lineHeight = 12.sp 
+                        ) 
+                    } else { 
+                        Spacer(modifier = Modifier.height(14.dp)) 
+                    } 
+                } 
+                
+                Text( 
+                    text = seg.text, 
+                    fontSize = 19.sp, 
+                    fontWeight = if (isKanjiText) FontWeight.SemiBold else FontWeight.Normal, 
+                    color = BlossomColors.TextPrimary, 
+                    lineHeight = 26.sp 
+                ) 
+            } 
         } 
     } 
 } 

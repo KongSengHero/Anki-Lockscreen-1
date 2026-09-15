@@ -2130,14 +2130,24 @@ fun ReadingScreen(
     
     
     if (showTranslationSheet && translateTargetText.isNotBlank()) { 
+        val matchingFurigana = remember(translateTargetText, currentStory?.furiganaContent) { 
+            val fContent = currentStory?.furiganaContent 
+            if (!fContent.isNullOrBlank()) { 
+                StoryTokenizer.findMatchingFuriganaSlice(translateTargetText, fContent) 
+            } else { 
+                null 
+            } 
+        } 
         TranslationBottomSheet( 
             sourceText = translateTargetText, 
+            furiganaSource = matchingFurigana, 
+            targetWords = currentStory?.targetWordsData ?: emptyList(), 
             onDismiss = { 
                 showTranslationSheet = false 
                 translateTargetText = "" 
             }, 
             onNavigateToJisho = onNavigateToJisho 
-        )
+        ) 
     } 
     
     
@@ -2211,6 +2221,10 @@ fun ReadingScreen(
             onCurrentIndexChange = { quizCurrentIndex = it }, 
             isQuizCompleted = isQuizCompleted, 
             onQuizCompletedChange = { isQuizCompleted = it }, 
+            onNavigateToJisho = { word -> 
+                showQuizOverlay = false 
+                onNavigateToJisho(word) 
+            }, 
             onDismiss = { showQuizOverlay = false } 
         ) 
     } 

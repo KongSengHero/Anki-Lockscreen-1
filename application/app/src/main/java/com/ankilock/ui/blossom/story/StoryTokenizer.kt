@@ -331,7 +331,8 @@ object StoryTokenizer {
         '散' to "さん", '晴' to "は", '曇' to "くも", '照' to "て", 
         '輝' to "かがや", '響' to "ひび", '震' to "ふる", '揺' to "ゆ", 
         '眠' to "ねむ", '覚' to "さ", '起' to "お", '疲' to "つか", '痛' to "いた", 
-        '治' to "なお", '変' to "か", '直' to "なお", '整' to "ととの", '備' to "そな" 
+        '治' to "なお", '変' to "か", '直' to "なお", '整' to "ととの", '備' to "そな", 
+        '幸' to "しあわ" 
     ) 
     
     fun getKanjiReading(text: String): String? { 
@@ -404,12 +405,69 @@ object StoryTokenizer {
                 } 
                 val kanjiWord = beforeBracket.substring(kanjiStart) 
                 if (kanjiWord.isNotEmpty()) { 
-                    segments.add(RubySegment(text = kanjiWord, ruby = ruby)) 
+                    val correctedRuby = if (kanjiWord.length == 1) { 
+                        val expected = singleKanjiReadings[kanjiWord[0]] 
+                        if (expected != null && expected.startsWith(ruby) && expected.length > ruby.length) { 
+                            expected 
+                        } else { 
+                            ruby 
+                        } 
+                    } else { 
+                        ruby 
+                    } 
+                    segments.add(RubySegment(text = kanjiWord, ruby = correctedRuby)) 
                 } 
             } 
             cursor = bracketClose + 1 
         } 
         return if (segments.isEmpty()) listOf(RubySegment(text = text, ruby = null)) else segments 
+    } 
+    
+    fun findMatchingFuriganaSlice(plainText: String, furiganaText: String): String? { 
+        if (plainText.isBlank() || furiganaText.isBlank()) return null 
+        val trimmedTarget = plainText.trim() 
+        if (trimmedTarget.isEmpty()) return null 
+        
+        val normalized = furiganaText.replace(Regex("(?i)<ruby>([^<]+)<rt>([^<]+)</rt></ruby>"), "$1[$2]") 
+            .replace(Regex("(?i)<r>([^<]+)</r>"), "[$1]") 
+            .replace(Regex("<[^>]*>"), "") 
+        
+        val plainToFuriganaIndices = mutableListOf<Int>() 
+        val plainBuilder = StringBuilder() 
+        
+        var inBracket = false 
+        for (i in normalized.indices) { 
+            val c = normalized[i] 
+            if (c == '[') { 
+                inBracket = true 
+                continue 
+            } else if (c == ']' && inBracket) { 
+                inBracket = false 
+                continue 
+            } 
+            
+            if (!inBracket) { 
+                plainBuilder.append(c) 
+                plainToFuriganaIndices.add(i) 
+            } 
+        } 
+        
+        val fullPlain = plainBuilder.toString() 
+        val matchStart = fullPlain.indexOf(trimmedTarget) 
+        if (matchStart == -1) return null 
+        val matchEnd = matchStart + trimmedTarget.length - 1 
+        
+        val rawStart = plainToFuriganaIndices[matchStart] 
+        var rawEnd = plainToFuriganaIndices[matchEnd] 
+        
+        if (rawEnd + 1 < normalized.length && normalized[rawEnd + 1] == '[') { 
+            val closingBracket = normalized.indexOf(']', rawEnd + 1) 
+            if (closingBracket != -1) { 
+                rawEnd = closingBracket 
+            } 
+        } 
+        
+        return normalized.substring(rawStart, rawEnd + 1) 
     } 
     
     private fun buildSegments(surface: String, rawReading: String): List<RubySegment> { 
