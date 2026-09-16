@@ -149,6 +149,11 @@ object CardSessionManager {
         }
     }
     
+    fun recordAnswered(card: CardInfo, oldStats: Triple<Int, Int, Int>) { 
+        previousCard = card 
+        previousStats = oldStats 
+    } 
+    
     fun undoLastReview(context: Context) { 
         val prev = previousCard
         if (prev != null) { 

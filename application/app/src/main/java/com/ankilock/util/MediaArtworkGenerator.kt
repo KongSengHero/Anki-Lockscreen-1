@@ -251,8 +251,8 @@ object MediaArtworkGenerator {
                 context = context, 
                 rawText = sentenceFurigana, 
                 highlightWord = kanjiText, 
-                baseTextSizePx = 17.5f * sp, 
-                rubyTextSizePx = 9f * sp, 
+                baseTextSizePx = 21f * sp, 
+                rubyTextSizePx = 11f * sp, 
                 baseTextColor = Color.WHITE, 
                 rubyTextColor = Color.parseColor("#90CAF9"), 
                 highlightColor = Color.parseColor("#8AB4F8"), 
@@ -267,7 +267,7 @@ object MediaArtworkGenerator {
         val sentenceLayout = if (sentenceRubyBmp == null && rawSentence.isNotBlank()) { 
             val sentencePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.WHITE 
-                textSize = 17.5f * sp 
+                textSize = 21f * sp 
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) 
                 setShadowLayer(4f * baseDensity, 0f, 1.5f * baseDensity, Color.parseColor("#99000000")) 
             } 
@@ -291,7 +291,7 @@ object MediaArtworkGenerator {
         val sentMeaningLayout = if (isRevealed && cleanSentenceMeaning.isNotBlank()) { 
             val sentMeaningPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { 
                 color = Color.parseColor("#CBD5E1") 
-                textSize = 13.5f * sp 
+                textSize = 15.5f * sp 
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL) 
                 setShadowLayer(4f * baseDensity, 0f, 1.5f * baseDensity, Color.parseColor("#99000000")) 
             } 

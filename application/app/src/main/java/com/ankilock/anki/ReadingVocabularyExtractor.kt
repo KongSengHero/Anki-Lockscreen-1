@@ -52,10 +52,22 @@ class ReadingVocabularyExtractor(private val context: Context) {
             "" 
         } 
 
-        val studiedSearchQuery = if (deckFilter.isNotBlank()) { 
-            "$deckFilter (-is:new or prop:reps>0) -is:suspended" 
+        val learnSearchQuery = if (deckFilter.isNotBlank()) { 
+            "$deckFilter is:learn -is:suspended" 
         } else { 
-            "(-is:new or prop:reps>0) -is:suspended" 
+            "is:learn -is:suspended" 
+        } 
+
+        val reviewSearchQuery = if (deckFilter.isNotBlank()) { 
+            "$deckFilter (is:review -prop:ivl>=21) -is:suspended" 
+        } else { 
+            "(is:review -prop:ivl>=21) -is:suspended" 
+        } 
+
+        val learnedSearchQuery = if (deckFilter.isNotBlank()) { 
+            "$deckFilter (is:review prop:ivl>=21) -is:suspended" 
+        } else { 
+            "(is:review prop:ivl>=21) -is:suspended" 
         } 
 
         val suspendedSearchQuery = if (deckFilter.isNotBlank()) { 
@@ -67,8 +79,27 @@ class ReadingVocabularyExtractor(private val context: Context) {
         extractFromNotesQuery( 
             authority = authority, 
             notesUri = notesUri, 
-            searchQuery = studiedSearchQuery, 
+            searchQuery = learnSearchQuery, 
             isSuspended = false, 
+            state = "learn", 
+            outMap = studiedMap 
+        ) 
+
+        extractFromNotesQuery( 
+            authority = authority, 
+            notesUri = notesUri, 
+            searchQuery = reviewSearchQuery, 
+            isSuspended = false, 
+            state = "review", 
+            outMap = studiedMap 
+        ) 
+
+        extractFromNotesQuery( 
+            authority = authority, 
+            notesUri = notesUri, 
+            searchQuery = learnedSearchQuery, 
+            isSuspended = false, 
+            state = "learned", 
             outMap = studiedMap 
         ) 
 
@@ -77,6 +108,7 @@ class ReadingVocabularyExtractor(private val context: Context) {
             notesUri = notesUri, 
             searchQuery = suspendedSearchQuery, 
             isSuspended = true, 
+            state = "review", 
             outMap = suspendedMap 
         ) 
 
@@ -87,6 +119,23 @@ class ReadingVocabularyExtractor(private val context: Context) {
                 notesUri = notesUri, 
                 searchQuery = "$simpleDeckFilter -is:new", 
                 isSuspended = false, 
+                state = "review", 
+                outMap = studiedMap 
+            ) 
+        } 
+
+        if (studiedMap.isEmpty()) { 
+            val studiedSearchQuery = if (deckFilter.isNotBlank()) { 
+                "$deckFilter (-is:new or prop:reps>0) -is:suspended" 
+            } else { 
+                "(-is:new or prop:reps>0) -is:suspended" 
+            } 
+            extractFromNotesQuery( 
+                authority = authority, 
+                notesUri = notesUri, 
+                searchQuery = studiedSearchQuery, 
+                isSuspended = false, 
+                state = "review", 
                 outMap = studiedMap 
             ) 
         } 
@@ -117,6 +166,7 @@ class ReadingVocabularyExtractor(private val context: Context) {
         notesUri: Uri, 
         searchQuery: String, 
         isSuspended: Boolean, 
+        state: String = "review", 
         outMap: MutableMap<String, AnkiVocabularyItem> 
     ) { 
         var cursor: Cursor? = null 
@@ -152,7 +202,8 @@ class ReadingVocabularyExtractor(private val context: Context) {
                                     kanji = parsed.kanji, 
                                     reading = parsed.kana, 
                                     meaning = parsed.meaning, 
-                                    isSuspended = isSuspended 
+                                    isSuspended = isSuspended, 
+                                    state = state 
                                 ) 
                                 outMap[item.displayWord] = item 
                             } 
@@ -205,7 +256,12 @@ class ReadingVocabularyExtractor(private val context: Context) {
 
                     if (noteId > 0 && !processedNoteIds.contains(noteId)) { 
                         processedNoteIds.add(noteId) 
-                        val item = extractNoteVocabularyById(authority, noteId, isSuspended) 
+                        val cardState = when { 
+                            interval >= 21 -> "learned" 
+                            queue == 2 -> "review" 
+                            else -> "learn" 
+                        } 
+                        val item = extractNoteVocabularyById(authority, noteId, isSuspended, cardState) 
                         if (item != null) { 
                             if (isSuspended) { 
                                 if (!studiedMap.containsKey(item.displayWord)) { 
@@ -229,7 +285,8 @@ class ReadingVocabularyExtractor(private val context: Context) {
     private fun extractNoteVocabularyById( 
         authority: String, 
         noteId: Long, 
-        isSuspended: Boolean 
+        isSuspended: Boolean, 
+        state: String = "review" 
     ): AnkiVocabularyItem? { 
         val noteUri = Uri.withAppendedPath(AnkiDroidContract.Notes.getContentUri(authority), noteId.toString()) 
         var noteCursor: Cursor? = null 
@@ -255,7 +312,8 @@ class ReadingVocabularyExtractor(private val context: Context) {
                                 kanji = parsed.kanji, 
                                 reading = parsed.kana, 
                                 meaning = parsed.meaning, 
-                                isSuspended = isSuspended 
+                                isSuspended = isSuspended, 
+                                state = state 
                             ) 
                         } 
                     } 

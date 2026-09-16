@@ -395,10 +395,16 @@ fun ReadingScreen(
             
             val count = prefs.storyConnectingWordsCount 
             val allWords = vocabSummary?.words ?: emptyList() 
-            val words = if (count > 0 && allWords.isNotEmpty()) { 
-                allWords.shuffled().take(count) 
+            val filter = prefs.storyVocabularyFilter 
+            val eligibleVocab = if (filter == "all" || filter.isBlank()) { 
+                allWords 
             } else { 
-                emptyList() 
+                allWords.filter { it.state.equals(filter, ignoreCase = true) } 
+            } 
+            val words = when { 
+                count == -1 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled() 
+                count > 0 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled().take(count) 
+                else -> emptyList() 
             } 
             val result = storyService.generateStory( 
                 apiKey = apiKey, 
@@ -769,7 +775,11 @@ fun ReadingScreen(
                 } else { 
                     "Random Theme" 
                 } 
-                val wordsDesc = if (connectingWordsCount == 0) "0 connecting words (Free story)" else "$connectingWordsCount connecting cards" 
+                val wordsDesc = when (connectingWordsCount) { 
+                    0 -> "0 connecting words (Free story)" 
+                    -1 -> "ALL connecting cards" 
+                    else -> "$connectingWordsCount connecting cards" 
+                } 
                 
                 Surface( 
                     onClick = { showStoryConfigDialog = true }, 
@@ -1558,7 +1568,7 @@ fun ReadingScreen(
                                                     Text( 
                                                         text = "Take Comprehension Quiz (${story.questions.size})", 
                                                         fontSize = 15.sp, 
-                                                        fontWeight = FontWeight.Bold, 
+                                                        fontWeight = FontWeight.SemiBold, 
                                                         color = BlossomColors.BlossomWhite 
                                                     ) 
                                                 } 

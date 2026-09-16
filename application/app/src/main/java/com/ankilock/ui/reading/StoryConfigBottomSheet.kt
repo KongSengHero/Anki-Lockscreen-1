@@ -76,6 +76,7 @@ import com.ankilock.data.StoryThemes
 import com.ankilock.ui.blossom.BlossomColors 
 import com.ankilock.ui.components.GlobalSeekerContainer 
 import com.ankilock.ui.components.GlobalSeekerRow 
+import com.ankilock.ui.components.SlidingPillSwitcher 
 import com.ankilock.ui.components.Squircle3DButton 
 import androidx.compose.runtime.mutableFloatStateOf 
 import kotlin.math.roundToInt 
@@ -104,7 +105,9 @@ fun StoryConfigBottomSheet(
         "Long" to "~500w" 
     ) 
     
-    val connectingWordsSteps = listOf(0, 5, 7, 9, 11) 
+    val connectingWordsSteps = listOf(0, 5, 7, 9, 11, 22, -1) 
+    val vocabFilterOptions = listOf("all", "learn", "review", "learned") 
+    val vocabFilterLabels = mapOf("all" to "ALL", "learn" to "Learn", "review" to "Review", "learned" to "Learned") 
     
     var selectedLevel by remember { 
         mutableStateOf(if (prefs.readingJlptLevel.isNotBlank()) prefs.readingJlptLevel else "N5") 
@@ -119,6 +122,9 @@ fun StoryConfigBottomSheet(
     var sliderIndex by remember { 
         val idx = connectingWordsSteps.indexOf(selectedWordsCount).let { if (it >= 0) it.toFloat() else 1f } 
         mutableFloatStateOf(idx) 
+    } 
+    var selectedVocabFilter by remember { 
+        mutableStateOf(prefs.storyVocabularyFilter) 
     } 
     
     var selectedTab by remember { mutableIntStateOf(if (prefs.isCustomThemeModeActive) 1 else 0) } 
@@ -332,9 +338,13 @@ fun StoryConfigBottomSheet(
                     GlobalSeekerRow( 
                         icon = Icons.Filled.Tune, 
                         label = "Connecting Studied Words", 
-                        valueDisplay = if (selectedWordsCount == 0) "Free (0 words)" else "$selectedWordsCount words", 
+                        valueDisplay = when (selectedWordsCount) { 
+                            0 -> "Free (0 words)" 
+                            -1 -> "ALL words" 
+                            else -> "$selectedWordsCount words" 
+                        }, 
                         value = sliderIndex, 
-                        valueRange = 0f..4f, 
+                        valueRange = 0f..connectingWordsSteps.lastIndex.toFloat(), 
                         onValueChange = { newIdx -> 
                             sliderIndex = newIdx 
                             val nearest = newIdx.roundToInt().coerceIn(0, connectingWordsSteps.lastIndex) 
@@ -344,7 +354,23 @@ fun StoryConfigBottomSheet(
                             sliderIndex = connectingWordsSteps.indexOf(selectedWordsCount).toFloat() 
                         }, 
                         accentColor = BlossomColors.SakuraRose, 
-                        snapValues = listOf(0f, 1f, 2f, 3f, 4f) 
+                        snapValues = connectingWordsSteps.indices.map { it.toFloat() } 
+                    ) 
+                } 
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { 
+                    Text( 
+                        text = "Vocabulary Filter", 
+                        fontSize = 12.5.sp, 
+                        fontWeight = FontWeight.SemiBold, 
+                        color = BlossomColors.TextSecondary 
+                    ) 
+                    SlidingPillSwitcher( 
+                        options = vocabFilterOptions, 
+                        selectedOption = selectedVocabFilter, 
+                        onOptionSelected = { selectedVocabFilter = it }, 
+                        labelProvider = { vocabFilterLabels[it] ?: it.uppercase() }, 
+                        activeColor = BlossomColors.SakuraRose 
                     ) 
                 } 
                 
@@ -854,6 +880,7 @@ fun StoryConfigBottomSheet(
                     prefs.readingJlptLevel = selectedLevel 
                     prefs.storyLength = selectedLength 
                     prefs.storyConnectingWordsCount = selectedWordsCount 
+                    prefs.storyVocabularyFilter = selectedVocabFilter 
                     prefs.disabledStoryThemes = disabledThemes 
                     prefs.disabledStoryTopics = disabledTopics 
                     if (selectedTab == 1) { 
@@ -877,7 +904,7 @@ fun StoryConfigBottomSheet(
             ) { 
                 Text( 
                     text = "Apply & Save Settings", 
-                    fontWeight = FontWeight.Bold, 
+                    fontWeight = FontWeight.SemiBold, 
                     fontSize = 14.5.sp, 
                     color = Color.White 
                 ) 

@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.HapticFeedbackConstants 
+import androidx.compose.foundation.layout.defaultMinSize 
 import androidx.compose.foundation.layout.fillMaxWidth 
 import androidx.compose.material3.Icon 
 import androidx.compose.runtime.mutableStateOf 
@@ -233,7 +234,9 @@ fun Squircle3DButton(
     ) 
     
     Box( 
-        modifier = modifier 
+        modifier = Modifier 
+            .defaultMinSize(minHeight = 44.dp) 
+            .then(modifier) 
             .clickable( 
                 interactionSource = interactionSource, 
                 indication = null, 
@@ -300,7 +303,8 @@ fun Squircle3DButton(
         
         Box( 
             modifier = Modifier 
-                .matchParentSize() 
+                .fillMaxWidth() 
+                .defaultMinSize(minHeight = 44.dp) 
                 .padding(bottom = depth) 
                 .offset(y = currentOffset) 
                 .clip(shape) 
@@ -366,7 +370,7 @@ fun Squircle3DButton(
             
             Box( 
                 modifier = Modifier 
-                    .matchParentSize() 
+                    .fillMaxWidth() 
                     .padding(contentPadding), 
                 contentAlignment = Alignment.Center 
             ) { 
@@ -433,7 +437,7 @@ fun Squircle3DButton(
             Text( 
                 text = text, 
                 fontSize = 15.sp, 
-                fontWeight = FontWeight.Bold, 
+                fontWeight = FontWeight.SemiBold, 
                 color = contentColor 
             ) 
         } 

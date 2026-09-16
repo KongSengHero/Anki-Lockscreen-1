@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets 
 import androidx.compose.foundation.layout.asPaddingValues 
@@ -684,7 +685,7 @@ class MainActivity : ComponentActivity() {
         var isEnabled by remember { mutableStateOf(prefs.isServiceEnabled) } 
         var isMusicPlayerStyle by remember { mutableStateOf(prefs.isMusicPlayerStyle) } 
         var classicRevealedAction by remember { mutableStateOf(prefs.classicRevealedAction) } 
-        var isAutoPlayAudio by remember { mutableStateOf(prefs.isAutoPlayAudio) } 
+        var autoPlayMode by remember { mutableIntStateOf(prefs.autoPlayAudioMode) } 
         val selectedDeckIds = remember { mutableStateListOf<String>() } 
         var updateInterval by remember { mutableIntStateOf(prefs.updateIntervalMinutes) } 
         var snoozeDuration by remember { mutableIntStateOf(prefs.snoozeDurationMinutes) } 
@@ -698,6 +699,8 @@ class MainActivity : ComponentActivity() {
         val deckCardsCache = remember { mutableStateMapOf<Long, CardInfo?>() } 
         val deckStatsCache = remember { mutableStateMapOf<Long, Triple<Int, Int, Int>>() } 
         val deckCardQueues = remember { mutableStateMapOf<Long, MutableList<CardInfo>>() } 
+        val lastAnsweredCardByDeck = remember { mutableStateMapOf<Long, CardInfo>() } 
+        val lastAnsweredStatsByDeck = remember { mutableStateMapOf<Long, Triple<Int, Int, Int>>() } 
         val coroutineScope = androidx.compose.runtime.rememberCoroutineScope() 
         
         DisposableEffect(Unit) { 
@@ -796,10 +799,10 @@ class MainActivity : ComponentActivity() {
                 dimOpacity = dimOpacityState, 
                 artworkOpacity = artworkOpacityState, 
                 customImageUri = customImageUriState, 
-                isAutoPlay = isAutoPlayAudio, 
-                onToggleAutoPlay = { autoPlay -> 
-                    isAutoPlayAudio = autoPlay 
-                    prefs.isAutoPlayAudio = autoPlay 
+                autoPlayMode = autoPlayMode, 
+                onToggleAutoPlay = { mode -> 
+                    autoPlayMode = mode 
+                    prefs.autoPlayAudioMode = mode 
                 }, 
                 isPlayingWord = (audioPlayer.currentPlayingTrack == AudioTrackPlaying.WORD), 
                 isPlayingSentence = (audioPlayer.currentPlayingTrack == AudioTrackPlaying.SENTENCE), 
@@ -807,8 +810,13 @@ class MainActivity : ComponentActivity() {
                     isRevealed = willReveal 
                     if (willReveal) { 
                         CardSessionManager.reveal(this@MainActivity) 
-                        if (isAutoPlayAudio) { 
-                            (card ?: activeCard)?.let { audioPlayer.playSequence(it) } 
+                        val targetCard = card ?: activeCard 
+                        if (targetCard != null) { 
+                            when (autoPlayMode) { 
+                                1 -> audioPlayer.playWord(targetCard) 
+                                2 -> audioPlayer.playSentence(targetCard) 
+                                3 -> audioPlayer.playSequence(targetCard) 
+                            } 
                         } 
                     } else { 
                         CardSessionManager.hide(this@MainActivity) 
@@ -837,10 +845,13 @@ class MainActivity : ComponentActivity() {
                 onAgain = { deck, card -> 
                     audioPlayer.stop() 
                     isRevealed = false 
+                    val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
+                    lastAnsweredCardByDeck[deck.id] = card 
+                    lastAnsweredStatsByDeck[deck.id] = currentStats 
+                    CardSessionManager.recordAnswered(card, currentStats) 
                     val queue = deckCardQueues[deck.id] 
                     val nextCard = if (queue != null && queue.isNotEmpty()) queue.removeAt(0) else null 
                     deckCardsCache[deck.id] = nextCard 
-                    val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                     val optNew = if (currentStats.first > 0) currentStats.first - 1 else 0 
                     val optLearn = currentStats.second + 1 
                     val optReview = currentStats.third 
@@ -876,10 +887,13 @@ class MainActivity : ComponentActivity() {
                 onGood = { deck, card -> 
                     audioPlayer.stop() 
                     isRevealed = false 
+                    val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
+                    lastAnsweredCardByDeck[deck.id] = card 
+                    lastAnsweredStatsByDeck[deck.id] = currentStats 
+                    CardSessionManager.recordAnswered(card, currentStats) 
                     val queue = deckCardQueues[deck.id] 
                     val nextCard = if (queue != null && queue.isNotEmpty()) queue.removeAt(0) else null 
                     deckCardsCache[deck.id] = nextCard 
-                    val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                     val optNew = if (currentStats.first > 0) currentStats.first - 1 else 0 
                     val optLearn = if (currentStats.second > 0) currentStats.second - 1 else 0 
                     val optReview = if (currentStats.first == 0 && currentStats.second == 0 && currentStats.third > 0) currentStats.third - 1 else currentStats.third 
@@ -950,18 +964,34 @@ class MainActivity : ComponentActivity() {
                             } 
                         } 
                         "undo" -> { 
-                            CardSessionManager.undoLastReview(this@MainActivity) 
-                            coroutineScope.launch(Dispatchers.IO) { 
-                                val freshDecks = ankiHelper.getDeckList() 
-                                val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
-                                    ?: ankiHelper.getDeckStatsForDeck(deck.name) 
-                                val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
-                                val firstCard = batch.firstOrNull() 
-                                val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
-                                withContext(Dispatchers.Main) { 
-                                    deckCardsCache[deck.id] = firstCard 
-                                    deckCardQueues[deck.id] = remaining 
-                                    deckStatsCache[deck.id] = freshStats 
+                            val restoredCard = lastAnsweredCardByDeck.remove(deck.id) 
+                            val restoredStats = lastAnsweredStatsByDeck.remove(deck.id) 
+                            if (restoredCard != null) { 
+                                val currentVisibleCard = deckCardsCache[deck.id] 
+                                if (currentVisibleCard != null) { 
+                                    val q = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
+                                    q.add(0, currentVisibleCard) 
+                                } 
+                                deckCardsCache[deck.id] = restoredCard 
+                                if (restoredStats != null) { 
+                                    deckStatsCache[deck.id] = restoredStats 
+                                } 
+                                isRevealed = false 
+                                CardSessionManager.undoLastReview(this@MainActivity) 
+                            } else { 
+                                CardSessionManager.undoLastReview(this@MainActivity) 
+                                coroutineScope.launch(Dispatchers.IO) { 
+                                    val freshDecks = ankiHelper.getDeckList() 
+                                    val freshStats = freshDecks.find { it.id == deck.id }?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                                        ?: ankiHelper.getDeckStatsForDeck(deck.name) 
+                                    val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
+                                    val firstCard = batch.firstOrNull() 
+                                    val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
+                                    withContext(Dispatchers.Main) { 
+                                        deckCardsCache[deck.id] = firstCard 
+                                        deckCardQueues[deck.id] = remaining 
+                                        deckStatsCache[deck.id] = freshStats 
+                                    } 
                                 } 
                             } 
                         } 
@@ -1083,7 +1113,8 @@ class MainActivity : ComponentActivity() {
             ModalBottomSheet( 
                 onDismissRequest = { showBackgroundsSheet = false }, 
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), 
-                containerColor = BlossomColors.BackgroundDeep 
+                containerColor = BlossomColors.BackgroundDeep, 
+                windowInsets = WindowInsets(0) 
             ) { 
                 Column( 
                     modifier = Modifier 
@@ -1091,7 +1122,8 @@ class MainActivity : ComponentActivity() {
                         .nestedScroll(noBounceNestedScroll) 
                         .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp), 
+                        .navigationBarsPadding() 
+                        .padding(bottom = 16.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1129,24 +1161,30 @@ class MainActivity : ComponentActivity() {
                         onSelectType = { type -> 
                             backgroundTypeState = type 
                             prefs.backgroundType = type 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         }, 
                         onSelectSavedUri = { uriStr -> 
                             customImageUriState = uriStr 
                             prefs.customImageUri = uriStr 
                             backgroundTypeState = "custom" 
                             prefs.backgroundType = "custom" 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         }, 
                         onRemoveSavedUri = { uriStr -> 
                             prefs.removeSavedImageUri(uriStr) 
                             savedImageUrisState = prefs.savedImageUris 
                             customImageUriState = prefs.customImageUri 
                             backgroundTypeState = prefs.backgroundType 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         }, 
                         onPickNewImage = { 
                             imagePickerLauncher.launch("image/*") 
@@ -1156,24 +1194,30 @@ class MainActivity : ComponentActivity() {
                         }, 
                         onBlurCommit = { 
                             prefs.blurRadius = blurRadiusState.toInt() 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         }, 
                         onOpacityChange = { newOpacity -> 
                             dimOpacityState = newOpacity 
                         }, 
                         onOpacityCommit = { 
                             prefs.dimOpacity = dimOpacityState 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         }, 
                         onArtworkOpacityChange = { newArtOpacity -> 
                             artworkOpacityState = newArtOpacity 
                         }, 
                         onArtworkOpacityCommit = { 
                             prefs.artworkOpacity = artworkOpacityState 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
-                            AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                                AnkiAppWidgetProvider.updateAllWidgets(this@MainActivity) 
+                            } 
                         } 
                     ) 
                     
@@ -1230,7 +1274,8 @@ class MainActivity : ComponentActivity() {
             ModalBottomSheet( 
                 onDismissRequest = { showDecksSheet = false }, 
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), 
-                containerColor = BlossomColors.BackgroundDeep 
+                containerColor = BlossomColors.BackgroundDeep, 
+                windowInsets = WindowInsets(0) 
             ) { 
                 Column( 
                     modifier = Modifier 
@@ -1238,7 +1283,8 @@ class MainActivity : ComponentActivity() {
                         .nestedScroll(noBounceNestedScroll) 
                         .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp), 
+                        .navigationBarsPadding() 
+                        .padding(bottom = 16.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1275,7 +1321,8 @@ class MainActivity : ComponentActivity() {
             ModalBottomSheet( 
                 onDismissRequest = { showStyleSheet = false }, 
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), 
-                containerColor = BlossomColors.BackgroundDeep 
+                containerColor = BlossomColors.BackgroundDeep, 
+                windowInsets = WindowInsets(0) 
             ) { 
                 Column( 
                     modifier = Modifier 
@@ -1283,7 +1330,8 @@ class MainActivity : ComponentActivity() {
                         .nestedScroll(noBounceNestedScroll) 
                         .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 
-                        .padding(bottom = 36.dp), 
+                        .navigationBarsPadding() 
+                        .padding(bottom = 16.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
                     Row( 
@@ -1305,14 +1353,18 @@ class MainActivity : ComponentActivity() {
                     ModernStyleCard(isMusicPlayerStyle) { isMusic -> 
                         isMusicPlayerStyle = isMusic 
                         prefs.isMusicPlayerStyle = isMusic 
-                        if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                        coroutineScope.launch(Dispatchers.IO) { 
+                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                        } 
                     } 
                     
                     if (!isMusicPlayerStyle) { 
                         ModernClassicActionCard(classicRevealedAction) { action -> 
                             classicRevealedAction = action 
                             prefs.classicRevealedAction = action 
-                            if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                            coroutineScope.launch(Dispatchers.IO) { 
+                                if (isEnabled) AnkiNotificationService.update(this@MainActivity) 
+                            } 
                         } 
                     } 
                     
@@ -1746,7 +1798,8 @@ class MainActivity : ComponentActivity() {
                     Squircle3DButton( 
                         onClick = onPickNewImage, 
                         containerColor = BlossomColors.WisteriaViolet, 
-                        modifier = Modifier.fillMaxWidth() 
+                        bevelColor = BlossomColors.WisteriaVioletLip, 
+                        modifier = Modifier.fillMaxWidth().height(48.dp) 
                     ) { 
                         Row( 
                             verticalAlignment = Alignment.CenterVertically, 
@@ -1765,7 +1818,7 @@ class MainActivity : ComponentActivity() {
                             Text( 
                                 text = "Add App Background from Phone", 
                                 color = Color.White, 
-                                fontWeight = FontWeight.Bold, 
+                                fontWeight = FontWeight.SemiBold, 
                                 fontSize = 13.sp 
                             ) 
                         } 
@@ -1988,7 +2041,8 @@ class MainActivity : ComponentActivity() {
                     Squircle3DButton( 
                         onClick = onPickNewImage, 
                         containerColor = BlossomColors.SlateBlue, 
-                        modifier = Modifier.fillMaxWidth() 
+                        bevelColor = BlossomColors.SlateBlueLip, 
+                        modifier = Modifier.fillMaxWidth().height(48.dp) 
                     ) { 
                         Row( 
                             verticalAlignment = Alignment.CenterVertically, 
@@ -2007,7 +2061,7 @@ class MainActivity : ComponentActivity() {
                             Text( 
                                 text = "Add Picture from Phone", 
                                 color = Color.White, 
-                                fontWeight = FontWeight.Bold, 
+                                fontWeight = FontWeight.SemiBold, 
                                 fontSize = 13.sp 
                             ) 
                         } 

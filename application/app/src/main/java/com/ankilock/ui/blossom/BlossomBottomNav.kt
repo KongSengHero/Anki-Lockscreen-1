@@ -64,15 +64,15 @@ enum class BlossomTab(
     val activeColor: Color 
         get() = when (this) { 
             CARDS -> BlossomColors.SlateBlue 
-            STORIES -> BlossomColors.MatchaSage 
-            JISHO -> BlossomColors.WarmOchre 
+            STORIES -> BlossomColors.SkyCyan 
+            JISHO -> BlossomColors.MatchaSage 
         } 
         
     val containerColor: Color 
         get() = when (this) { 
             CARDS -> BlossomColors.SlateBlueContainer 
-            STORIES -> BlossomColors.MatchaSageContainer 
-            JISHO -> BlossomColors.WarmOchreContainer 
+            STORIES -> BlossomColors.SkyCyanContainer 
+            JISHO -> BlossomColors.MatchaSageContainer 
         } 
     
     companion object { 

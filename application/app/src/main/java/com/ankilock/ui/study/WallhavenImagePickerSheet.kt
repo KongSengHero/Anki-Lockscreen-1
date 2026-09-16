@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan 
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -98,6 +101,7 @@ import com.ankilock.data.StoryAssetLoader
 import com.ankilock.ui.blossom.BlossomColors
 import com.ankilock.ui.blossom.BlossomNunito
 import com.ankilock.ui.blossom.BlossomShapes
+import com.ankilock.ui.components.Squircle3DButton 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -171,6 +175,9 @@ fun WallhavenImagePickerSheet(
     var errorMessage by remember { mutableStateOf<String?>(null) } 
     var results by remember { mutableStateOf<List<WallhavenImageResult>>(emptyList()) } 
     var previewingItem by remember { mutableStateOf<WallhavenImageResult?>(null) } 
+    var currentPage by remember { mutableIntStateOf(1) } 
+    var isLoadingMore by remember { mutableStateOf(false) } 
+    var hasMorePages by remember { mutableStateOf(true) } 
     
     val storyTags = remember(initialTitle, initialGenre, initialVisualAnchor, initialArtTags) { 
         WallhavenServiceHelper.buildSearchTags(initialTitle, initialGenre, initialVisualAnchor, initialArtTags) 
@@ -179,11 +186,14 @@ fun WallhavenImagePickerSheet(
     fun performSearch(query: String) { 
         isSearching = true 
         errorMessage = null 
+        currentPage = 1 
+        hasMorePages = true 
         keyboardController?.hide() 
         coroutineScope.launch { 
             val res = WallhavenServiceHelper.searchImages( 
                 query = query, 
-                apiKey = prefs.wallhavenApiKey 
+                apiKey = prefs.wallhavenApiKey, 
+                page = 1 
             ) 
             isSearching = false 
             if (res.isSuccess) { 
@@ -197,6 +207,31 @@ fun WallhavenImagePickerSheet(
         } 
     } 
     
+    fun loadMoreImages() { 
+        if (isLoadingMore || !hasMorePages || isSearching) return 
+        isLoadingMore = true 
+        val nextPage = currentPage + 1 
+        coroutineScope.launch { 
+            val res = WallhavenServiceHelper.searchImages( 
+                query = searchQuery, 
+                apiKey = prefs.wallhavenApiKey, 
+                page = nextPage 
+            ) 
+            isLoadingMore = false 
+            if (res.isSuccess) { 
+                val newItems = res.getOrDefault(emptyList()) 
+                if (newItems.isNotEmpty()) { 
+                    val existingIds = results.map { it.id }.toSet() 
+                    val filtered = newItems.filter { it.id !in existingIds } 
+                    results = results + filtered 
+                    currentPage = nextPage 
+                } else { 
+                    hasMorePages = false 
+                } 
+            } 
+        } 
+    } 
+    
     LaunchedEffect(Unit) { 
         performSearch(searchQuery) 
     } 
@@ -205,6 +240,7 @@ fun WallhavenImagePickerSheet(
         onDismissRequest = onDismiss, 
         sheetState = sheetState, 
         containerColor = BlossomColors.SurfaceOverlay, 
+        windowInsets = WindowInsets(0), 
         dragHandle = { 
             Box( 
                 modifier = Modifier 
@@ -587,6 +623,55 @@ fun WallhavenImagePickerSheet(
                                     } 
                                 } 
                             } 
+                            if (hasMorePages) { 
+                                item(span = StaggeredGridItemSpan.FullLine) { 
+                                    Box( 
+                                        modifier = Modifier 
+                                            .fillMaxWidth() 
+                                            .padding(top = 8.dp, bottom = 20.dp), 
+                                        contentAlignment = Alignment.Center 
+                                    ) { 
+                                        Squircle3DButton( 
+                                            onClick = { loadMoreImages() }, 
+                                            modifier = Modifier 
+                                                .fillMaxWidth() 
+                                                .height(46.dp), 
+                                            enabled = !isLoadingMore, 
+                                            containerColor = BlossomColors.SlateBlue, 
+                                            bevelColor = BlossomColors.SlateBlueLip, 
+                                            contentColor = Color.White, 
+                                            shape = BlossomShapes.SquircleMedium 
+                                        ) { 
+                                            if (isLoadingMore) { 
+                                                CircularProgressIndicator( 
+                                                    color = Color.White, 
+                                                    strokeWidth = 2.dp, 
+                                                    modifier = Modifier.size(18.dp) 
+                                                ) 
+                                            } else { 
+                                                Row( 
+                                                    verticalAlignment = Alignment.CenterVertically, 
+                                                    horizontalArrangement = Arrangement.Center 
+                                                ) { 
+                                                    Icon( 
+                                                        imageVector = Icons.Default.Refresh, 
+                                                        contentDescription = null, 
+                                                        tint = Color.White, 
+                                                        modifier = Modifier.size(18.dp) 
+                                                    ) 
+                                                    Spacer(modifier = Modifier.width(8.dp)) 
+                                                    Text( 
+                                                        text = "Load More Wallpapers", 
+                                                        fontSize = 14.sp, 
+                                                        fontWeight = FontWeight.SemiBold, 
+                                                        color = Color.White 
+                                                    ) 
+                                                } 
+                                            } 
+                                        } 
+                                    } 
+                                } 
+                            } 
                         } 
                     } 
                     else -> { 
@@ -610,45 +695,60 @@ fun WallhavenImagePickerSheet(
     
     if (previewingItem != null) { 
         val item = previewingItem!! 
-        Dialog( 
-            onDismissRequest = { if (!isDownloading) previewingItem = null }, 
-            properties = DialogProperties( 
-                usePlatformDefaultWidth = false, 
-                decorFitsSystemWindows = true 
-            ) 
-        ) { 
-            val configuration = LocalConfiguration.current 
-            val density = LocalDensity.current 
-            val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() } 
-            val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() } 
-            
-            var scale by remember { mutableFloatStateOf(1f) } 
-            var offset by remember { mutableStateOf(Offset.Zero) } 
-            var rotationAngle by remember { mutableFloatStateOf(0f) } 
-            val transformState = rememberTransformableState { zoomChange, panChange, _ -> 
-                val newScale = (scale * zoomChange).coerceIn(1f, 5f) 
-                scale = newScale 
-                if (newScale <= 1.05f) { 
-                    offset = Offset.Zero 
-                } else { 
-                    val panMultiplier = 1f + (newScale - 1f) * 1.5f 
-                    val maxOffsetX = (screenWidthPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
-                    val maxOffsetY = (screenHeightPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
-                    offset = Offset( 
-                        x = (offset.x + panChange.x * panMultiplier).coerceIn(-maxOffsetX, maxOffsetX), 
-                        y = (offset.y + panChange.y * panMultiplier).coerceIn(-maxOffsetY, maxOffsetY) 
-                    ) 
-                } 
+        val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+        val configuration = LocalConfiguration.current 
+        val density = LocalDensity.current 
+        val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() } 
+        val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() } 
+        
+        var scale by remember { mutableFloatStateOf(1f) } 
+        var offset by remember { mutableStateOf(Offset.Zero) } 
+        var rotationAngle by remember { mutableFloatStateOf(0f) } 
+        val transformState = rememberTransformableState { zoomChange, panChange, _ -> 
+            val newScale = (scale * zoomChange).coerceIn(1f, 5f) 
+            scale = newScale 
+            if (newScale <= 1.05f) { 
+                offset = Offset.Zero 
+            } else { 
+                val panMultiplier = 1f + (newScale - 1f) * 1.5f 
+                val maxOffsetX = (screenWidthPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
+                val maxOffsetY = (screenHeightPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
+                offset = Offset( 
+                    x = (offset.x + panChange.x * panMultiplier).coerceIn(-maxOffsetX, maxOffsetX), 
+                    y = (offset.y + panChange.y * panMultiplier).coerceIn(-maxOffsetY, maxOffsetY) 
+                ) 
             } 
-            
-            Box( 
+        } 
+        
+        ModalBottomSheet( 
+            onDismissRequest = { if (!isDownloading) previewingItem = null }, 
+            sheetState = previewSheetState, 
+            containerColor = BlossomColors.BackgroundDeep, 
+            windowInsets = WindowInsets(0), 
+            dragHandle = { 
+                Box( 
+                    modifier = Modifier 
+                        .padding(vertical = 12.dp) 
+                        .size(width = 38.dp, height = 4.dp) 
+                        .clip(BlossomShapes.Pill) 
+                        .background(BlossomColors.CardBorder) 
+                ) 
+            } 
+        ) { 
+            Column( 
                 modifier = Modifier 
-                    .fillMaxSize() 
-                    .background(Color.Black.copy(alpha = 0.96f)) 
+                    .fillMaxWidth() 
+                    .fillMaxHeight(0.92f) 
+                    .padding(horizontal = 16.dp) 
+                    .navigationBarsPadding() 
             ) { 
                 Box( 
                     modifier = Modifier 
-                        .fillMaxSize() 
+                        .fillMaxWidth() 
+                        .weight(1f) 
+                        .clip(BlossomShapes.SquircleLarge) 
+                        .background(BlossomColors.SurfaceCard1) 
+                        .border(1.dp, BlossomColors.CardBorderSubtle, BlossomShapes.SquircleLarge) 
                         .pointerInput(Unit) { 
                             detectTapGestures( 
                                 onDoubleTap = { 
@@ -679,33 +779,16 @@ fun WallhavenImagePickerSheet(
                     ) 
                 } 
                 
+                Spacer(modifier = Modifier.height(16.dp)) 
+                
                 Row( 
                     modifier = Modifier 
-                        .align(Alignment.TopEnd) 
-                        .statusBarsPadding() 
-                        .padding(16.dp), 
-                    verticalAlignment = Alignment.CenterVertically, 
-                    horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                        .fillMaxWidth() 
+                        .padding(bottom = 16.dp), 
+                    horizontalArrangement = Arrangement.spacedBy(10.dp), 
+                    verticalAlignment = Alignment.CenterVertically 
                 ) { 
-                    IconButton( 
-                        onClick = { 
-                            rotationAngle = (rotationAngle + 90f) % 360f 
-                            offset = Offset.Zero 
-                        }, 
-                        modifier = Modifier 
-                            .size(38.dp) 
-                            .clip(CircleShape) 
-                            .background(Color.Black.copy(alpha = 0.65f)) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Default.Refresh, 
-                            contentDescription = "Rotate", 
-                            tint = Color.White, 
-                            modifier = Modifier.size(20.dp) 
-                        ) 
-                    } 
-                    
-                    Button( 
+                    Squircle3DButton( 
                         onClick = { 
                             isDownloading = true 
                             coroutineScope.launch { 
@@ -730,41 +813,68 @@ fun WallhavenImagePickerSheet(
                                 } 
                             } 
                         }, 
+                        modifier = Modifier 
+                            .weight(1f) 
+                            .height(46.dp), 
                         enabled = !isDownloading, 
-                        shape = BlossomShapes.Pill, 
-                        colors = ButtonDefaults.buttonColors( 
-                            containerColor = BlossomColors.SlateBlue 
-                        ), 
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp), 
-                        modifier = Modifier.height(38.dp) 
+                        containerColor = BlossomColors.SlateBlue, 
+                        bevelColor = BlossomColors.SlateBlueLip, 
+                        contentColor = Color.White, 
+                        shape = BlossomShapes.SquircleMedium 
                     ) { 
                         if (isDownloading) { 
                             CircularProgressIndicator( 
                                 color = Color.White, 
                                 strokeWidth = 2.dp, 
-                                modifier = Modifier.size(16.dp) 
+                                modifier = Modifier.size(18.dp) 
                             ) 
                         } else { 
                             Text( 
                                 text = "Apply", 
                                 color = Color.White, 
-                                fontWeight = FontWeight.Bold, 
-                                fontSize = 13.sp 
+                                fontWeight = FontWeight.SemiBold, 
+                                fontSize = 14.sp 
                             ) 
                         } 
                     } 
                     
-                    IconButton( 
+                    Squircle3DButton( 
+                        onClick = { 
+                            rotationAngle = (rotationAngle + 90f) % 360f 
+                            offset = Offset.Zero 
+                        }, 
+                        modifier = Modifier 
+                            .width(54.dp) 
+                            .height(46.dp), 
+                        enabled = !isDownloading, 
+                        containerColor = BlossomColors.SurfaceCard1, 
+                        bevelColor = BlossomColors.SurfaceElevated, 
+                        contentColor = BlossomColors.TextPrimary, 
+                        shape = BlossomShapes.SquircleMedium 
+                    ) { 
+                        Icon( 
+                            imageVector = Icons.Default.Refresh, 
+                            contentDescription = "Rotate", 
+                            tint = BlossomColors.TextPrimary, 
+                            modifier = Modifier.size(20.dp) 
+                        ) 
+                    } 
+                    
+                    Squircle3DButton( 
                         onClick = { if (!isDownloading) previewingItem = null }, 
                         modifier = Modifier 
-                            .size(38.dp) 
-                            .clip(CircleShape) 
-                            .background(Color.Black.copy(alpha = 0.65f)) 
+                            .width(54.dp) 
+                            .height(46.dp), 
+                        enabled = !isDownloading, 
+                        containerColor = BlossomColors.SurfaceCard1, 
+                        bevelColor = BlossomColors.SurfaceElevated, 
+                        contentColor = BlossomColors.TextPrimary, 
+                        shape = BlossomShapes.SquircleMedium 
                     ) { 
                         Icon( 
                             imageVector = Icons.Default.Close, 
                             contentDescription = "Close", 
-                            tint = Color.White, 
+                            tint = BlossomColors.TextPrimary, 
                             modifier = Modifier.size(20.dp) 
                         ) 
                     } 

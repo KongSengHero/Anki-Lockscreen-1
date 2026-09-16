@@ -117,6 +117,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean(KEY_AUTOPLAY_AUDIO, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTOPLAY_AUDIO, value).apply()
     
+    var autoPlayAudioMode: Int 
+        get() = prefs.getInt(KEY_AUTOPLAY_AUDIO_MODE, if (isAutoPlayAudio) 3 else 0) 
+        set(value) = prefs.edit().putInt(KEY_AUTOPLAY_AUDIO_MODE, value).putBoolean(KEY_AUTOPLAY_AUDIO, value > 0).apply() 
+    
     var aiApiKey: String
         get() = prefs.getString(KEY_AI_API_KEY, "") ?: ""
         set(value) = prefs.edit().putString(KEY_AI_API_KEY, value).apply()
@@ -522,6 +526,16 @@ class PreferencesManager(context: Context) {
         recentJishoSearches = emptyList() 
     } 
     
+    fun removeRecentJishoSearch(term: String) { 
+        val current = recentJishoSearches.toMutableList() 
+        current.removeAll { it.equals(term.trim(), ignoreCase = true) } 
+        recentJishoSearches = current 
+    } 
+    
+    var storyVocabularyFilter: String 
+        get() = prefs.getString(KEY_STORY_VOCABULARY_FILTER, "all") ?: "all" 
+        set(value) = prefs.edit().putString(KEY_STORY_VOCABULARY_FILTER, value).apply() 
+    
     var dailyStreakCount: Int 
         get() { 
             checkAndResetDailyProgress() 
@@ -803,6 +817,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ARTWORK_OPACITY = "artwork_opacity"
         private const val KEY_CLASSIC_REVEALED_ACTION = "classic_revealed_action"
         private const val KEY_AUTOPLAY_AUDIO = "autoplay_audio"
+        private const val KEY_AUTOPLAY_AUDIO_MODE = "autoplay_audio_mode" 
+        private const val KEY_STORY_VOCABULARY_FILTER = "story_vocabulary_filter" 
         private const val KEY_AI_API_KEY = "ai_api_key"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"

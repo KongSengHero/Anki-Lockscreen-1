@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row 
 import androidx.compose.foundation.layout.Spacer 
 import androidx.compose.foundation.layout.aspectRatio 
+import androidx.compose.foundation.layout.fillMaxHeight 
 import androidx.compose.foundation.layout.fillMaxSize 
 import androidx.compose.foundation.layout.fillMaxWidth 
 import androidx.compose.foundation.layout.height 
@@ -89,8 +90,8 @@ fun DeckCarouselCard(
     onDeckChanged: (Long) -> Unit, 
     onPlayWord: (CardInfo) -> Unit = {}, 
     onPlaySentence: (CardInfo) -> Unit = {}, 
-    isAutoPlay: Boolean = false, 
-    onToggleAutoPlay: (Boolean) -> Unit = {}, 
+    autoPlayMode: Int = 0, 
+    onToggleAutoPlay: (Int) -> Unit = {}, 
     isPlayingWord: Boolean = false, 
     isPlayingSentence: Boolean = false, 
     backgroundType: String? = null, 
@@ -382,36 +383,57 @@ fun DeckCarouselCard(
                     } 
                 } 
                 
-                Button( 
-                    onClick = { onToggleAutoPlay(!isAutoPlay) }, 
-                    shape = RoundedCornerShape(10.dp), 
-                    colors = ButtonDefaults.buttonColors( 
-                        containerColor = if (isAutoPlay) BlossomColors.MatchaSage.copy(alpha = 0.35f) else BlossomColors.BtnWordBg 
-                    ), 
-                    border = BorderStroke( 
-                        1.dp, 
-                        if (isAutoPlay) BlossomColors.MatchaSage else BlossomColors.BtnWordBorder 
-                    ), 
+                val autoPlayFillFraction = when (autoPlayMode) { 
+                    1 -> 0.33f 
+                    2 -> 0.66f 
+                    3 -> 1.0f 
+                    else -> 0f 
+                } 
+                Box( 
                     modifier = Modifier 
                         .weight(1.1f) 
-                        .height(38.dp), 
-                    contentPadding = PaddingValues(horizontal = 4.dp) 
+                        .height(38.dp) 
+                        .clip(RoundedCornerShape(10.dp)) 
+                        .background(BlossomColors.BtnWordBg) 
+                        .border( 
+                            1.dp, 
+                            if (autoPlayMode > 0) BlossomColors.MatchaSage else BlossomColors.BtnWordBorder, 
+                            RoundedCornerShape(10.dp) 
+                        ) 
+                        .clickable { onToggleAutoPlay((autoPlayMode + 1) % 4) } 
                 ) { 
+                    if (autoPlayFillFraction > 0f) { 
+                        Box( 
+                            modifier = Modifier 
+                                .fillMaxHeight() 
+                                .fillMaxWidth(autoPlayFillFraction) 
+                                .background(BlossomColors.MatchaSage.copy(alpha = 0.35f)) 
+                        ) 
+                    } 
                     Row( 
                         verticalAlignment = Alignment.CenterVertically, 
-                        horizontalArrangement = Arrangement.spacedBy(5.dp) 
+                        horizontalArrangement = Arrangement.spacedBy(5.dp), 
+                        modifier = Modifier 
+                            .align(Alignment.Center) 
+                            .padding(horizontal = 4.dp) 
                     ) { 
                         Icon( 
                             imageVector = Icons.Filled.AutoAwesome, 
                             contentDescription = null, 
-                            tint = if (isAutoPlay) BlossomColors.MatchaSage else BlossomColors.TextMuted, 
+                            tint = if (autoPlayMode > 0) BlossomColors.MatchaSage else BlossomColors.TextMuted, 
                             modifier = Modifier.size(15.dp) 
                         ) 
                         Text( 
-                            text = if (isAutoPlay) "Auto On" else "Auto Play", 
-                            fontSize = 11.5.sp, 
+                            text = when (autoPlayMode) { 
+                                1 -> "Word Only" 
+                                2 -> "Sentence" 
+                                3 -> "Word & Sent" 
+                                else -> "Auto Play" 
+                            }, 
+                            fontSize = 11.sp, 
                             fontWeight = FontWeight.Bold, 
-                            color = if (isAutoPlay) BlossomColors.MatchaSage else BlossomColors.BtnWordText 
+                            color = if (autoPlayMode > 0) BlossomColors.MatchaSage else BlossomColors.BtnWordText, 
+                            maxLines = 1 
                         ) 
                     } 
                 } 

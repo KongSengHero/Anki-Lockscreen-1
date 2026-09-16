@@ -55,6 +55,13 @@ object BlossomColors {
     var MatchaSageContainer by mutableStateOf(Color(0xFF1B3024)) 
         private set 
     
+    var SkyCyan by mutableStateOf(Color(0xFF22D3EE)) 
+        private set 
+    var SkyCyanLip by mutableStateOf(Color(0xFF0891B2)) 
+        private set 
+    var SkyCyanContainer by mutableStateOf(Color(0xFF162B35)) 
+        private set 
+    
     var WarmOchre by mutableStateOf(Color(0xFFCFA055)) 
         private set 
     var WarmOchreLip by mutableStateOf(Color(0xFF9A7233)) 
@@ -246,6 +253,10 @@ object BlossomColors {
                 MatchaSageLip = Color(0xFF205C37) 
                 MatchaSageContainer = Color(0xFFE8F5EC) 
     
+                SkyCyan = Color(0xFF0891B2) 
+                SkyCyanLip = Color(0xFF0E7490) 
+                SkyCyanContainer = Color(0xFFE0F7FA) 
+    
                 WarmOchre = Color(0xFFC07A15) 
                 WarmOchreLip = Color(0xFF8F580B) 
                 WarmOchreContainer = Color(0xFFFEF3E2) 
@@ -359,6 +370,10 @@ object BlossomColors {
                 MatchaSageLip = Color(0xFF358C54) 
                 MatchaSageContainer = Color(0xFF142B1D) 
     
+                SkyCyan = Color(0xFF22D3EE) 
+                SkyCyanLip = Color(0xFF0891B2) 
+                SkyCyanContainer = Color(0xFF132832) 
+    
                 WarmOchre = Color(0xFFE5C07B) 
                 WarmOchreLip = Color(0xFFA68545) 
                 WarmOchreContainer = Color(0xFF2B2213) 
@@ -471,6 +486,10 @@ object BlossomColors {
                 MatchaSage = Color(0xFF5FA77C) 
                 MatchaSageLip = Color(0xFF3E7755) 
                 MatchaSageContainer = Color(0xFF1B3024) 
+    
+                SkyCyan = Color(0xFF22D3EE) 
+                SkyCyanLip = Color(0xFF0891B2) 
+                SkyCyanContainer = Color(0xFF162B35) 
     
                 WarmOchre = Color(0xFFCFA055) 
                 WarmOchreLip = Color(0xFF9A7233) 

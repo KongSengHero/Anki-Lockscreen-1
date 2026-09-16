@@ -6,7 +6,8 @@ data class AnkiVocabularyItem(
     val kanji: String, 
     val reading: String = "", 
     val meaning: String = "", 
-    val isSuspended: Boolean = false 
+    val isSuspended: Boolean = false, 
+    val state: String = "review" 
 ) { 
     val displayWord: String 
         get() = kanji.ifBlank { reading } 

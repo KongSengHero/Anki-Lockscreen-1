@@ -360,7 +360,7 @@ fun ComprehensionQuizOverlay(
                                     Text( 
                                         text = "Retake", 
                                         color = BlossomColors.TextPrimary, 
-                                        fontWeight = FontWeight.Bold, 
+                                        fontWeight = FontWeight.SemiBold, 
                                         fontSize = 15.sp 
                                     ) 
                                 } 
@@ -377,7 +377,7 @@ fun ComprehensionQuizOverlay(
                                     Text( 
                                         text = "Done", 
                                         color = BlossomColors.BlossomWhite, 
-                                        fontWeight = FontWeight.Bold, 
+                                        fontWeight = FontWeight.SemiBold, 
                                         fontSize = 15.sp 
                                     ) 
                                 } 
@@ -543,7 +543,7 @@ fun ComprehensionQuizOverlay(
                                         Text( 
                                             text = if (isFinalQuestion) "Submit Quiz" else "Next Question", 
                                             fontSize = 15.sp, 
-                                            fontWeight = FontWeight.Bold, 
+                                            fontWeight = FontWeight.SemiBold, 
                                             color = nextTextColor 
                                         ) 
                                         Spacer(modifier = Modifier.width(8.dp)) 
