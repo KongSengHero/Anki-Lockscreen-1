@@ -312,7 +312,7 @@ fun Squircle3DButton(
                     initialValue = -1f, 
                     targetValue = 2f, 
                     animationSpec = infiniteRepeatable( 
-                        animation = tween(2400, easing = LinearEasing), 
+                        animation = tween(3500, easing = LinearEasing), 
                         repeatMode = RepeatMode.Restart 
                     ), 
                     label = "shineOffset" 
@@ -333,7 +333,7 @@ fun Squircle3DButton(
                                         Color.Transparent 
                                     ), 
                                     startX = startX, 
-                                    endX = startX + width * 0.45f 
+                                    endX = startX + width * 0.65f 
                                 ) 
                             ) 
                         } 

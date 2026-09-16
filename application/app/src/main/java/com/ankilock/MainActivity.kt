@@ -442,7 +442,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 imageVector = Icons.Default.LocalFireDepartment, 
                                 contentDescription = "Streak", 
-                                tint = if (isStreakActive) BlossomColors.WarmOchre else BlossomColors.TextMuted, 
+                                tint = if (isStreakActive) Color(0xFFFF5722) else BlossomColors.TextMuted, 
                                 modifier = Modifier.size(14.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(4.dp)) 
@@ -468,7 +468,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 imageVector = Icons.AutoMirrored.Filled.MenuBook, 
                                 contentDescription = "Stories Passed", 
-                                tint = BlossomColors.MatchaSage, 
+                                tint = BlossomColors.SkyCyan, 
                                 modifier = Modifier.size(13.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(4.dp)) 
@@ -494,7 +494,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 imageVector = Icons.Default.Bolt, 
                                 contentDescription = "Daily Energy", 
-                                tint = BlossomColors.SlateBlue, 
+                                tint = BlossomColors.WisteriaViolet, 
                                 modifier = Modifier.size(14.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(4.dp)) 
@@ -561,7 +561,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 Icons.Default.LocalFireDepartment, 
                                 contentDescription = null, 
-                                tint = BlossomColors.WarmOchre, 
+                                tint = Color(0xFFFF5722), 
                                 modifier = Modifier.size(24.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(10.dp)) 
@@ -575,14 +575,14 @@ class MainActivity : ComponentActivity() {
                         
                         Surface( 
                             shape = BlossomShapes.SquircleSmall, 
-                            color = BlossomColors.WarmOchreContainer, 
-                            border = BorderStroke(1.dp, BlossomColors.WarmOchre.copy(alpha = 0.5f)) 
+                            color = Color(0xFF381E17), 
+                            border = BorderStroke(1.dp, Color(0xFFFF5722).copy(alpha = 0.5f)) 
                         ) { 
                             Text( 
                                 text = "$streakCount Days", 
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = BlossomColors.WarmOchre, 
+                                color = Color(0xFFFF5722), 
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
                             ) 
                         } 
@@ -601,7 +601,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 imageVector = if (isStreakActive) Icons.Default.Check else Icons.Default.LocalFireDepartment, 
                                 contentDescription = null, 
-                                tint = if (isStreakActive) BlossomColors.BlossomGreen else BlossomColors.WarmOchre, 
+                                tint = if (isStreakActive) BlossomColors.BlossomGreen else Color(0xFFFF5722), 
                                 modifier = Modifier.size(16.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(8.dp)) 
@@ -702,14 +702,14 @@ class MainActivity : ComponentActivity() {
                                                 .clip(RoundedCornerShape(8.dp)) 
                                                 .background( 
                                                     when { 
-                                                        isCompleted -> BlossomColors.WarmOchre 
-                                                        isToday -> BlossomColors.WarmOchre.copy(alpha = 0.15f) 
+                                                        isCompleted -> Color(0xFFFF5722) 
+                                                        isToday -> Color(0xFFFF5722).copy(alpha = 0.15f) 
                                                         else -> Color.Transparent 
                                                     } 
                                                 ) 
                                                 .then( 
                                                     if (isToday && !isCompleted) { 
-                                                        Modifier.border(1.dp, BlossomColors.WarmOchre.copy(alpha = 0.6f), RoundedCornerShape(8.dp)) 
+                                                        Modifier.border(1.dp, Color(0xFFFF5722).copy(alpha = 0.6f), RoundedCornerShape(8.dp)) 
                                                     } else Modifier 
                                                 ), 
                                             contentAlignment = Alignment.Center 
@@ -720,7 +720,7 @@ class MainActivity : ComponentActivity() {
                                                 fontWeight = if (isCompleted || isToday) FontWeight.Bold else FontWeight.Normal, 
                                                 color = when { 
                                                     isCompleted -> BlossomColors.BlossomWhite 
-                                                    isToday -> BlossomColors.WarmOchre 
+                                                    isToday -> Color(0xFFFF5722) 
                                                     else -> BlossomColors.TextPrimary 
                                                 } 
                                             ) 
@@ -737,7 +737,7 @@ class MainActivity : ComponentActivity() {
                         onClick = onDismiss, 
                         shape = RoundedCornerShape(12.dp), 
                         colors = ButtonDefaults.buttonColors( 
-                            containerColor = BlossomColors.WarmOchre, 
+                            containerColor = Color(0xFFFF5722), 
                             contentColor = BlossomColors.BlossomWhite 
                         ), 
                         modifier = Modifier.fillMaxWidth(), 
@@ -775,7 +775,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 Icons.AutoMirrored.Filled.MenuBook, 
                                 contentDescription = null, 
-                                tint = BlossomColors.MatchaSage, 
+                                tint = BlossomColors.SkyCyan, 
                                 modifier = Modifier.size(24.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(10.dp)) 
@@ -789,14 +789,14 @@ class MainActivity : ComponentActivity() {
                         
                         Surface( 
                             shape = BlossomShapes.SquircleSmall, 
-                            color = BlossomColors.MatchaSageContainer, 
-                            border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.5f)) 
+                            color = BlossomColors.SkyCyanContainer, 
+                            border = BorderStroke(1.dp, BlossomColors.SkyCyan.copy(alpha = 0.5f)) 
                         ) { 
                             Text( 
                                 text = "$completedStoriesCount Passed", 
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = BlossomColors.MatchaSage, 
+                                color = BlossomColors.SkyCyan, 
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
                             ) 
                         } 
@@ -813,7 +813,7 @@ class MainActivity : ComponentActivity() {
                         onClick = onDismiss, 
                         shape = RoundedCornerShape(12.dp), 
                         colors = ButtonDefaults.buttonColors( 
-                            containerColor = BlossomColors.MatchaSage, 
+                            containerColor = BlossomColors.SkyCyan, 
                             contentColor = BlossomColors.BlossomWhite 
                         ), 
                         modifier = Modifier.fillMaxWidth(), 
@@ -851,7 +851,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 Icons.Default.Bolt, 
                                 contentDescription = null, 
-                                tint = BlossomColors.SlateBlue, 
+                                tint = BlossomColors.WisteriaViolet, 
                                 modifier = Modifier.size(24.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(10.dp)) 
@@ -865,14 +865,14 @@ class MainActivity : ComponentActivity() {
                         
                         Surface( 
                             shape = BlossomShapes.SquircleSmall, 
-                            color = BlossomColors.SlateBlueContainer, 
-                            border = BorderStroke(1.dp, BlossomColors.SlateBlue.copy(alpha = 0.5f)) 
+                            color = BlossomColors.WisteriaVioletContainer, 
+                            border = BorderStroke(1.dp, BlossomColors.WisteriaViolet.copy(alpha = 0.5f)) 
                         ) { 
                             Text( 
                                 text = "$storyEnergy / 7 Available", 
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = BlossomColors.SlateBlue, 
+                                color = BlossomColors.WisteriaViolet, 
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
                             ) 
                         } 
@@ -889,7 +889,7 @@ class MainActivity : ComponentActivity() {
                         onClick = onDismiss, 
                         shape = RoundedCornerShape(12.dp), 
                         colors = ButtonDefaults.buttonColors( 
-                            containerColor = BlossomColors.SlateBlue, 
+                            containerColor = BlossomColors.WisteriaViolet, 
                             contentColor = BlossomColors.BlossomWhite 
                         ), 
                         modifier = Modifier.fillMaxWidth(), 

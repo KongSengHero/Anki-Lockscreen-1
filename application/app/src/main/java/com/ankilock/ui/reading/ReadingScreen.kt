@@ -711,6 +711,8 @@ fun ReadingScreen(
             } 
         } 
 
+        val storyScrollState = rememberScrollState() 
+        
         CustomSelectionContainer( 
             onTranslate = { selectedText -> 
                 translateTargetText = selectedText 
@@ -724,7 +726,7 @@ fun ReadingScreen(
                 Column( 
                     modifier = Modifier 
                         .fillMaxSize() 
-                        .verticalScroll(rememberScrollState()) 
+                        .verticalScroll(storyScrollState) 
                         .padding(horizontal = 16.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
@@ -1419,7 +1421,8 @@ fun ReadingScreen(
                                                                             val word = targetVocabWords.find { it.displayWord == wordAnnotation.item } 
                                                                             if (word != null) { 
                                                                                 up.consume() 
-                                                                                selectedWordDetail = word 
+                                                                                translateTargetText = word.displayWord
+                                                                                showTranslationSheet = true 
                                                                             } 
                                                                         } 
                                                                     } 
@@ -1464,7 +1467,8 @@ fun ReadingScreen(
                                                                           reading = token.segments.joinToString("") { it.ruby ?: it.text }, 
                                                                           meaning = token.meaning 
                                                                       ) 
-                                                                    selectedWordDetail = item 
+                                                                    translateTargetText = item.displayWord
+                                                                    showTranslationSheet = true 
                                                                 } 
                                                             } 
                                                         ) 
@@ -1521,7 +1525,10 @@ fun ReadingScreen(
                                                                     if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
                                                                 ), 
                                                                 onClick = { 
-                                                                    matchedItem?.let { selectedWordDetail = it } 
+                                                                    matchedItem?.let {
+                                                                        translateTargetText = it.displayWord
+                                                                        showTranslationSheet = true
+                                                                    } 
                                                                 } 
                                                             ) { 
                                                                 Row( 
@@ -1751,6 +1758,82 @@ fun ReadingScreen(
         } 
 
         Spacer(modifier = Modifier.height(padding.calculateBottomPadding() + 32.dp)) 
+                } 
+            } 
+        } 
+        
+        val showFloatingBar = currentStory != null && storyScrollState.value > 400 
+        
+        androidx.compose.animation.AnimatedVisibility( 
+            visible = showFloatingBar, 
+            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
+                    androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }), 
+            exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
+                   androidx.compose.animation.slideOutVertically(targetOffsetY = { it / 2 }), 
+            modifier = Modifier 
+                .align(Alignment.BottomCenter) 
+                .padding(bottom = padding.calculateBottomPadding() + 16.dp) 
+        ) { 
+            Surface( 
+                shape = RoundedCornerShape(24.dp), 
+                color = BlossomColors.SurfaceCard1.copy(alpha = 0.92f), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                shadowElevation = 8.dp 
+            ) { 
+                Row( 
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.spacedBy(4.dp) 
+                ) { 
+                    IconButton( 
+                        onClick = { 
+                            if (isNarrating || isAudioPaused) { 
+                                stopNarration() 
+                            } else { 
+                                startNarration() 
+                            } 
+                        }, 
+                        modifier = Modifier.size(40.dp) 
+                    ) { 
+                        Icon( 
+                            imageVector = if (isNarrating || isAudioPaused) Icons.Filled.Stop 
+                                else Icons.AutoMirrored.Filled.VolumeUp, 
+                            contentDescription = "Narrate", 
+                            tint = if (isNarrating) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(20.dp) 
+                        ) 
+                    } 
+                    
+                    IconButton( 
+                        onClick = { 
+                            currentStory?.let { 
+                                translateTargetText = it.content 
+                                showTranslationSheet = true 
+                            } 
+                        }, 
+                        modifier = Modifier.size(40.dp) 
+                    ) { 
+                        Icon( 
+                            imageVector = Icons.Filled.Translate, 
+                            contentDescription = "Translate", 
+                            tint = BlossomColors.TextSecondary, 
+                            modifier = Modifier.size(20.dp) 
+                        ) 
+                    } 
+                    
+                    if (currentStory?.questions?.isNotEmpty() == true) { 
+                        IconButton( 
+                            onClick = { showQuizOverlay = true }, 
+                            modifier = Modifier.size(40.dp) 
+                        ) { 
+                            Icon( 
+                                imageVector = Icons.Filled.AutoAwesome, 
+                                contentDescription = "Take Test", 
+                                tint = BlossomColors.TextSecondary, 
+                                modifier = Modifier.size(20.dp) 
+                            ) 
+                        } 
+                    } 
                 } 
             } 
         } 

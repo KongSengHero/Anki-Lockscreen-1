@@ -89,7 +89,9 @@ fun TranslationBottomSheet(
     val translatorService = remember(context) { TranslatorService(context) } 
     val ttsHelper = remember { JapaneseTtsHelper(context) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
-    var isJapaneseMinimized by remember { mutableStateOf(false) } 
+    var isJapaneseMinimized by remember { mutableStateOf(false) }
+    var isTtsPlaying by remember { mutableStateOf(false) }
+    var showFurigana by remember { mutableStateOf(false) } 
     
     val rubySegments = remember(sourceText, furiganaSource, targetWords) { 
         val clean = sourceText.trim() 
@@ -265,18 +267,23 @@ fun TranslationBottomSheet(
                             ) 
 
                             Row(verticalAlignment = Alignment.CenterVertically) { 
-                                IconButton( 
-                                    onClick = { 
-                                        ttsHelper.speak(sourceText) 
-                                    }, 
-                                    modifier = Modifier.size(24.dp) 
-                                ) { 
-                                    Icon( 
-                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
-                                        contentDescription = "Pronounce Japanese", 
-                                        tint = BlossomColors.SakuraRose, 
-                                        modifier = Modifier.size(16.dp) 
-                                    ) 
+                                IconButton(
+                                    onClick = {
+                                        ttsHelper.speak(
+                                            sourceText,
+                                            onStart = { isTtsPlaying = true },
+                                            onDone = { isTtsPlaying = false },
+                                            onError = { isTtsPlaying = false }
+                                        )
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = "Pronounce Japanese",
+                                        tint = if (isTtsPlaying) BlossomColors.SakuraRose else BlossomColors.TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 } 
 
                                 Spacer(modifier = Modifier.width(6.dp)) 
@@ -298,18 +305,34 @@ fun TranslationBottomSheet(
 
                                 Spacer(modifier = Modifier.width(6.dp)) 
 
-                                IconButton( 
-                                    onClick = { 
-                                        isJapaneseMinimized = !isJapaneseMinimized 
-                                    }, 
-                                    modifier = Modifier.size(24.dp) 
-                                ) { 
-                                    Icon( 
-                                        imageVector = if (isJapaneseMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp, 
-                                        contentDescription = if (isJapaneseMinimized) "Expand Japanese" else "Minimize Japanese", 
-                                        tint = BlossomColors.TextSecondary, 
-                                        modifier = Modifier.size(18.dp) 
-                                    ) 
+                                IconButton(
+                                    onClick = {
+                                        showFurigana = !showFurigana
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Text(
+                                        text = "ふ",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextMuted
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.width(6.dp))
+                                
+                                IconButton(
+                                    onClick = {
+                                        isJapaneseMinimized = !isJapaneseMinimized
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isJapaneseMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                        contentDescription = if (isJapaneseMinimized) "Expand Japanese" else "Minimize Japanese",
+                                        tint = BlossomColors.TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 } 
                             } 
                         } 
@@ -329,11 +352,17 @@ fun TranslationBottomSheet(
                             Column { 
                                 Spacer(modifier = Modifier.height(10.dp)) 
 
-                                JapaneseFuriganaDisplay( 
-                                    segments = resolvedSegments, 
-                                    onSegmentClick = { word -> 
-                                        ttsHelper.speak(word) 
-                                    } 
+                                JapaneseFuriganaDisplay(
+                                    segments = resolvedSegments,
+                                    showFurigana = showFurigana,
+                                    onSegmentClick = { word ->
+                                        ttsHelper.speak(
+                                            word,
+                                            onStart = { isTtsPlaying = true },
+                                            onDone = { isTtsPlaying = false },
+                                            onError = { isTtsPlaying = false }
+                                        )
+                                    }
                                 ) 
 
                                 if (!isLoading && !result?.romaji.isNullOrBlank()) { 
@@ -491,11 +520,12 @@ fun TranslationBottomSheet(
 
 @OptIn(ExperimentalLayoutApi::class) 
 @Composable 
-private fun JapaneseFuriganaDisplay( 
-    segments: List<RubySegment>, 
-    onSegmentClick: ((String) -> Unit)? = null 
-) { 
-    val hasAnyRuby = segments.any { !it.ruby.isNullOrBlank() } 
+private fun JapaneseFuriganaDisplay(
+    segments: List<RubySegment>,
+    showFurigana: Boolean = true,
+    onSegmentClick: ((String) -> Unit)? = null
+) {
+    val hasAnyRuby = showFurigana && segments.any { !it.ruby.isNullOrBlank() } 
     
     FlowRow( 
         modifier = Modifier.fillMaxWidth(), 

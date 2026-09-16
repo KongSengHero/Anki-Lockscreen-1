@@ -651,6 +651,19 @@ object StoryTokenizer {
                 continue 
             } 
             
+            val matchedHiragana = commonHiraganaPhrases.firstOrNull { remaining.startsWith(it) } 
+            if (matchedHiragana != null) { 
+                result.add( 
+                    StoryToken( 
+                        surface = matchedHiragana, 
+                        segments = listOf(RubySegment(text = matchedHiragana)), 
+                        meaning = commonWordMeanings[matchedHiragana] ?: "" 
+                    ) 
+                ) 
+                remaining = remaining.substring(matchedHiragana.length) 
+                continue 
+            } 
+            
             val matchedAux = commonAuxiliaries.firstOrNull { remaining.startsWith(it) } 
             if (matchedAux != null) { 
                 result.add( 
@@ -732,19 +745,6 @@ object StoryTokenizer {
                     ) 
                 ) 
                 remaining = remaining.substring(kanjiEnd) 
-                continue 
-            } 
-            
-            val matchedHiragana = commonHiraganaPhrases.firstOrNull { remaining.startsWith(it) } 
-            if (matchedHiragana != null) { 
-                result.add( 
-                    StoryToken( 
-                        surface = matchedHiragana, 
-                        segments = listOf(RubySegment(text = matchedHiragana)), 
-                        meaning = commonWordMeanings[matchedHiragana] ?: "" 
-                    ) 
-                ) 
-                remaining = remaining.substring(matchedHiragana.length) 
                 continue 
             } 
             
