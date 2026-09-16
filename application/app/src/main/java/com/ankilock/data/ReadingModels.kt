@@ -41,7 +41,9 @@ data class GeneratedStory(
     val questions: List<StoryQuizQuestion> = emptyList(), 
     val theme: String? = null, 
     val topic: String? = null, 
-    val isPinned: Boolean = false 
+    val isPinned: Boolean = false, 
+    val quizScore: Int? = null, 
+    val isPassed: Boolean = false 
 ) 
 
 data class CardModel( 

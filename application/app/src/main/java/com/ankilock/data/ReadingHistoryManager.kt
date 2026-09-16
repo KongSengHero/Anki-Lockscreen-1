@@ -71,6 +71,8 @@ class ReadingHistoryManager(private val context: Context) {
                 val theme = obj.optString("theme", "").ifBlank { null } 
                 val topic = obj.optString("topic", "").ifBlank { null } 
                 val isPinned = obj.optBoolean("isPinned", false) 
+                val quizScore = if (obj.has("quizScore")) obj.getInt("quizScore") else null 
+                val isPassed = obj.optBoolean("isPassed", false) 
                 
                 val furiganaContent = obj.optString("furiganaContent", "").ifBlank { null } 
                 
@@ -87,7 +89,9 @@ class ReadingHistoryManager(private val context: Context) {
                         questions = questions, 
                         theme = theme, 
                         topic = topic, 
-                        isPinned = isPinned 
+                        isPinned = isPinned, 
+                        quizScore = quizScore, 
+                        isPassed = isPassed 
                     ) 
                 ) 
             } 
@@ -137,6 +141,23 @@ class ReadingHistoryManager(private val context: Context) {
             File(context.filesDir, "stories/images").deleteRecursively() 
         } catch (_: Exception) { 
         } 
+    } 
+    
+    fun recordQuizResult(id: String, score: Int, isPassed: Boolean) { 
+        val stories = getStories().map { story -> 
+            if (story.id == id) { 
+                val bestScore = maxOf(story.quizScore ?: 0, score) 
+                val nowPassed = story.isPassed || isPassed 
+                story.copy(quizScore = bestScore, isPassed = nowPassed) 
+            } else { 
+                story 
+            } 
+        } 
+        saveList(stories) 
+    } 
+    
+    fun getPassedStoriesCount(): Int { 
+        return getStories().count { it.isPassed } 
     } 
     
     fun getTotalStorageBytes(): Long { 
@@ -256,6 +277,8 @@ class ReadingHistoryManager(private val context: Context) {
                     } 
                     put("questions", qArray) 
                     put("isPinned", story.isPinned) 
+                    if (story.quizScore != null) put("quizScore", story.quizScore) 
+                    put("isPassed", story.isPassed) 
                     
                     if (story.furiganaContent != null) put("furiganaContent", story.furiganaContent) 
                     if (story.theme != null) put("theme", story.theme) 

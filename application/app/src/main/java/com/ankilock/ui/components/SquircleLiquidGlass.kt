@@ -306,6 +306,40 @@ fun Squircle3DButton(
                 ) 
             } 
             
+            if (hasSweepingShine && enabled) { 
+                val infiniteTransition = rememberInfiniteTransition(label = "shineTransition") 
+                val shineOffset by infiniteTransition.animateFloat( 
+                    initialValue = -1f, 
+                    targetValue = 2f, 
+                    animationSpec = infiniteRepeatable( 
+                        animation = tween(2400, easing = LinearEasing), 
+                        repeatMode = RepeatMode.Restart 
+                    ), 
+                    label = "shineOffset" 
+                ) 
+                Box( 
+                    modifier = Modifier 
+                        .matchParentSize() 
+                        .clip(shape) 
+                        .drawWithContent { 
+                            drawContent() 
+                            val width = size.width 
+                            val startX = shineOffset * width 
+                            drawRect( 
+                                brush = Brush.horizontalGradient( 
+                                    colors = listOf( 
+                                        Color.Transparent, 
+                                        Color.White.copy(alpha = 0.28f), 
+                                        Color.Transparent 
+                                    ), 
+                                    startX = startX, 
+                                    endX = startX + width * 0.45f 
+                                ) 
+                            ) 
+                        } 
+                ) 
+            } 
+            
             overlayContent?.invoke(this) 
             
             Box( 

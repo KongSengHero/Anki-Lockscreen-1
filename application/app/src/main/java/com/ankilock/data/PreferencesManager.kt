@@ -368,6 +368,43 @@ class PreferencesManager(context: Context) {
         get() = prefs.getStringSet(KEY_COMPLETED_STORIES, emptySet()) ?: emptySet() 
         set(value) = prefs.edit().putStringSet(KEY_COMPLETED_STORIES, value).apply() 
     
+    var passedStoryIds: Set<String> 
+        get() = prefs.getStringSet(KEY_PASSED_STORIES, emptySet()) ?: emptySet() 
+        set(value) = prefs.edit().putStringSet(KEY_PASSED_STORIES, value).apply() 
+    
+    fun markStoryPassed(storyId: String) { 
+        val set = passedStoryIds.toMutableSet() 
+        set.add(storyId) 
+        passedStoryIds = set 
+        recordStoryTestPassed() 
+    } 
+    
+    var storyDailyEnergyRemaining: Int 
+        get() { 
+            checkAndResetDailyEnergy() 
+            return prefs.getInt(KEY_DAILY_STORY_ENERGY_REMAINING, MAX_DAILY_STORY_ENERGY) 
+        } 
+        set(value) = prefs.edit().putInt(KEY_DAILY_STORY_ENERGY_REMAINING, value).apply() 
+    
+    fun checkAndResetDailyEnergy() { 
+        val today = getTodayDateString() 
+        val recordedDate = prefs.getString(KEY_DAILY_STORY_ENERGY_DATE, "") ?: "" 
+        if (recordedDate != today) { 
+            prefs.edit() 
+                .putString(KEY_DAILY_STORY_ENERGY_DATE, today) 
+                .putInt(KEY_DAILY_STORY_ENERGY_REMAINING, MAX_DAILY_STORY_ENERGY) 
+                .apply() 
+        } 
+    } 
+    
+    fun consumeDailyStoryEnergy(): Boolean { 
+        checkAndResetDailyEnergy() 
+        val current = storyDailyEnergyRemaining 
+        if (current <= 0) return false 
+        storyDailyEnergyRemaining = current - 1 
+        return true 
+    } 
+    
     var storyLanguage: String 
         get() = prefs.getString(KEY_STORY_LANGUAGE, "ja") ?: "ja" 
         set(value) = prefs.edit().putString(KEY_STORY_LANGUAGE, value).apply() 
@@ -605,6 +642,22 @@ class PreferencesManager(context: Context) {
         evaluateDailyStreak() 
     } 
     
+    fun recordStoryTestPassed() { 
+        checkAndResetDailyProgress() 
+        val today = getTodayDateString() 
+        val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
+        if (lastStreakDate != today) { 
+            val yesterday = getYesterdayDateString() 
+            val currentStreak = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
+            val newStreak = if (lastStreakDate == yesterday) currentStreak + 1 else 1 
+            prefs.edit() 
+                .putInt(KEY_DAILY_STREAK_COUNT, newStreak) 
+                .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
+                .putBoolean(KEY_TODAY_STORY_COMPLETED, true) 
+                .apply() 
+        } 
+    } 
+    
     fun evaluateDailyStreak() { 
         val today = getTodayDateString() 
         val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
@@ -828,6 +881,10 @@ class PreferencesManager(context: Context) {
         private const val KEY_STORY_LEVEL = "story_level" 
         private const val KEY_STORY_LENGTH = "story_length" 
         private const val KEY_COMPLETED_STORIES = "completed_stories" 
+        private const val KEY_PASSED_STORIES = "passed_stories" 
+        private const val KEY_DAILY_STORY_ENERGY_DATE = "daily_story_energy_date" 
+        private const val KEY_DAILY_STORY_ENERGY_REMAINING = "daily_story_energy_remaining" 
+        const val MAX_DAILY_STORY_ENERGY = 7 
         private const val KEY_STORY_LANGUAGE = "story_language" 
         private const val KEY_STORY_PAGE_PREFIX = "story_page_" 
         private const val KEY_STORY_FRACTION_PREFIX = "story_fraction_" 

@@ -385,9 +385,7 @@ class MainActivity : ComponentActivity() {
         streakCount: Int, 
         isStreakActive: Boolean, 
         completedStoriesCount: Int, 
-        dueCardsCount: Int, 
-        isRefreshing: Boolean, 
-        onRefresh: () -> Unit, 
+        storyEnergy: Int, 
         modifier: Modifier = Modifier 
     ) { 
         Box( 
@@ -460,7 +458,7 @@ class MainActivity : ComponentActivity() {
                         ) { 
                             Icon( 
                                 imageVector = Icons.AutoMirrored.Filled.MenuBook, 
-                                contentDescription = "Stories Completed", 
+                                contentDescription = "Stories Passed", 
                                 tint = BlossomColors.MatchaSage, 
                                 modifier = Modifier.size(13.dp) 
                             ) 
@@ -485,36 +483,16 @@ class MainActivity : ComponentActivity() {
                         ) { 
                             Icon( 
                                 imageVector = Icons.Default.Bolt, 
-                                contentDescription = "Cards Due", 
+                                contentDescription = "Daily Energy", 
                                 tint = BlossomColors.SlateBlue, 
                                 modifier = Modifier.size(14.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(4.dp)) 
                             Text( 
-                                text = "$dueCardsCount", 
+                                text = "$storyEnergy", 
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
                                 color = BlossomColors.TextPrimary 
-                            ) 
-                        } 
-                    } 
-                    
-                    IconButton( 
-                        onClick = onRefresh, 
-                        modifier = Modifier.size(32.dp) 
-                    ) { 
-                        if (isRefreshing) { 
-                            androidx.compose.material3.CircularProgressIndicator( 
-                                modifier = Modifier.size(16.dp), 
-                                color = BlossomColors.SlateBlue, 
-                                strokeWidth = 2.dp 
-                            ) 
-                        } else { 
-                            Icon( 
-                                imageVector = Icons.Default.Refresh, 
-                                contentDescription = "Refresh", 
-                                tint = BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(17.dp) 
                             ) 
                         } 
                     } 
@@ -530,11 +508,11 @@ class MainActivity : ComponentActivity() {
         var selectedBlossomTab by remember { mutableStateOf(BlossomTab.CARDS) } 
         val pagerState = rememberPagerState(initialPage = selectedBlossomTab.ordinal) { tabs.size } 
         var showAiConfigDialog by remember { mutableStateOf(false) } 
-        var isRefreshing by remember { mutableStateOf(false) } 
         var stats by remember { mutableStateOf(CardSessionManager.currentStats) } 
         var streakCount by remember { mutableIntStateOf(prefs.dailyStreakCount) } 
         var isStreakActive by remember { mutableStateOf(prefs.isStreakCompletedToday) } 
-        var completedStoriesCount by remember { mutableIntStateOf(prefs.completedStoryIds.size) } 
+        var completedStoriesCount by remember { mutableIntStateOf(prefs.passedStoryIds.size) } 
+        var storyEnergy by remember { mutableIntStateOf(prefs.storyDailyEnergyRemaining) } 
         var jishoTargetQuery by remember { mutableStateOf("") } 
         val coroutineScope = androidx.compose.runtime.rememberCoroutineScope() 
         
@@ -551,7 +529,8 @@ class MainActivity : ComponentActivity() {
                 stats = CardSessionManager.currentStats 
                 streakCount = prefs.dailyStreakCount 
                 isStreakActive = prefs.isStreakCompletedToday 
-                completedStoriesCount = prefs.completedStoryIds.size 
+                completedStoriesCount = prefs.passedStoryIds.size 
+                storyEnergy = prefs.storyDailyEnergyRemaining 
             } 
             CardSessionManager.addListener(listener) 
             onDispose { 
@@ -603,6 +582,12 @@ class MainActivity : ComponentActivity() {
                                 coroutineScope.launch { 
                                     pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
                                 } 
+                            }, 
+                            onTopBarStatsChanged = { 
+                                streakCount = prefs.dailyStreakCount 
+                                isStreakActive = prefs.isStreakCompletedToday 
+                                completedStoriesCount = prefs.passedStoryIds.size 
+                                storyEnergy = prefs.storyDailyEnergyRemaining 
                             } 
                         ) 
                         BlossomTab.JISHO -> com.ankilock.ui.jisho.JishoScreen( 
@@ -622,20 +607,7 @@ class MainActivity : ComponentActivity() {
                         streakCount = streakCount, 
                         isStreakActive = isStreakActive, 
                         completedStoriesCount = completedStoriesCount, 
-                        dueCardsCount = if (prefs.selectedDeckIds.isEmpty()) 0 else if (stats.first + stats.second + stats.third > 0) (stats.first + stats.second + stats.third) else decksState.filter { it.id.toString() in prefs.selectedDeckIds }.sumOf { it.totalDue }, 
-                        isRefreshing = isRefreshing, 
-                        onRefresh = { 
-                            coroutineScope.launch { 
-                                isRefreshing = true 
-                                refreshData() 
-                                CardSessionManager.refresh(this@MainActivity) 
-                                stats = CardSessionManager.currentStats 
-                                streakCount = prefs.dailyStreakCount 
-                                isStreakActive = prefs.isStreakCompletedToday 
-                                completedStoriesCount = prefs.completedStoryIds.size 
-                                isRefreshing = false 
-                            } 
-                        }, 
+                        storyEnergy = storyEnergy, 
                         modifier = Modifier.align(Alignment.TopCenter) 
                     ) 
                 } 

@@ -72,7 +72,8 @@ fun ComprehensionQuizOverlay(
     isQuizCompleted: Boolean = false, 
     onQuizCompletedChange: (Boolean) -> Unit = {}, 
     onDismiss: () -> Unit, 
-    onNavigateToJisho: (String) -> Unit = {} 
+    onNavigateToJisho: (String) -> Unit = {}, 
+    onQuizSubmitted: (score: Int, isPassed: Boolean) -> Unit = { _, _ -> } 
 ) { 
     if (questions.isEmpty()) return 
     
@@ -113,15 +114,18 @@ fun ComprehensionQuizOverlay(
                             verticalAlignment = Alignment.CenterVertically, 
                             horizontalArrangement = Arrangement.SpaceBetween 
                         ) { 
-                            IconButton( 
+                            Squircle3DButton( 
                                 onClick = onDismiss, 
                                 modifier = Modifier 
-                                    .size(38.dp) 
-                                    .clip(CircleShape) 
-                                    .background(BlossomColors.SurfaceElevated) 
+                                    .width(54.dp) 
+                                    .height(46.dp), 
+                                containerColor = BlossomColors.SurfaceElevated, 
+                                bevelColor = BlossomColors.CardBorder, 
+                                contentColor = BlossomColors.TextPrimary, 
+                                shape = BlossomShapes.SquircleMedium 
                             ) { 
                                 Icon( 
-                                    Icons.Filled.Close, 
+                                    imageVector = Icons.Filled.Close, 
                                     contentDescription = "Close Quiz", 
                                     tint = BlossomColors.TextPrimary, 
                                     modifier = Modifier.size(20.dp) 
@@ -144,22 +148,25 @@ fun ComprehensionQuizOverlay(
                                 } 
                             } 
                             
-                            IconButton( 
+                            Squircle3DButton( 
                                 onClick = { 
                                     userAnswers.clear() 
                                     onCurrentIndexChange(0) 
                                     onQuizCompletedChange(false) 
                                 }, 
                                 modifier = Modifier 
-                                    .size(38.dp) 
-                                    .clip(CircleShape) 
-                                    .background(BlossomColors.SurfaceElevated) 
+                                    .width(54.dp) 
+                                    .height(46.dp), 
+                                containerColor = BlossomColors.SurfaceElevated, 
+                                bevelColor = BlossomColors.CardBorder, 
+                                contentColor = BlossomColors.TextPrimary, 
+                                shape = BlossomShapes.SquircleMedium 
                             ) { 
                                 Icon( 
-                                    Icons.Filled.Refresh, 
+                                    imageVector = Icons.Filled.Refresh, 
                                     contentDescription = "Restart", 
-                                    tint = BlossomColors.TextSecondary, 
-                                    modifier = Modifier.size(18.dp) 
+                                    tint = BlossomColors.TextPrimary, 
+                                    modifier = Modifier.size(20.dp) 
                                 ) 
                             } 
                         } 
@@ -529,6 +536,11 @@ fun ComprehensionQuizOverlay(
                                         if (!isFinalQuestion) { 
                                             onCurrentIndexChange(currentIndex + 1) 
                                         } else { 
+                                            val correctCount = questions.count { userAnswers[it.id] == it.correctOptionIndex } 
+                                            val totalQuestions = questions.size 
+                                            val percent = if (totalQuestions > 0) (correctCount * 100) / totalQuestions else 0 
+                                            val isPassed = percent >= 80 
+                                            onQuizSubmitted(percent, isPassed) 
                                             onQuizCompletedChange(true) 
                                         } 
                                     }, 

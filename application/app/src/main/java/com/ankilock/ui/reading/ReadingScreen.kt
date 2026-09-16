@@ -194,7 +194,8 @@ fun ReadingScreen(
     hasAnkiPermission: Boolean, 
     openHistoryTrigger: Int = 0, 
     onHistoryTriggerConsumed: () -> Unit = {}, 
-    onNavigateToJisho: (String) -> Unit = {} 
+    onNavigateToJisho: (String) -> Unit = {}, 
+    onTopBarStatsChanged: () -> Unit = {} 
 ) { 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -375,6 +376,10 @@ fun ReadingScreen(
     
     fun executeGeneration() { 
         coroutineScope.launch { 
+            if (prefs.storyDailyEnergyRemaining <= 0) { 
+                generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
+                return@launch 
+            } 
             isGeneratingStory = true 
             generationError = null 
             
@@ -433,6 +438,8 @@ fun ReadingScreen(
                 currentStory = enrichedStory 
                 historyManager.saveStory(enrichedStory) 
                 savedStories = historyManager.getStories() 
+                prefs.consumeDailyStoryEnergy() 
+                onTopBarStatsChanged() 
             }.onFailure { err -> 
                 generationError = err.message ?: "Failed to generate story" 
             } 
@@ -1619,6 +1626,8 @@ fun ReadingScreen(
                     showApiKeyDialog = true 
                 } else if (!prefs.hasAcceptedInternetDisclosure) { 
                     showInternetConsentDialog = true 
+                } else if (prefs.storyDailyEnergyRemaining <= 0) { 
+                    generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
                 } else { 
                     executeGeneration() 
                 } 
@@ -1630,7 +1639,8 @@ fun ReadingScreen(
             containerColor = buttonBackground, 
             bevelColor = buttonBevel, 
             shape = BlossomShapes.SquircleMedium, 
-            depth = 3.dp 
+            depth = 3.dp, 
+            hasSweepingShine = !isLockedWithoutKey && !isGeneratingStory 
         ) { 
             AnimatedContent( 
                 targetState = when { 
@@ -1695,7 +1705,7 @@ fun ReadingScreen(
                             ) 
                             Spacer(modifier = Modifier.width(8.dp)) 
                             Text( 
-                                text = if (currentStory == null) "Generate $selectedJlpt Story" else "Generate Another Story", 
+                                text = if (currentStory == null) "Generate $selectedJlpt Story (${prefs.storyDailyEnergyRemaining}/7)" else "Generate Another Story (${prefs.storyDailyEnergyRemaining}/7)", 
                                 fontWeight = FontWeight.SemiBold, 
                                 fontSize = 15.sp, 
                                 color = BlossomColors.BlossomWhite, 
@@ -1833,10 +1843,12 @@ fun ReadingScreen(
                                 }, 
                                 modifier = Modifier 
                                     .fillMaxWidth() 
-                                    .height(115.dp), 
+                                    .height(135.dp), 
                                 shape = RoundedCornerShape(16.dp), 
                                 containerColor = BlossomColors.SurfaceElevated, 
-                                borderBrush = androidx.compose.ui.graphics.SolidColor(BlossomColors.CardBorder), 
+                                borderBrush = androidx.compose.ui.graphics.SolidColor( 
+                                    if (item.isPassed) BlossomColors.BlossomGreen else BlossomColors.CardBorder 
+                                ), 
                                 depth = 3.dp 
                             ) { 
                                 Box(modifier = Modifier.fillMaxSize()) { 
@@ -1888,6 +1900,24 @@ fun ReadingScreen(
                                                         softWrap = false, 
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
                                                     ) 
+                                                } 
+                                                if (item.isPassed) { 
+                                                    Spacer(modifier = Modifier.width(6.dp)) 
+                                                    Surface( 
+                                                        shape = RoundedCornerShape(6.dp), 
+                                                        color = BlossomColors.BlossomGreenSurface, 
+                                                        border = BorderStroke(1.dp, BlossomColors.BlossomGreen.copy(alpha = 0.5f)) 
+                                                    ) { 
+                                                        Text( 
+                                                            text = if (item.quizScore != null) "Passed (${item.quizScore}%)" else "Passed", 
+                                                            fontSize = 10.sp, 
+                                                            fontWeight = FontWeight.Bold, 
+                                                            color = BlossomColors.BlossomGreen, 
+                                                            maxLines = 1, 
+                                                            softWrap = false, 
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                                        ) 
+                                                    } 
                                                 } 
                                                 if (!item.theme.isNullOrBlank()) { 
                                                     Spacer(modifier = Modifier.width(6.dp)) 
@@ -2222,7 +2252,19 @@ fun ReadingScreen(
                 showQuizOverlay = false 
                 onNavigateToJisho(word) 
             }, 
-            onDismiss = { showQuizOverlay = false } 
+            onDismiss = { showQuizOverlay = false }, 
+            onQuizSubmitted = { score, isPassed -> 
+                val story = currentStory 
+                if (story != null) { 
+                    historyManager.recordQuizResult(story.id, score, isPassed) 
+                    if (isPassed) { 
+                        prefs.markStoryPassed(story.id) 
+                    } 
+                    currentStory = story.copy(quizScore = score, isPassed = story.isPassed || isPassed) 
+                    savedStories = historyManager.getStories() 
+                    onTopBarStatsChanged() 
+                } 
+            } 
         ) 
     } 
     
