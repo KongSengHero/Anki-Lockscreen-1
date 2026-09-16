@@ -63,6 +63,7 @@ import com.ankilock.data.StoryWordItem
 import com.ankilock.translation.TranslationResult
 import com.ankilock.translation.TranslatorService
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.blossom.BlossomShapes
 import com.ankilock.ui.blossom.story.RubySegment 
 import com.ankilock.ui.blossom.story.StoryTokenizer 
 import com.ankilock.ui.components.Squircle3DButton
@@ -419,8 +420,9 @@ fun TranslationBottomSheet(
                         } 
                     } 
                 }, 
-                shape = RoundedCornerShape(12.dp), 
+                shape = BlossomShapes.SquircleMedium, 
                 containerColor = BlossomColors.SakuraRose, 
+                bevelColor = BlossomColors.SakuraRoseLip, 
                 depth = 3.dp, 
                 modifier = Modifier 
                     .fillMaxWidth() 

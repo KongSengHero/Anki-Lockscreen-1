@@ -198,34 +198,25 @@ fun Squircle3DButton(
     overlayContent: (@Composable BoxScope.() -> Unit)? = null, 
     content: @Composable BoxScope.() -> Unit 
 ) { 
-    val context = LocalContext.current 
     val view = LocalView.current 
-    val coroutineScope = rememberCoroutineScope() 
     val interactionSource = remember { MutableInteractionSource() } 
     val isPressed by interactionSource.collectIsPressedAsState() 
-    var isManuallyPressed by remember { mutableStateOf(false) } 
     
-    val defaultBorderColor = containerColor.copy( 
-        red = (containerColor.red * 0.72f).coerceIn(0f, 1f), 
-        green = (containerColor.green * 0.72f).coerceIn(0f, 1f), 
-        blue = (containerColor.blue * 0.72f).coerceIn(0f, 1f), 
+    val actualBevelColor = bevelColor ?: containerColor.copy( 
+        red = (containerColor.red * 0.65f).coerceIn(0f, 1f), 
+        green = (containerColor.green * 0.65f).coerceIn(0f, 1f), 
+        blue = (containerColor.blue * 0.65f).coerceIn(0f, 1f), 
         alpha = 1f 
     ) 
-    val effectiveBorderColor = when { 
-        borderBrush is androidx.compose.ui.graphics.SolidColor -> borderBrush.value 
-        else -> defaultBorderColor 
+    val effectiveBorderColor = if (enabled) { 
+        Color.White.copy(alpha = 0.22f) 
+    } else { 
+        Color.White.copy(alpha = 0.08f) 
     } 
-    val defaultBevelColor = containerColor.copy( 
-        red = (containerColor.red * 0.58f).coerceIn(0f, 1f), 
-        green = (containerColor.green * 0.58f).coerceIn(0f, 1f), 
-        blue = (containerColor.blue * 0.58f).coerceIn(0f, 1f), 
-        alpha = 1f 
-    ) 
-    val actualBevelColor = bevelColor ?: defaultBevelColor 
+    val faceColor = if (enabled) containerColor else containerColor.copy(alpha = 0.35f) 
     
-    val isVisualPressed = (isPressed || isManuallyPressed) && enabled 
     val currentOffset by animateDpAsState( 
-        targetValue = if (isVisualPressed) depth else 0.dp, 
+        targetValue = if (isPressed && enabled) depth else 0.dp, 
         animationSpec = spring( 
             dampingRatio = Spring.DampingRatioMediumBouncy, 
             stiffness = Spring.StiffnessMedium 
@@ -234,37 +225,14 @@ fun Squircle3DButton(
     ) 
     
     Box( 
-        modifier = Modifier 
-            .defaultMinSize(minHeight = 44.dp) 
-            .then(modifier) 
+        modifier = modifier 
             .clickable( 
                 interactionSource = interactionSource, 
                 indication = null, 
-                enabled = enabled && !isManuallyPressed 
+                enabled = enabled 
             ) { 
-                coroutineScope.launch { 
-                    isManuallyPressed = true 
-                    try { 
-                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM) 
-                    } catch (_: Exception) { 
-                    } 
-                    try { 
-                        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator 
-                        if (vibrator != null && vibrator.hasVibrator()) { 
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
-                                vibrator.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)) 
-                            } else { 
-                                @Suppress("DEPRECATION") 
-                                vibrator.vibrate(35) 
-                            } 
-                        } 
-                    } catch (_: Exception) { 
-                    } 
-                    delay(120) 
-                    isManuallyPressed = false 
-                    delay(50) 
-                    onClick() 
-                } 
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) 
+                onClick() 
             } 
     ) { 
         Box( 
@@ -275,50 +243,29 @@ fun Squircle3DButton(
                 .then( 
                     if (bevelBrush != null) { 
                         Modifier.background(bevelBrush) 
-                    } else if (borderBrush != null && borderBrush !is androidx.compose.ui.graphics.SolidColor) { 
-                        Modifier.background(borderBrush) 
                     } else { 
                         Modifier.background(if (enabled) actualBevelColor else actualBevelColor.copy(alpha = 0.35f)) 
                     } 
                 ) 
         ) 
         
-        val faceBrush = containerBrush ?: if (enabled) { 
-            Brush.verticalGradient( 
-                colors = listOf( 
-                    containerColor.copy( 
-                        red = (containerColor.red + (1f - containerColor.red) * 0.16f).coerceIn(0f, 1f), 
-                        green = (containerColor.green + (1f - containerColor.green) * 0.16f).coerceIn(0f, 1f), 
-                        blue = (containerColor.blue + (1f - containerColor.blue) * 0.16f).coerceIn(0f, 1f), 
-                        alpha = 1f 
-                    ), 
-                    containerColor.copy(alpha = 1f) 
-                ) 
-            ) 
-        } else { 
-            Brush.verticalGradient( 
-                listOf(containerColor.copy(alpha = 0.35f), containerColor.copy(alpha = 0.35f)) 
-            ) 
-        } 
-        
         Box( 
             modifier = Modifier 
-                .fillMaxWidth() 
-                .defaultMinSize(minHeight = 44.dp) 
+                .matchParentSize() 
                 .padding(bottom = depth) 
                 .offset(y = currentOffset) 
                 .clip(shape) 
-                .background(faceBrush) 
                 .then( 
-                    if (borderBrush != null) { 
-                        Modifier.border(width = 1.dp, brush = borderBrush, shape = shape) 
+                    if (containerBrush != null) { 
+                        Modifier.background(containerBrush) 
                     } else { 
-                        Modifier.border( 
-                            width = 1.dp, 
-                            color = if (enabled) effectiveBorderColor else effectiveBorderColor.copy(alpha = 0.35f), 
-                            shape = shape 
-                        ) 
+                        Modifier.background(faceColor) 
                     } 
+                ) 
+                .border( 
+                    width = 1.dp, 
+                    color = effectiveBorderColor, 
+                    shape = shape 
                 ) 
         ) { 
             if (progressFraction != null && progressFraction > 0f) { 
@@ -331,46 +278,11 @@ fun Squircle3DButton(
                 ) 
             } 
             
-            if (hasSweepingShine && enabled) { 
-                val infiniteTransition = rememberInfiniteTransition(label = "sweepingShine") 
-                val shineTranslate by infiniteTransition.animateFloat( 
-                    initialValue = -1.2f, 
-                    targetValue = 2.4f, 
-                    animationSpec = infiniteRepeatable( 
-                        animation = tween(durationMillis = 4000, easing = LinearEasing), 
-                        repeatMode = RepeatMode.Restart 
-                    ), 
-                    label = "shineTranslate" 
-                ) 
-                Box( 
-                    modifier = Modifier 
-                        .matchParentSize() 
-                        .clip(shape) 
-                        .drawWithContent { 
-                            drawContent() 
-                            val width = size.width 
-                            val height = size.height 
-                            val xOffset = width * shineTranslate 
-                            drawRect( 
-                                brush = Brush.linearGradient( 
-                                    0.0f to Color.Transparent, 
-                                    0.40f to Color.White.copy(alpha = 0.02f), 
-                                    0.50f to Color.White.copy(alpha = 0.38f), 
-                                    0.60f to Color.White.copy(alpha = 0.02f), 
-                                    1.0f to Color.Transparent, 
-                                    start = Offset(xOffset - width * 0.35f, 0f), 
-                                    end = Offset(xOffset + width * 0.35f, height) 
-                                ) 
-                            ) 
-                        } 
-                ) 
-            } 
-            
             overlayContent?.invoke(this) 
             
             Box( 
                 modifier = Modifier 
-                    .fillMaxWidth() 
+                    .fillMaxSize() 
                     .padding(contentPadding), 
                 contentAlignment = Alignment.Center 
             ) { 

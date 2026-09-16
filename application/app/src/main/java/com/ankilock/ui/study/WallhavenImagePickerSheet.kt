@@ -847,8 +847,8 @@ fun WallhavenImagePickerSheet(
                             .width(54.dp) 
                             .height(46.dp), 
                         enabled = !isDownloading, 
-                        containerColor = BlossomColors.SurfaceCard1, 
-                        bevelColor = BlossomColors.SurfaceElevated, 
+                        containerColor = BlossomColors.SurfaceElevated, 
+                        bevelColor = BlossomColors.CardBorder, 
                         contentColor = BlossomColors.TextPrimary, 
                         shape = BlossomShapes.SquircleMedium 
                     ) { 
@@ -866,8 +866,8 @@ fun WallhavenImagePickerSheet(
                             .width(54.dp) 
                             .height(46.dp), 
                         enabled = !isDownloading, 
-                        containerColor = BlossomColors.SurfaceCard1, 
-                        bevelColor = BlossomColors.SurfaceElevated, 
+                        containerColor = BlossomColors.SurfaceElevated, 
+                        bevelColor = BlossomColors.CardBorder, 
                         contentColor = BlossomColors.TextPrimary, 
                         shape = BlossomShapes.SquircleMedium 
                     ) { 

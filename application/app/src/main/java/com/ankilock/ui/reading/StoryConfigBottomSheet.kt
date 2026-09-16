@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import com.ankilock.data.PreferencesManager 
 import com.ankilock.data.StoryThemes 
 import com.ankilock.ui.blossom.BlossomColors 
+import com.ankilock.ui.blossom.BlossomShapes 
 import com.ankilock.ui.components.GlobalSeekerContainer 
 import com.ankilock.ui.components.GlobalSeekerRow 
 import com.ankilock.ui.components.SlidingPillSwitcher 
@@ -898,8 +899,9 @@ fun StoryConfigBottomSheet(
                 modifier = Modifier 
                     .fillMaxWidth() 
                     .height(50.dp), 
-                shape = RoundedCornerShape(14.dp), 
+                shape = BlossomShapes.SquircleMedium, 
                 containerColor = BlossomColors.SakuraRose, 
+                bevelColor = BlossomColors.SakuraRoseLip, 
                 depth = 3.dp 
             ) { 
                 Text( 

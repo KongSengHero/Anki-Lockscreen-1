@@ -61,6 +61,8 @@ import androidx.compose.ui.window.Dialog
 import com.ankilock.data.PreferencesManager
 import com.ankilock.data.StoryThemes
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.blossom.BlossomShapes
+import com.ankilock.ui.components.Squircle3DButton
 
 @Composable
 fun StoryThemeConfigDialog( 
@@ -287,21 +289,21 @@ fun StoryThemeConfigDialog(
 
                 Spacer(modifier = Modifier.height(14.dp)) 
 
-                Button( 
+                Squircle3DButton( 
                     onClick = onDismiss, 
                     modifier = Modifier 
                         .fillMaxWidth() 
-                        .height(46.dp), 
-                    shape = RoundedCornerShape(14.dp), 
-                    colors = ButtonDefaults.buttonColors( 
-                        containerColor = BlossomColors.SakuraRose, 
-                        contentColor = BlossomColors.BlossomWhite 
-                    ) 
+                        .height(48.dp), 
+                    containerColor = BlossomColors.SakuraRose, 
+                    bevelColor = BlossomColors.SakuraRoseLip, 
+                    shape = BlossomShapes.SquircleMedium, 
+                    depth = 3.dp 
                 ) { 
                     Text( 
                         text = "Done", 
                         fontWeight = FontWeight.SemiBold, 
-                        fontSize = 15.sp 
+                        fontSize = 15.sp, 
+                        color = Color.White 
                     ) 
                 } 
             } 
@@ -691,28 +693,33 @@ private fun CustomStoryContent(
 
         Spacer(modifier = Modifier.height(6.dp)) 
 
-        Button( 
+        Squircle3DButton( 
             onClick = onApplyCustom, 
             modifier = Modifier 
                 .fillMaxWidth() 
                 .height(48.dp), 
-            shape = RoundedCornerShape(14.dp), 
-            colors = ButtonDefaults.buttonColors( 
-                containerColor = badgeColors.contentColor, 
-                contentColor = Color.Black 
-            ) 
+            containerColor = badgeColors.contentColor, 
+            shape = BlossomShapes.SquircleMedium, 
+            depth = 3.dp 
         ) { 
-            Icon( 
-                Icons.Filled.AutoAwesome, 
-                contentDescription = null, 
-                modifier = Modifier.size(16.dp) 
-            ) 
-            Spacer(modifier = Modifier.width(8.dp)) 
-            Text( 
-                text = "Apply & Lock for Next Stories", 
-                fontWeight = FontWeight.Bold, 
-                fontSize = 14.sp 
-            ) 
+            Row( 
+                verticalAlignment = Alignment.CenterVertically, 
+                horizontalArrangement = Arrangement.Center 
+            ) { 
+                Icon( 
+                    Icons.Filled.AutoAwesome, 
+                    contentDescription = null, 
+                    tint = Color.Black, 
+                    modifier = Modifier.size(16.dp) 
+                ) 
+                Spacer(modifier = Modifier.width(8.dp)) 
+                Text( 
+                    text = "Apply & Lock for Next Stories", 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 14.sp, 
+                    color = Color.Black 
+                ) 
+            } 
         } 
     } 
 } 

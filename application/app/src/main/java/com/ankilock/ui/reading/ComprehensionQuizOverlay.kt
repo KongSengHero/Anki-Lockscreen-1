@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankilock.data.StoryQuizQuestion
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.blossom.BlossomShapes
 import com.ankilock.ui.components.Squircle3DButton
 
 @OptIn(ExperimentalMaterial3Api::class) 
@@ -354,7 +355,8 @@ fun ComprehensionQuizOverlay(
                                         .weight(1f) 
                                         .height(50.dp), 
                                     containerColor = BlossomColors.SurfaceElevated, 
-                                    shape = RoundedCornerShape(18.dp), 
+                                    bevelColor = BlossomColors.CardBorder, 
+                                    shape = BlossomShapes.SquircleMedium, 
                                     depth = 3.dp 
                                 ) { 
                                     Text( 
@@ -371,7 +373,8 @@ fun ComprehensionQuizOverlay(
                                         .weight(1f) 
                                         .height(50.dp), 
                                     containerColor = BlossomColors.SakuraRose, 
-                                    shape = RoundedCornerShape(18.dp), 
+                                    bevelColor = BlossomColors.SakuraRoseLip, 
+                                    shape = BlossomShapes.SquircleMedium, 
                                     depth = 3.dp 
                                 ) { 
                                     Text( 
@@ -496,7 +499,8 @@ fun ComprehensionQuizOverlay(
                                             .weight(1f) 
                                             .height(50.dp), 
                                         containerColor = BlossomColors.SurfaceElevated, 
-                                        shape = RoundedCornerShape(18.dp), 
+                                        bevelColor = BlossomColors.CardBorder, 
+                                        shape = BlossomShapes.SquircleMedium, 
                                         depth = 3.dp 
                                     ) { 
                                         Row( 
@@ -533,7 +537,8 @@ fun ComprehensionQuizOverlay(
                                         .weight(if (currentIndex > 0) 1.5f else 1f) 
                                         .height(50.dp), 
                                     containerColor = nextButtonBackground, 
-                                    shape = RoundedCornerShape(18.dp), 
+                                    bevelColor = if (hasAnsweredCurrent) BlossomColors.SakuraRoseLip else BlossomColors.CardBorder, 
+                                    shape = BlossomShapes.SquircleMedium, 
                                     depth = 3.dp 
                                 ) { 
                                     Row( 

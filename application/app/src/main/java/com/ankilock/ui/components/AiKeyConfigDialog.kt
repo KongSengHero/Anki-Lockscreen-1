@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.ankilock.ai.AiServiceHelper
 import com.ankilock.data.PreferencesManager
 import com.ankilock.ui.blossom.BlossomColors
+import com.ankilock.ui.blossom.BlossomShapes
 import com.ankilock.ui.reading.FishAudioDialog 
 import com.ankilock.ui.reading.FishAudioVoiceDialog 
 import com.ankilock.ui.reading.GeminiModelDialog 
@@ -629,9 +630,10 @@ fun AiKeyConfigDialog(
                     enabled = apiKeyText.isNotBlank() && !isTesting, 
                     modifier = Modifier 
                         .weight(1f) 
-                        .height(44.dp), 
+                        .height(46.dp), 
                     containerColor = BlossomColors.SurfaceElevated, 
-                    shape = RoundedCornerShape(12.dp), 
+                    bevelColor = BlossomColors.CardBorder, 
+                    shape = BlossomShapes.SquircleMedium, 
                     depth = 3.dp 
                 ) { 
                     if (isTesting) { 
@@ -656,9 +658,10 @@ fun AiKeyConfigDialog(
                     }, 
                     modifier = Modifier 
                         .weight(1f) 
-                        .height(44.dp), 
+                        .height(46.dp), 
                     containerColor = BlossomColors.SakuraRose, 
-                    shape = RoundedCornerShape(12.dp), 
+                    bevelColor = BlossomColors.SakuraRoseLip, 
+                    shape = BlossomShapes.SquircleMedium, 
                     depth = 3.dp 
                 ) { 
                     Text("Save Key", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) 

@@ -1549,9 +1549,10 @@ fun ReadingScreen(
                                                 onClick = { showQuizOverlay = true }, 
                                                 modifier = Modifier 
                                                     .fillMaxWidth() 
-                                                    .height(52.dp), 
-                                                containerColor = BlossomColors.SakuraRose.copy(alpha = 0.85f), 
-                                                shape = RoundedCornerShape(20.dp), 
+                                                    .height(50.dp), 
+                                                containerColor = BlossomColors.SakuraRose, 
+                                                bevelColor = BlossomColors.SakuraRoseLip, 
+                                                shape = BlossomShapes.SquircleMedium, 
                                                 depth = 3.dp 
                                             ) { 
                                                 Row( 
@@ -1561,15 +1562,15 @@ fun ReadingScreen(
                                                     Icon( 
                                                         Icons.Filled.AutoAwesome, 
                                                         contentDescription = null, 
-                                                        tint = BlossomColors.BlossomWhite, 
+                                                        tint = Color.White, 
                                                         modifier = Modifier.size(18.dp) 
                                                     ) 
                                                     Spacer(modifier = Modifier.width(8.dp)) 
                                                     Text( 
-                                                        text = "Take Comprehension Quiz (${story.questions.size})", 
+                                                        text = "Take Test (${story.questions.size})", 
                                                         fontSize = 15.sp, 
                                                         fontWeight = FontWeight.SemiBold, 
-                                                        color = BlossomColors.BlossomWhite 
+                                                        color = Color.White 
                                                     ) 
                                                 } 
                                             } 
@@ -1601,28 +1602,15 @@ fun ReadingScreen(
         } 
         
         val isLockedWithoutKey = apiKey.isBlank() 
-        val generateButtonGradient = if (!isLockedWithoutKey && !isGeneratingStory) { 
-            Brush.horizontalGradient( 
-                colors = listOf( 
-                    BlossomColors.SakuraRose, 
-                    Color(0xFFFF7597) 
-                ) 
-            ) 
-        } else null 
-        val generateButtonBorderGradient = if (!isLockedWithoutKey && !isGeneratingStory) { 
-            Brush.horizontalGradient( 
-                colors = listOf( 
-                    Color(0xFFB83250), 
-                    Color(0xFFC74362) 
-                ) 
-            ) 
-        } else if (isLockedWithoutKey) { 
-            androidx.compose.ui.graphics.SolidColor(BlossomColors.BlossomRed.copy(alpha = 0.45f)) 
-        } else null 
         val buttonBackground = when { 
-            isGeneratingStory -> BlossomColors.SakuraRose.copy(alpha = 0.40f) 
             isLockedWithoutKey -> BlossomColors.SurfaceElevated 
+            isGeneratingStory -> BlossomColors.SakuraRose.copy(alpha = 0.40f) 
             else -> BlossomColors.SakuraRose 
+        } 
+        val buttonBevel = when { 
+            isLockedWithoutKey -> BlossomColors.CardBorder 
+            isGeneratingStory -> BlossomColors.SakuraRoseLip.copy(alpha = 0.40f) 
+            else -> BlossomColors.SakuraRoseLip 
         } 
         
         Squircle3DButton( 
@@ -1638,12 +1626,10 @@ fun ReadingScreen(
             enabled = !isGeneratingStory, 
             modifier = Modifier 
                 .fillMaxWidth() 
-                .height(52.dp), 
+                .height(50.dp), 
             containerColor = buttonBackground, 
-            containerBrush = generateButtonGradient, 
-            borderBrush = generateButtonBorderGradient, 
-            hasSweepingShine = false, 
-            shape = RoundedCornerShape(20.dp), 
+            bevelColor = buttonBevel, 
+            shape = BlossomShapes.SquircleMedium, 
             depth = 3.dp 
         ) { 
             AnimatedContent( 
@@ -2482,8 +2468,9 @@ private fun WordDetailBottomSheet(
                     .fillMaxWidth() 
                     .height(48.dp), 
                 containerColor = BlossomColors.SakuraRose, 
+                bevelColor = BlossomColors.SakuraRoseLip, 
                 contentColor = Color.White, 
-                shape = RoundedCornerShape(14.dp), 
+                shape = BlossomShapes.SquircleMedium, 
                 depth = 3.dp 
             ) { 
                 Row( 
