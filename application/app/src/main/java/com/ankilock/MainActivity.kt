@@ -74,6 +74,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.style.TextOverflow 
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack 
+import androidx.compose.material.icons.automirrored.filled.ArrowForward 
+import androidx.compose.ui.draw.clip 
+import androidx.compose.ui.window.Dialog 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -386,6 +390,9 @@ class MainActivity : ComponentActivity() {
         isStreakActive: Boolean, 
         completedStoriesCount: Int, 
         storyEnergy: Int, 
+        onStreakClick: () -> Unit = {}, 
+        onBookClick: () -> Unit = {}, 
+        onEnergyClick: () -> Unit = {}, 
         modifier: Modifier = Modifier 
     ) { 
         Box( 
@@ -425,7 +432,8 @@ class MainActivity : ComponentActivity() {
                     Surface( 
                         shape = BlossomShapes.SquircleSmall, 
                         color = BlossomColors.SurfaceCard1, 
-                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
+                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
+                        modifier = Modifier.clickable { onStreakClick() } 
                     ) { 
                         Row( 
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
@@ -450,7 +458,8 @@ class MainActivity : ComponentActivity() {
                     Surface( 
                         shape = BlossomShapes.SquircleSmall, 
                         color = BlossomColors.SurfaceCard1, 
-                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
+                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
+                        modifier = Modifier.clickable { onBookClick() } 
                     ) { 
                         Row( 
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
@@ -475,7 +484,8 @@ class MainActivity : ComponentActivity() {
                     Surface( 
                         shape = BlossomShapes.SquircleSmall, 
                         color = BlossomColors.SurfaceCard1, 
-                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
+                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
+                        modifier = Modifier.clickable { onEnergyClick() } 
                     ) { 
                         Row( 
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
@@ -501,6 +511,397 @@ class MainActivity : ComponentActivity() {
         } 
     } 
     
+    @Composable 
+    fun StreakCalendarDialog( 
+        streakCount: Int, 
+        isStreakActive: Boolean, 
+        activeDates: Set<String>, 
+        onDismiss: () -> Unit 
+    ) { 
+        var monthOffset by remember { mutableIntStateOf(0) } 
+        val calendar = remember(monthOffset) { 
+            val c = java.util.Calendar.getInstance() 
+            c.add(java.util.Calendar.MONTH, monthOffset) 
+            c 
+        } 
+        val todaySdf = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US) } 
+        val todayStr = remember { todaySdf.format(java.util.Date()) } 
+        val monthTitle = remember(calendar) { 
+            java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(calendar.time) 
+        } 
+        
+        val year = calendar.get(java.util.Calendar.YEAR) 
+        val month = calendar.get(java.util.Calendar.MONTH) 
+        val daysInMonth = calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH) 
+        
+        val firstDayOfWeek = remember(year, month) { 
+            val c = java.util.Calendar.getInstance() 
+            c.set(year, month, 1) 
+            val dayOfWeek = c.get(java.util.Calendar.DAY_OF_WEEK) 
+            (dayOfWeek + 5) % 7 
+        } 
+        
+        Dialog(onDismissRequest = onDismiss) { 
+            Card( 
+                shape = RoundedCornerShape(20.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column( 
+                    modifier = Modifier.padding(20.dp), 
+                    verticalArrangement = Arrangement.spacedBy(14.dp) 
+                ) { 
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Icon( 
+                                Icons.Default.LocalFireDepartment, 
+                                contentDescription = null, 
+                                tint = BlossomColors.WarmOchre, 
+                                modifier = Modifier.size(24.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(10.dp)) 
+                            Text( 
+                                text = "Daily Streak", 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 18.sp, 
+                                color = BlossomColors.TextPrimary 
+                            ) 
+                        } 
+                        
+                        Surface( 
+                            shape = BlossomShapes.SquircleSmall, 
+                            color = BlossomColors.WarmOchreContainer, 
+                            border = BorderStroke(1.dp, BlossomColors.WarmOchre.copy(alpha = 0.5f)) 
+                        ) { 
+                            Text( 
+                                text = "$streakCount Days", 
+                                fontSize = 12.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = BlossomColors.WarmOchre, 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                            ) 
+                        } 
+                    } 
+                    
+                    Surface( 
+                        shape = RoundedCornerShape(12.dp), 
+                        color = BlossomColors.SurfaceElevated, 
+                        border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
+                        modifier = Modifier.fillMaxWidth() 
+                    ) { 
+                        Row( 
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), 
+                            verticalAlignment = Alignment.CenterVertically 
+                        ) { 
+                            Icon( 
+                                imageVector = if (isStreakActive) Icons.Default.Check else Icons.Default.LocalFireDepartment, 
+                                contentDescription = null, 
+                                tint = if (isStreakActive) BlossomColors.BlossomGreen else BlossomColors.WarmOchre, 
+                                modifier = Modifier.size(16.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(8.dp)) 
+                            Text( 
+                                text = if (isStreakActive) { 
+                                    "Streak active today! Awesome work." 
+                                } else { 
+                                    "Pass a story quiz or review 10 cards to keep your streak!" 
+                                }, 
+                                fontSize = 12.sp, 
+                                color = BlossomColors.TextSecondary 
+                            ) 
+                        } 
+                    } 
+                    
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        IconButton( 
+                            onClick = { monthOffset -= 1 }, 
+                            modifier = Modifier.size(32.dp) 
+                        ) { 
+                            Icon( 
+                                Icons.AutoMirrored.Filled.ArrowBack, 
+                                contentDescription = "Previous Month", 
+                                tint = BlossomColors.TextSecondary, 
+                                modifier = Modifier.size(18.dp) 
+                            ) 
+                        } 
+                        
+                        Text( 
+                            text = monthTitle, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 14.sp, 
+                            color = BlossomColors.TextPrimary 
+                        ) 
+                        
+                        IconButton( 
+                            onClick = { if (monthOffset < 0) monthOffset += 1 }, 
+                            enabled = monthOffset < 0, 
+                            modifier = Modifier.size(32.dp) 
+                        ) { 
+                            Icon( 
+                                Icons.AutoMirrored.Filled.ArrowForward, 
+                                contentDescription = "Next Month", 
+                                tint = if (monthOffset < 0) BlossomColors.TextSecondary else BlossomColors.TextMuted.copy(alpha = 0.3f), 
+                                modifier = Modifier.size(18.dp) 
+                            ) 
+                        } 
+                    } 
+                    
+                    val dayNames = listOf("M", "T", "W", "T", "F", "S", "S") 
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        dayNames.forEach { dayName -> 
+                            Box( 
+                                modifier = Modifier.weight(1f), 
+                                contentAlignment = Alignment.Center 
+                            ) { 
+                                Text( 
+                                    text = dayName, 
+                                    fontSize = 11.sp, 
+                                    fontWeight = FontWeight.SemiBold, 
+                                    color = BlossomColors.TextMuted 
+                                ) 
+                            } 
+                        } 
+                    } 
+                    
+                    val totalCells = ((firstDayOfWeek + daysInMonth + 6) / 7) * 7 
+                    val weeks = totalCells / 7 
+                    Column( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalArrangement = Arrangement.spacedBy(4.dp) 
+                    ) { 
+                        for (week in 0 until weeks) { 
+                            Row( 
+                                modifier = Modifier.fillMaxWidth(), 
+                                horizontalArrangement = Arrangement.SpaceBetween 
+                            ) { 
+                                for (dayCol in 0 until 7) { 
+                                    val cellIndex = week * 7 + dayCol 
+                                    val dayNumber = cellIndex - firstDayOfWeek + 1 
+                                    if (dayNumber in 1..daysInMonth) { 
+                                        val dateStr = String.format(java.util.Locale.US, "%04d-%02d-%02d", year, month + 1, dayNumber) 
+                                        val isCompleted = dateStr in activeDates 
+                                        val isToday = dateStr == todayStr 
+                                        
+                                        Box( 
+                                            modifier = Modifier 
+                                                .weight(1f) 
+                                                .height(34.dp) 
+                                                .padding(2.dp) 
+                                                .clip(RoundedCornerShape(8.dp)) 
+                                                .background( 
+                                                    when { 
+                                                        isCompleted -> BlossomColors.WarmOchre 
+                                                        isToday -> BlossomColors.WarmOchre.copy(alpha = 0.15f) 
+                                                        else -> Color.Transparent 
+                                                    } 
+                                                ) 
+                                                .then( 
+                                                    if (isToday && !isCompleted) { 
+                                                        Modifier.border(1.dp, BlossomColors.WarmOchre.copy(alpha = 0.6f), RoundedCornerShape(8.dp)) 
+                                                    } else Modifier 
+                                                ), 
+                                            contentAlignment = Alignment.Center 
+                                        ) { 
+                                            Text( 
+                                                text = "$dayNumber", 
+                                                fontSize = 12.sp, 
+                                                fontWeight = if (isCompleted || isToday) FontWeight.Bold else FontWeight.Normal, 
+                                                color = when { 
+                                                    isCompleted -> BlossomColors.BlossomWhite 
+                                                    isToday -> BlossomColors.WarmOchre 
+                                                    else -> BlossomColors.TextPrimary 
+                                                } 
+                                            ) 
+                                        } 
+                                    } else { 
+                                        Spacer(modifier = Modifier.weight(1f)) 
+                                    } 
+                                } 
+                            } 
+                        } 
+                    } 
+                    
+                    Button( 
+                        onClick = onDismiss, 
+                        shape = RoundedCornerShape(12.dp), 
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = BlossomColors.WarmOchre, 
+                            contentColor = BlossomColors.BlossomWhite 
+                        ), 
+                        modifier = Modifier.fillMaxWidth(), 
+                        contentPadding = PaddingValues(vertical = 10.dp) 
+                    ) { 
+                        Text("Close", fontWeight = FontWeight.Bold) 
+                    } 
+                } 
+            } 
+        } 
+    } 
+    
+    @Composable 
+    fun MasteredStoriesInfoDialog( 
+        completedStoriesCount: Int, 
+        onDismiss: () -> Unit 
+    ) { 
+        Dialog(onDismissRequest = onDismiss) { 
+            Card( 
+                shape = RoundedCornerShape(20.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column( 
+                    modifier = Modifier.padding(22.dp), 
+                    verticalArrangement = Arrangement.spacedBy(14.dp) 
+                ) { 
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Icon( 
+                                Icons.AutoMirrored.Filled.MenuBook, 
+                                contentDescription = null, 
+                                tint = BlossomColors.MatchaSage, 
+                                modifier = Modifier.size(24.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(10.dp)) 
+                            Text( 
+                                text = "Mastered Stories", 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 18.sp, 
+                                color = BlossomColors.TextPrimary 
+                            ) 
+                        } 
+                        
+                        Surface( 
+                            shape = BlossomShapes.SquircleSmall, 
+                            color = BlossomColors.MatchaSageContainer, 
+                            border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.5f)) 
+                        ) { 
+                            Text( 
+                                text = "$completedStoriesCount Passed", 
+                                fontSize = 12.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = BlossomColors.MatchaSage, 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                            ) 
+                        } 
+                    } 
+                    
+                    Text( 
+                        text = "This counter tracks the total number of stories whose comprehension quiz you have passed with a score of 80% or higher.\n\nCompleting tests reinforces your vocabulary and reading mastery in real Japanese context. Keep reading and taking tests to expand your collection!", 
+                        fontSize = 13.sp, 
+                        color = BlossomColors.TextSecondary, 
+                        lineHeight = 20.sp 
+                    ) 
+                    
+                    Button( 
+                        onClick = onDismiss, 
+                        shape = RoundedCornerShape(12.dp), 
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = BlossomColors.MatchaSage, 
+                            contentColor = BlossomColors.BlossomWhite 
+                        ), 
+                        modifier = Modifier.fillMaxWidth(), 
+                        contentPadding = PaddingValues(vertical = 10.dp) 
+                    ) { 
+                        Text("Got It", fontWeight = FontWeight.Bold) 
+                    } 
+                } 
+            } 
+        } 
+    } 
+    
+    @Composable 
+    fun DailyEnergyInfoDialog( 
+        storyEnergy: Int, 
+        onDismiss: () -> Unit 
+    ) { 
+        Dialog(onDismissRequest = onDismiss) { 
+            Card( 
+                shape = RoundedCornerShape(20.dp), 
+                colors = CardDefaults.cardColors(containerColor = BlossomColors.SurfaceCard1), 
+                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                modifier = Modifier.fillMaxWidth() 
+            ) { 
+                Column( 
+                    modifier = Modifier.padding(22.dp), 
+                    verticalArrangement = Arrangement.spacedBy(14.dp) 
+                ) { 
+                    Row( 
+                        modifier = Modifier.fillMaxWidth(), 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.SpaceBetween 
+                    ) { 
+                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                            Icon( 
+                                Icons.Default.Bolt, 
+                                contentDescription = null, 
+                                tint = BlossomColors.SlateBlue, 
+                                modifier = Modifier.size(24.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(10.dp)) 
+                            Text( 
+                                text = "Daily Story Energy", 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 18.sp, 
+                                color = BlossomColors.TextPrimary 
+                            ) 
+                        } 
+                        
+                        Surface( 
+                            shape = BlossomShapes.SquircleSmall, 
+                            color = BlossomColors.SlateBlueContainer, 
+                            border = BorderStroke(1.dp, BlossomColors.SlateBlue.copy(alpha = 0.5f)) 
+                        ) { 
+                            Text( 
+                                text = "$storyEnergy / 7 Available", 
+                                fontSize = 12.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = BlossomColors.SlateBlue, 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                            ) 
+                        } 
+                    } 
+                    
+                    Text( 
+                        text = "You have 7 daily story energy points. Each new AI story you generate consumes 1 energy point.\n\nEnergy automatically replenishes back to 7 every day at midnight, giving you fresh story reading daily!", 
+                        fontSize = 13.sp, 
+                        color = BlossomColors.TextSecondary, 
+                        lineHeight = 20.sp 
+                    ) 
+                    
+                    Button( 
+                        onClick = onDismiss, 
+                        shape = RoundedCornerShape(12.dp), 
+                        colors = ButtonDefaults.buttonColors( 
+                            containerColor = BlossomColors.SlateBlue, 
+                            contentColor = BlossomColors.BlossomWhite 
+                        ), 
+                        modifier = Modifier.fillMaxWidth(), 
+                        contentPadding = PaddingValues(vertical = 10.dp) 
+                    ) { 
+                        Text("Got It", fontWeight = FontWeight.Bold) 
+                    } 
+                } 
+            } 
+        } 
+    }  
+    
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) 
     @Composable
     fun MainContainer() { 
@@ -508,6 +909,9 @@ class MainActivity : ComponentActivity() {
         var selectedBlossomTab by remember { mutableStateOf(BlossomTab.CARDS) } 
         val pagerState = rememberPagerState(initialPage = selectedBlossomTab.ordinal) { tabs.size } 
         var showAiConfigDialog by remember { mutableStateOf(false) } 
+        var showStreakCalendarDialog by remember { mutableStateOf(false) } 
+        var showBookInfoDialog by remember { mutableStateOf(false) } 
+        var showEnergyInfoDialog by remember { mutableStateOf(false) } 
         var stats by remember { mutableStateOf(CardSessionManager.currentStats) } 
         var streakCount by remember { mutableIntStateOf(prefs.dailyStreakCount) } 
         var isStreakActive by remember { mutableStateOf(prefs.isStreakCompletedToday) } 
@@ -608,6 +1012,9 @@ class MainActivity : ComponentActivity() {
                         isStreakActive = isStreakActive, 
                         completedStoriesCount = completedStoriesCount, 
                         storyEnergy = storyEnergy, 
+                        onStreakClick = { showStreakCalendarDialog = true }, 
+                        onBookClick = { showBookInfoDialog = true }, 
+                        onEnergyClick = { showEnergyInfoDialog = true }, 
                         modifier = Modifier.align(Alignment.TopCenter) 
                     ) 
                 } 
@@ -617,6 +1024,29 @@ class MainActivity : ComponentActivity() {
                         prefs = prefs, 
                         onDismiss = { showAiConfigDialog = false }, 
                         onSaved = { showAiConfigDialog = false } 
+                    ) 
+                } 
+                
+                if (showStreakCalendarDialog) { 
+                    StreakCalendarDialog( 
+                        streakCount = streakCount, 
+                        isStreakActive = isStreakActive, 
+                        activeDates = prefs.getActiveStreakDates(), 
+                        onDismiss = { showStreakCalendarDialog = false } 
+                    ) 
+                } 
+                
+                if (showBookInfoDialog) { 
+                    MasteredStoriesInfoDialog( 
+                        completedStoriesCount = completedStoriesCount, 
+                        onDismiss = { showBookInfoDialog = false } 
+                    ) 
+                } 
+                
+                if (showEnergyInfoDialog) { 
+                    DailyEnergyInfoDialog( 
+                        storyEnergy = storyEnergy, 
+                        onDismiss = { showEnergyInfoDialog = false } 
                     ) 
                 } 
                 

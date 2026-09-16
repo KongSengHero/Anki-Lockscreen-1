@@ -32,8 +32,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.width 
+import androidx.compose.foundation.layout.WindowInsets 
+import androidx.compose.foundation.layout.asPaddingValues 
+import androidx.compose.foundation.layout.navigationBars 
+import androidx.compose.foundation.lazy.LazyColumn 
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -1758,7 +1761,8 @@ fun ReadingScreen(
             onDismissRequest = { showHistorySheet = false }, 
             sheetState = historySheetState, 
             containerColor = BlossomColors.SurfaceCard1, 
-            contentColor = BlossomColors.TextPrimary 
+            contentColor = BlossomColors.TextPrimary, 
+            windowInsets = WindowInsets(0) 
         ) { 
             Column( 
                 modifier = Modifier 
@@ -1813,7 +1817,8 @@ fun ReadingScreen(
                             .fillMaxWidth() 
                             .weight(1f) 
                             .nestedScroll(historyNoBounceNestedScroll), 
-                        verticalArrangement = Arrangement.spacedBy(10.dp) 
+                        verticalArrangement = Arrangement.spacedBy(10.dp), 
+                        contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp) 
                     ) { 
                         items(savedStories, key = { it.id }) { item -> 
                             val itemCoverFile = remember(item.id, wallpaperUpdateTrigger) { 
@@ -1960,28 +1965,36 @@ fun ReadingScreen(
                                             ) 
                                         } 
                                         Spacer(modifier = Modifier.width(8.dp)) 
-                                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                                        Column( 
+                                            modifier = Modifier.fillMaxHeight(), 
+                                            verticalArrangement = Arrangement.SpaceBetween, 
+                                            horizontalAlignment = Alignment.End 
+                                        ) { 
                                             IconButton( 
                                                 onClick = { 
                                                     historyManager.togglePin(item.id) 
                                                     savedStories = historyManager.getStories() 
-                                                } 
+                                                }, 
+                                                modifier = Modifier.size(32.dp) 
                                             ) { 
                                                 Icon( 
                                                     if (item.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin, 
                                                     contentDescription = if (item.isPinned) "Unpin Story" else "Pin Story", 
-                                                    tint = if (item.isPinned) BlossomColors.SakuraRose else (if (itemBitmap != null) Color.White.copy(alpha = 0.75f) else BlossomColors.TextSecondary) 
+                                                    tint = if (item.isPinned) BlossomColors.SakuraRose else (if (itemBitmap != null) Color.White.copy(alpha = 0.75f) else BlossomColors.TextSecondary), 
+                                                    modifier = Modifier.size(18.dp) 
                                                 ) 
                                             } 
                                             IconButton( 
                                                 onClick = { 
                                                     storyToDelete = item 
-                                                } 
+                                                }, 
+                                                modifier = Modifier.size(32.dp) 
                                             ) { 
                                                 Icon( 
                                                     Icons.Filled.DeleteOutline, 
                                                     contentDescription = "Delete Story", 
-                                                    tint = BlossomColors.BlossomRed 
+                                                    tint = BlossomColors.BlossomRed, 
+                                                    modifier = Modifier.size(18.dp) 
                                                 ) 
                                             } 
                                         } 

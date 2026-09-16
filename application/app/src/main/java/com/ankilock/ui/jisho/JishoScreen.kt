@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.width 
+import androidx.compose.foundation.horizontalScroll 
+import androidx.compose.foundation.rememberScrollState 
+import androidx.compose.foundation.gestures.detectTapGestures 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -279,13 +281,20 @@ fun JishoScreen(
                                 verticalAlignment = Alignment.CenterVertically, 
                                 horizontalArrangement = Arrangement.SpaceBetween 
                             ) { 
-                                Text( 
-                                    text = "RECENT SEARCHES", 
-                                    fontSize = 11.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = BlossomColors.TextMuted, 
-                                    letterSpacing = 0.8.sp 
-                                ) 
+                                Surface( 
+                                    shape = RoundedCornerShape(8.dp), 
+                                    color = BlossomColors.SurfaceElevated, 
+                                    border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
+                                ) { 
+                                    Text( 
+                                        text = "RECENT SEARCHES", 
+                                        fontSize = 11.sp, 
+                                        fontWeight = FontWeight.Bold, 
+                                        color = BlossomColors.TextSecondary, 
+                                        letterSpacing = 0.8.sp, 
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                                    ) 
+                                } 
                                 TextButton( 
                                     onClick = { 
                                         prefs.clearRecentJishoSearches() 
@@ -350,43 +359,86 @@ fun JishoScreen(
                     } 
                     
                     item { 
-                        Text( 
-                            text = "SUGGESTED EXPLORATIONS", 
-                            fontSize = 11.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = BlossomColors.TextMuted, 
-                            letterSpacing = 0.8.sp, 
+                        Surface( 
+                            shape = RoundedCornerShape(8.dp), 
+                            color = BlossomColors.SurfaceElevated, 
+                            border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
                             modifier = Modifier.padding(bottom = 12.dp) 
-                        ) 
+                        ) { 
+                            Text( 
+                                text = "SUGGESTED EXPLORATIONS", 
+                                fontSize = 11.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = BlossomColors.TextSecondary, 
+                                letterSpacing = 0.8.sp, 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
+                            ) 
+                        } 
                         
                         val suggested = listOf( 
-                            "JLPT N5", "JLPT N4", "食べる", "猫", "ありがとう", 
-                            "桜", "美しい", "勉強", "友だち", "taberu", "house" 
+                            "JLPT N5", "JLPT N4", "JLPT N3", "JLPT N2", "JLPT N1", 
+                            "食べる", "飲む", "見る", "聞く", "話す", 
+                            "猫", "犬", "桜", "ありがとう", "美しい", 
+                            "勉強", "友だち", "旅行", "家族", "時間", 
+                            "仕事", "日常", "音楽", "夢", "幸せ", 
+                            "自然", "心", "空", "雨", "海" 
                         ) 
+                        val half = (suggested.size + 1) / 2 
+                        val row1 = suggested.take(half) 
+                        val row2 = suggested.drop(half) 
                         
-                        FlowRow( 
-                            horizontalArrangement = Arrangement.spacedBy(8.dp), 
-                            verticalArrangement = Arrangement.spacedBy(8.dp), 
-                            modifier = Modifier.fillMaxWidth() 
+                        Column( 
+                            modifier = Modifier 
+                                .fillMaxWidth() 
+                                .horizontalScroll(rememberScrollState()), 
+                            verticalArrangement = Arrangement.spacedBy(8.dp) 
                         ) { 
-                            suggested.forEach { term -> 
-                                Surface( 
-                                    shape = RoundedCornerShape(16.dp), 
-                                    color = BlossomColors.MatchaSageContainer.copy(alpha = 0.5f), 
-                                    border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.35f)), 
-                                    modifier = Modifier.clickable { 
-                                        query = term 
-                                        keyboardController?.hide() 
-                                        executeSearch(term) 
+                            Row( 
+                                horizontalArrangement = Arrangement.spacedBy(8.dp) 
+                            ) { 
+                                row1.forEach { term -> 
+                                    Surface( 
+                                        shape = RoundedCornerShape(16.dp), 
+                                        color = BlossomColors.MatchaSageContainer.copy(alpha = 0.5f), 
+                                        border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.35f)), 
+                                        modifier = Modifier.clickable { 
+                                            query = term 
+                                            keyboardController?.hide() 
+                                            executeSearch(term) 
+                                        } 
+                                    ) { 
+                                        Text( 
+                                            text = term, 
+                                            fontSize = 13.sp, 
+                                            fontWeight = FontWeight.Medium, 
+                                            color = BlossomColors.MatchaSage, 
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp) 
+                                        ) 
                                     } 
-                                ) { 
-                                    Text( 
-                                        text = term, 
-                                        fontSize = 13.sp, 
-                                        fontWeight = FontWeight.Medium, 
-                                        color = BlossomColors.MatchaSage, 
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp) 
-                                    ) 
+                                } 
+                            } 
+                            Row( 
+                                horizontalArrangement = Arrangement.spacedBy(8.dp) 
+                            ) { 
+                                row2.forEach { term -> 
+                                    Surface( 
+                                        shape = RoundedCornerShape(16.dp), 
+                                        color = BlossomColors.MatchaSageContainer.copy(alpha = 0.5f), 
+                                        border = BorderStroke(1.dp, BlossomColors.MatchaSage.copy(alpha = 0.35f)), 
+                                        modifier = Modifier.clickable { 
+                                            query = term 
+                                            keyboardController?.hide() 
+                                            executeSearch(term) 
+                                        } 
+                                    ) { 
+                                        Text( 
+                                            text = term, 
+                                            fontSize = 13.sp, 
+                                            fontWeight = FontWeight.Medium, 
+                                            color = BlossomColors.MatchaSage, 
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp) 
+                                        ) 
+                                    } 
                                 } 
                             } 
                         } 

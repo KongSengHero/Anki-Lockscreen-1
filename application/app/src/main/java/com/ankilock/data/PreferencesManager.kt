@@ -642,9 +642,42 @@ class PreferencesManager(context: Context) {
         evaluateDailyStreak() 
     } 
     
+    var streakCompletedDates: Set<String> 
+        get() = prefs.getStringSet(KEY_STREAK_COMPLETED_DATES, emptySet()) ?: emptySet() 
+        set(value) = prefs.edit().putStringSet(KEY_STREAK_COMPLETED_DATES, value).apply() 
+    
+    fun addStreakCompletedDate(date: String) { 
+        val current = streakCompletedDates.toMutableSet() 
+        current.add(date) 
+        streakCompletedDates = current 
+    } 
+    
+    fun getActiveStreakDates(): Set<String> { 
+        val result = streakCompletedDates.toMutableSet() 
+        val count = dailyStreakCount 
+        val lastDate = lastCompletedStreakDate 
+        if (count > 0 && lastDate.isNotEmpty()) { 
+            try { 
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US) 
+                val cal = java.util.Calendar.getInstance() 
+                val date = sdf.parse(lastDate) 
+                if (date != null) { 
+                    cal.time = date 
+                    for (i in 0 until count) { 
+                        result.add(sdf.format(cal.time)) 
+                        cal.add(java.util.Calendar.DAY_OF_YEAR, -1) 
+                    } 
+                } 
+            } catch (e: Exception) { 
+            } 
+        } 
+        return result 
+    } 
+    
     fun recordStoryTestPassed() { 
         checkAndResetDailyProgress() 
         val today = getTodayDateString() 
+        addStreakCompletedDate(today) 
         val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
         if (lastStreakDate != today) { 
             val yesterday = getYesterdayDateString() 
@@ -664,14 +697,17 @@ class PreferencesManager(context: Context) {
         val learnedCards = prefs.getInt(KEY_TODAY_LEARNED_CARDS_COUNT, 0) 
         val storyDone = prefs.getBoolean(KEY_TODAY_STORY_COMPLETED, false) 
         val qualifies = learnedCards >= 10 || storyDone 
-        if (qualifies && lastStreakDate != today) { 
-            val yesterday = getYesterdayDateString() 
-            val currentStreak = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
-            val newStreak = if (lastStreakDate == yesterday) currentStreak + 1 else 1 
-            prefs.edit() 
-                .putInt(KEY_DAILY_STREAK_COUNT, newStreak) 
-                .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
-                .apply() 
+        if (qualifies) { 
+            addStreakCompletedDate(today) 
+            if (lastStreakDate != today) { 
+                val yesterday = getYesterdayDateString() 
+                val currentStreak = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
+                val newStreak = if (lastStreakDate == yesterday) currentStreak + 1 else 1 
+                prefs.edit() 
+                    .putInt(KEY_DAILY_STREAK_COUNT, newStreak) 
+                    .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
+                    .apply() 
+            } 
         } 
     } 
     
@@ -847,6 +883,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_RECENT_JISHO_SEARCHES = "recent_jisho_searches" 
         private const val KEY_DAILY_STREAK_COUNT = "daily_streak_count" 
         private const val KEY_LAST_COMPLETED_STREAK_DATE = "last_completed_streak_date" 
+        private const val KEY_STREAK_COMPLETED_DATES = "streak_completed_dates" 
         private const val KEY_TODAY_LEARNED_CARDS_COUNT = "today_learned_cards_count" 
         private const val KEY_TODAY_STORY_COMPLETED = "today_story_completed" 
         private const val KEY_TODAY_PROGRESS_DATE = "today_progress_date" 

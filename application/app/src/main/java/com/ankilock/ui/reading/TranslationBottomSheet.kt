@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.KeyboardArrowDown 
+import androidx.compose.material.icons.filled.KeyboardArrowUp 
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Search 
+import androidx.compose.ui.text.style.TextOverflow 
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -85,6 +89,7 @@ fun TranslationBottomSheet(
     val translatorService = remember(context) { TranslatorService(context) } 
     val ttsHelper = remember { JapaneseTtsHelper(context) } 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    var isJapaneseMinimized by remember { mutableStateOf(false) } 
     
     val rubySegments = remember(sourceText, furiganaSource, targetWords) { 
         val clean = sourceText.trim() 
@@ -290,26 +295,57 @@ fun TranslationBottomSheet(
                                         modifier = Modifier.size(14.dp) 
                                     ) 
                                 } 
+
+                                Spacer(modifier = Modifier.width(6.dp)) 
+
+                                IconButton( 
+                                    onClick = { 
+                                        isJapaneseMinimized = !isJapaneseMinimized 
+                                    }, 
+                                    modifier = Modifier.size(24.dp) 
+                                ) { 
+                                    Icon( 
+                                        imageVector = if (isJapaneseMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp, 
+                                        contentDescription = if (isJapaneseMinimized) "Expand Japanese" else "Minimize Japanese", 
+                                        tint = BlossomColors.TextSecondary, 
+                                        modifier = Modifier.size(18.dp) 
+                                    ) 
+                                } 
                             } 
                         } 
 
-                        Spacer(modifier = Modifier.height(10.dp)) 
-
-                        JapaneseFuriganaDisplay( 
-                            segments = resolvedSegments, 
-                            onSegmentClick = { word -> 
-                                ttsHelper.speak(word) 
-                            } 
-                        ) 
-
-                        if (!isLoading && !result?.romaji.isNullOrBlank()) { 
-                            Spacer(modifier = Modifier.height(8.dp)) 
+                        if (isJapaneseMinimized) { 
+                            Spacer(modifier = Modifier.height(4.dp)) 
                             Text( 
-                                text = result!!.romaji, 
-                                fontSize = 13.sp, 
-                                color = BlossomColors.TextSecondary, 
-                                fontWeight = FontWeight.Normal 
+                                text = sourceText.replace("\n", " "), 
+                                fontSize = 12.sp, 
+                                color = BlossomColors.TextMuted, 
+                                maxLines = 1, 
+                                overflow = TextOverflow.Ellipsis 
                             ) 
+                        } 
+
+                        AnimatedVisibility(visible = !isJapaneseMinimized) { 
+                            Column { 
+                                Spacer(modifier = Modifier.height(10.dp)) 
+
+                                JapaneseFuriganaDisplay( 
+                                    segments = resolvedSegments, 
+                                    onSegmentClick = { word -> 
+                                        ttsHelper.speak(word) 
+                                    } 
+                                ) 
+
+                                if (!isLoading && !result?.romaji.isNullOrBlank()) { 
+                                    Spacer(modifier = Modifier.height(8.dp)) 
+                                    Text( 
+                                        text = result!!.romaji, 
+                                        fontSize = 13.sp, 
+                                        color = BlossomColors.TextSecondary, 
+                                        fontWeight = FontWeight.Normal 
+                                    ) 
+                                } 
+                            } 
                         } 
                     } 
                 } 

@@ -28,9 +28,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.layout.width 
+import androidx.compose.foundation.layout.WindowInsets 
+import androidx.compose.foundation.layout.asPaddingValues 
+import androidx.compose.foundation.layout.navigationBars 
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid 
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan 
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -256,7 +258,6 @@ fun WallhavenImagePickerSheet(
                 .fillMaxWidth() 
                 .fillMaxHeight(0.88f) 
                 .padding(horizontal = 18.dp) 
-                .navigationBarsPadding() 
         ) { 
             Row( 
                 modifier = Modifier.fillMaxWidth(), 
@@ -580,7 +581,7 @@ fun WallhavenImagePickerSheet(
                             columns = StaggeredGridCells.Fixed(2), 
                             horizontalArrangement = Arrangement.spacedBy(10.dp), 
                             verticalItemSpacing = 10.dp, 
-                            contentPadding = PaddingValues(bottom = 24.dp), 
+                            contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp), 
                             modifier = Modifier 
                                 .fillMaxSize() 
                                 .nestedScroll(noBounceNestedScroll) 
