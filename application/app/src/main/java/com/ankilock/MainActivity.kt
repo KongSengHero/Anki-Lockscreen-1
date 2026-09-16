@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1119,6 +1120,7 @@ class MainActivity : ComponentActivity() {
                 Column( 
                     modifier = Modifier 
                         .fillMaxWidth() 
+                        .fillMaxHeight(0.88f) 
                         .nestedScroll(noBounceNestedScroll) 
                         .verticalScroll(rememberScrollState()) 
                         .padding(horizontal = 20.dp) 

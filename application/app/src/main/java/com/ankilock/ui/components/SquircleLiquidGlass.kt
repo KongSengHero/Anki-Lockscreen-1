@@ -199,24 +199,46 @@ fun Squircle3DButton(
     content: @Composable BoxScope.() -> Unit 
 ) { 
     val view = LocalView.current 
+    val coroutineScope = rememberCoroutineScope() 
     val interactionSource = remember { MutableInteractionSource() } 
     val isPressed by interactionSource.collectIsPressedAsState() 
+    var isClickAnimating by remember { mutableStateOf(false) } 
+    val isVisualPressed = (isPressed || isClickAnimating) && enabled 
     
-    val actualBevelColor = bevelColor ?: containerColor.copy( 
+    val baseBevel = bevelColor ?: containerColor.copy( 
         red = (containerColor.red * 0.65f).coerceIn(0f, 1f), 
         green = (containerColor.green * 0.65f).coerceIn(0f, 1f), 
         blue = (containerColor.blue * 0.65f).coerceIn(0f, 1f), 
         alpha = 1f 
     ) 
+    val actualBevelColor = if (enabled) { 
+        baseBevel 
+    } else { 
+        baseBevel.copy( 
+            red = (baseBevel.red * 0.50f).coerceIn(0f, 1f), 
+            green = (baseBevel.green * 0.50f).coerceIn(0f, 1f), 
+            blue = (baseBevel.blue * 0.50f).coerceIn(0f, 1f), 
+            alpha = 1f 
+        ) 
+    } 
     val effectiveBorderColor = if (enabled) { 
         Color.White.copy(alpha = 0.22f) 
     } else { 
-        Color.White.copy(alpha = 0.08f) 
+        Color.Transparent 
     } 
-    val faceColor = if (enabled) containerColor else containerColor.copy(alpha = 0.35f) 
+    val faceColor = if (enabled) { 
+        containerColor 
+    } else { 
+        containerColor.copy( 
+            red = (containerColor.red * 0.50f).coerceIn(0f, 1f), 
+            green = (containerColor.green * 0.50f).coerceIn(0f, 1f), 
+            blue = (containerColor.blue * 0.50f).coerceIn(0f, 1f), 
+            alpha = 1f 
+        ) 
+    } 
     
     val currentOffset by animateDpAsState( 
-        targetValue = if (isPressed && enabled) depth else 0.dp, 
+        targetValue = if (!enabled || isVisualPressed) depth else 0.dp, 
         animationSpec = spring( 
             dampingRatio = Spring.DampingRatioMediumBouncy, 
             stiffness = Spring.StiffnessMedium 
@@ -229,10 +251,16 @@ fun Squircle3DButton(
             .clickable( 
                 interactionSource = interactionSource, 
                 indication = null, 
-                enabled = enabled 
+                enabled = enabled && !isClickAnimating 
             ) { 
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) 
-                onClick() 
+                coroutineScope.launch { 
+                    isClickAnimating = true 
+                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) 
+                    delay(120) 
+                    isClickAnimating = false 
+                    delay(70) 
+                    onClick() 
+                } 
             } 
     ) { 
         Box( 

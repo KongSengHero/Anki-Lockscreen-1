@@ -714,11 +714,11 @@ fun ReadingScreen(
                 Column( 
                     modifier = Modifier 
                         .fillMaxSize() 
-                        .padding(padding) 
                         .verticalScroll(rememberScrollState()) 
-                        .padding(horizontal = 16.dp, vertical = 10.dp), 
+                        .padding(horizontal = 16.dp), 
                     verticalArrangement = Arrangement.spacedBy(16.dp) 
                 ) { 
+                    Spacer(modifier = Modifier.height(padding.calculateTopPadding())) 
                     DisableSelection { 
                         Box( 
                             modifier = Modifier 
@@ -1753,6 +1753,7 @@ fun ReadingScreen(
             Column( 
                 modifier = Modifier 
                     .fillMaxWidth() 
+                    .fillMaxHeight(0.88f) 
                     .padding(horizontal = 20.dp, vertical = 12.dp) 
             ) { 
                 Row( 
