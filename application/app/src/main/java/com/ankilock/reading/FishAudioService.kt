@@ -331,9 +331,7 @@ class FishAudioService(private val context: Context) {
     fun setPlaybackSpeed(speed: Float) { 
         try { 
             mediaPlayer?.let { mp -> 
-                if (mp.isPlaying) { 
-                    mp.playbackParams = mp.playbackParams.setSpeed(speed) 
-                } 
+                mp.playbackParams = mp.playbackParams.setSpeed(speed) 
             } 
         } catch (_: Exception) { 
         } 
