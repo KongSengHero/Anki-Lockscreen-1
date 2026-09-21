@@ -42,14 +42,14 @@ export const FloatingActions: React.FC<FloatingActionsProps> = ({
 
   return (
     <div
-      className={`fixed top-20 right-3 z-40 transition-all duration-200 ${
+      className={`fixed top-16 right-3 z-40 transition-all duration-200 ${
         visible 
-          ? 'translate-x-0 opacity-100 pointer-events-auto' 
-          : 'translate-x-full opacity-0 pointer-events-none' 
+          ? 'translate-y-0 opacity-100 pointer-events-auto' 
+          : '-translate-y-4 opacity-0 pointer-events-none' 
       }`}
     >
       <div
-        className="flex flex-col items-center gap-1 px-1.5 py-2 rounded-[12px] shadow-2xl backdrop-blur-md"
+        className="flex flex-row items-center gap-1 px-2.5 py-1.5 rounded-[12px] shadow-2xl backdrop-blur-md"
         style={{
           backgroundColor: 'rgba(30, 34, 43, 0.92)', 
           border: '1px solid #2C3240', 
@@ -57,13 +57,45 @@ export const FloatingActions: React.FC<FloatingActionsProps> = ({
         }}
       >
         <button
-          onClick={onWallpaperClick}
-          className={`w-9 h-9 flex items-center justify-center active:scale-90 transition-all ${
-            hasWallpaper ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
-          }`}
-          title="Change Wallpaper"
+          onClick={onToggleAudio}
+          className="w-9 h-9 flex items-center justify-center active:scale-90 transition-all"
+          title="Toggle Narration"
         >
-          <ImageIcon className="w-[19px] h-[19px]" /> 
+          {isSynthesizingAudio ? (
+            <Loader2 className="w-[18px] h-[18px] animate-spin text-[#E87A90]" /> 
+          ) : (isPlayingAudio || isAudioPaused) ? (
+            <Square className="w-[18px] h-[18px] text-[#E87A90] fill-current" /> 
+          ) : (
+            <Volume2 className="w-[19px] h-[19px] text-[#9AA1AD] hover:text-[#E8EAF0]" /> 
+          )}
+        </button> 
+
+        <button
+          onClick={onOpenTranslation}
+          className="w-9 h-9 flex items-center justify-center text-[#9AA1AD] hover:text-[#E8EAF0] active:scale-90 transition-all"
+          title="Translate Story"
+        >
+          <Languages className="w-[19px] h-[19px]" /> 
+        </button> 
+
+        <button
+          onClick={onToggleFurigana}
+          className={`w-9 h-9 flex items-center justify-center font-bold text-base active:scale-90 transition-all select-none ${
+            showFurigana ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
+          }`}
+          title="Toggle Furigana"
+        >
+          ふ
+        </button> 
+
+        <button
+          onClick={onToggleHighlightVocab}
+          className={`w-9 h-9 flex items-center justify-center active:scale-90 transition-all ${
+            highlightVocab ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
+          }`}
+          title="Toggle Vocabulary Highlight"
+        >
+          <Sparkles className="w-[19px] h-[19px]" /> 
         </button> 
 
         <button
@@ -79,45 +111,13 @@ export const FloatingActions: React.FC<FloatingActionsProps> = ({
         </button> 
 
         <button
-          onClick={onToggleHighlightVocab}
+          onClick={onWallpaperClick}
           className={`w-9 h-9 flex items-center justify-center active:scale-90 transition-all ${
-            highlightVocab ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
+            hasWallpaper ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
           }`}
-          title="Toggle Vocabulary Highlight"
+          title="Change Wallpaper"
         >
-          <Sparkles className="w-[19px] h-[19px]" /> 
-        </button> 
-
-        <button
-          onClick={onToggleFurigana}
-          className={`w-9 h-9 flex items-center justify-center font-bold text-base active:scale-90 transition-all select-none ${
-            showFurigana ? 'text-[#E87A90]' : 'text-[#9AA1AD] hover:text-[#E8EAF0]' 
-          }`}
-          title="Toggle Furigana"
-        >
-          ふ
-        </button> 
-
-        <button
-          onClick={onOpenTranslation}
-          className="w-9 h-9 flex items-center justify-center text-[#9AA1AD] hover:text-[#E8EAF0] active:scale-90 transition-all"
-          title="Translate Story"
-        >
-          <Languages className="w-[19px] h-[19px]" /> 
-        </button> 
-
-        <button
-          onClick={onToggleAudio}
-          className="w-9 h-9 flex items-center justify-center active:scale-90 transition-all"
-          title="Toggle Narration"
-        >
-          {isSynthesizingAudio ? (
-            <Loader2 className="w-[18px] h-[18px] animate-spin text-[#E87A90]" /> 
-          ) : (isPlayingAudio || isAudioPaused) ? (
-            <Square className="w-[18px] h-[18px] text-[#E87A90] fill-current" /> 
-          ) : (
-            <Volume2 className="w-[19px] h-[19px] text-[#9AA1AD] hover:text-[#E8EAF0]" /> 
-          )}
+          <ImageIcon className="w-[19px] h-[19px]" /> 
         </button> 
       </div> 
     </div> 

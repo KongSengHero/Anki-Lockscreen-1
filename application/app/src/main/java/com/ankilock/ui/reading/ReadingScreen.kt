@@ -13,9 +13,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInHorizontally 
+import androidx.compose.animation.slideInVertically 
+import androidx.compose.animation.slideOutHorizontally 
+import androidx.compose.animation.slideOutVertically 
+import androidx.compose.animation.togetherWith 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +34,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width 
@@ -43,6 +46,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,11 +54,14 @@ import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
@@ -138,12 +145,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
@@ -262,10 +274,20 @@ fun ReadingScreen(
     var currentStory by remember { mutableStateOf<GeneratedStory?>(null) } 
     var storyActionsBottomY by remember { mutableFloatStateOf(Float.MAX_VALUE) } 
     var narrationCardBottomY by remember { mutableFloatStateOf(Float.MAX_VALUE) } 
+    var floatingOffsetX by remember { mutableFloatStateOf(0f) } 
+    var floatingOffsetY by remember { mutableFloatStateOf(0f) } 
+    var isFloatingMinimized by remember { mutableStateOf(false) } 
+    var floatingDockedSide by remember { mutableIntStateOf(1) } 
+    var floatingWidthPx by remember { mutableIntStateOf(0) } 
+    var floatingHeightPx by remember { mutableIntStateOf(0) } 
     
     LaunchedEffect(currentStory?.id) { 
         storyActionsBottomY = Float.MAX_VALUE 
         narrationCardBottomY = Float.MAX_VALUE 
+        floatingOffsetX = 0f 
+        floatingOffsetY = 0f 
+        isFloatingMinimized = false 
+        floatingDockedSide = 1 
     } 
     var isGeneratingStory by remember { mutableStateOf(false) } 
     var generationError by remember { mutableStateOf<String?>(null) } 
@@ -1800,6 +1822,9 @@ fun ReadingScreen(
         } 
         
         val density = LocalDensity.current 
+        val configuration = LocalConfiguration.current 
+        val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() } 
+        val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() } 
         val topCutoffPx = remember(padding, density) { 
             with(density) { (padding.calculateTopPadding() + 8.dp).toPx() } 
         } 
@@ -1817,267 +1842,429 @@ fun ReadingScreen(
             } 
         } 
         
-        androidx.compose.animation.AnimatedVisibility( 
-            visible = showFloatingNarration, 
-            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
-                    androidx.compose.animation.slideInHorizontally( 
-                        initialOffsetX = { -it }, 
-                        animationSpec = tween(200) 
-                    ), 
-            exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
-                   androidx.compose.animation.slideOutHorizontally( 
-                       targetOffsetX = { -it }, 
-                       animationSpec = tween(150) 
-                   ), 
-            modifier = Modifier 
-                .align(Alignment.TopStart) 
-                .padding(start = 12.dp, top = padding.calculateTopPadding() + 12.dp) 
-        ) { 
-            Surface( 
-                shape = RoundedCornerShape(12.dp), 
-                color = BlossomColors.SurfaceCard1.copy(alpha = 0.92f), 
-                border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.35f)), 
-                shadowElevation = 8.dp 
+        if (showFloatingActions || showFloatingNarration) { 
+            val topPaddingPx = with(density) { (padding.calculateTopPadding() + 8.dp).toPx() } 
+            val bottomPaddingPx = with(density) { (padding.calculateBottomPadding() + 8.dp).toPx() } 
+            val estimatedWidthPx = with(density) { 260.dp.toPx() } 
+            val effectiveWidthPx = if (floatingWidthPx > 0) floatingWidthPx.toFloat() else estimatedWidthPx 
+            val maxTravel = (screenWidthPx - effectiveWidthPx - with(density) { 24.dp.toPx() }).coerceAtLeast(100f) 
+            val estimatedHeightPx = with(density) { 104.dp.toPx() } 
+            val effectiveHeightPx = if (floatingHeightPx > 0) floatingHeightPx.toFloat() else estimatedHeightPx 
+            val maxExpandedOffsetY = (screenHeightPx - topPaddingPx - bottomPaddingPx - effectiveHeightPx).coerceAtLeast(0f) 
+            val minimizedTabHeightPx = with(density) { 52.dp.toPx() } 
+            val maxMinimizedOffsetY = (screenHeightPx - topPaddingPx - bottomPaddingPx - minimizedTabHeightPx).coerceAtLeast(0f) 
+            
+            androidx.compose.animation.AnimatedVisibility( 
+                visible = !isFloatingMinimized, 
+                enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
+                        (if (floatingDockedSide == -1) 
+                            slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(200)) 
+                        else 
+                            slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200))), 
+                exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
+                       (if (floatingDockedSide == -1) 
+                           slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(150)) 
+                       else 
+                           slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(150))), 
+                modifier = Modifier 
+                    .align(Alignment.TopEnd) 
+                    .offset { IntOffset(floatingOffsetX.roundToInt(), floatingOffsetY.roundToInt()) } 
+                    .padding(end = 12.dp, top = padding.calculateTopPadding() + 8.dp) 
             ) { 
-                Column( 
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp), 
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    verticalArrangement = Arrangement.spacedBy(4.dp) 
+                Box( 
+                    modifier = Modifier 
+                        .onSizeChanged { 
+                            if (it.width > 0) floatingWidthPx = it.width 
+                            if (it.height > 0) floatingHeightPx = it.height 
+                        } 
+                        .pointerInput(maxExpandedOffsetY) { 
+                            detectDragGestures( 
+                                onDrag = { change: PointerInputChange, dragAmount: Offset -> 
+                                    change.consume() 
+                                    val minAllowedX = -maxTravel - with(density) { 12.dp.toPx() } 
+                                    val maxAllowedX = with(density) { 12.dp.toPx() } 
+                                    floatingOffsetX = (floatingOffsetX + dragAmount.x).coerceIn(minAllowedX, maxAllowedX) 
+                                    floatingOffsetY = (floatingOffsetY + dragAmount.y).coerceIn(0f, maxExpandedOffsetY) 
+                                }, 
+                                onDragEnd = { 
+                                    if (-floatingOffsetX >= maxTravel * 0.85f) { 
+                                        floatingDockedSide = -1 
+                                        isFloatingMinimized = true 
+                                    } else if (-floatingOffsetX <= maxTravel * 0.15f) { 
+                                        floatingDockedSide = 1 
+                                        isFloatingMinimized = true 
+                                    } 
+                                } 
+                            ) 
+                        } 
                 ) { 
-                    IconButton( 
-                        onClick = { rewindToPreviousSentence() }, 
-                        enabled = !isSynthesizingAudio && activeSentenceIndex > 0, 
-                        modifier = Modifier.size(36.dp) 
+                    Column( 
+                        horizontalAlignment = Alignment.End, 
+                        verticalArrangement = Arrangement.spacedBy(8.dp) 
                     ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.SkipPrevious, 
-                            contentDescription = "Previous sentence", 
-                            tint = if (!isSynthesizingAudio && activeSentenceIndex > 0) BlossomColors.TextPrimary else BlossomColors.TextMuted, 
-                            modifier = Modifier 
-                                .size(19.dp) 
-                                .graphicsLayer { rotationZ = 90f } 
-                        ) 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { 
-                            if (isNarrating) { 
-                                pauseNarration() 
-                            } else if (isAudioPaused) { 
-                                resumeNarration() 
-                            } 
-                        }, 
-                        enabled = !isSynthesizingAudio, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Surface( 
-                            shape = CircleShape, 
-                            color = BlossomColors.SakuraRose, 
-                            modifier = Modifier.size(30.dp) 
+                        androidx.compose.animation.AnimatedVisibility( 
+                            visible = showFloatingActions, 
+                            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
+                                    androidx.compose.animation.slideInVertically( 
+                                        initialOffsetY = { -it }, 
+                                        animationSpec = tween(200) 
+                                    ), 
+                            exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
+                                   androidx.compose.animation.slideOutVertically( 
+                                       targetOffsetY = { -it }, 
+                                       animationSpec = tween(150) 
+                                   ) 
                         ) { 
-                            Box(contentAlignment = Alignment.Center) { 
-                                Icon( 
-                                    imageVector = if (isNarrating) Icons.Filled.Pause else Icons.Filled.PlayArrow, 
-                                    contentDescription = if (isNarrating) "Pause" else "Play", 
-                                    tint = BlossomColors.BlossomWhite, 
-                                    modifier = Modifier.size(16.dp) 
-                                ) 
+                            Surface( 
+                                shape = RoundedCornerShape(12.dp), 
+                                color = BlossomColors.SurfaceCard1.copy(alpha = 0.92f), 
+                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                shadowElevation = 8.dp 
+                            ) { 
+                                Row( 
+                                    modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), 
+                                    verticalAlignment = Alignment.CenterVertically, 
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp) 
+                                ) { 
+                                    IconButton( 
+                                        onClick = { 
+                                            floatingDockedSide = if (-floatingOffsetX >= maxTravel * 0.5f) -1 else 1 
+                                            isFloatingMinimized = true 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.DragIndicator, 
+                                            contentDescription = "Minimize or drag", 
+                                            tint = BlossomColors.TextMuted, 
+                                            modifier = Modifier.size(16.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    val isStoryPlaying = isNarrating && currentlyPlayingStoryId == currentStory?.id 
+                                    val isStoryPaused = isAudioPaused && currentlyPlayingStoryId == currentStory?.id 
+                                    val isStorySynthesizing = isSynthesizingAudio && currentlyPlayingStoryId == currentStory?.id 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            if (isStoryPlaying || isStoryPaused || isStorySynthesizing) { 
+                                                stopNarration() 
+                                            } else { 
+                                                startNarration() 
+                                            } 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        if (isStorySynthesizing) { 
+                                            CircularProgressIndicator( 
+                                                modifier = Modifier.size(18.dp), 
+                                                strokeWidth = 2.dp, 
+                                                color = BlossomColors.SakuraRose 
+                                            ) 
+                                        } else if (isStoryPlaying || isStoryPaused) { 
+                                            Icon( 
+                                                imageVector = Icons.Filled.Stop, 
+                                                contentDescription = "Stop Narration", 
+                                                tint = BlossomColors.BlossomRed, 
+                                                modifier = Modifier.size(19.dp) 
+                                            ) 
+                                        } else { 
+                                            Icon( 
+                                                imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
+                                                contentDescription = "Narrate Story", 
+                                                tint = BlossomColors.TextSecondary, 
+                                                modifier = Modifier.size(19.dp) 
+                                            ) 
+                                        } 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            currentStory?.let { 
+                                                translateTargetText = it.content 
+                                                showTranslationSheet = true 
+                                            } 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.Translate, 
+                                            contentDescription = "Translate Story", 
+                                            tint = BlossomColors.TextSecondary, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            showFurigana = !showFurigana 
+                                            prefs.showFuriganaInReader = showFurigana 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Text( 
+                                            text = "ふ", 
+                                            fontSize = 16.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            highlightWords = !highlightWords 
+                                            prefs.highlightVocabularyWords = highlightWords 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.AutoAwesome, 
+                                            contentDescription = "Toggle Vocabulary Highlight", 
+                                            tint = if (highlightWords) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager 
+                                            val clip = ClipData.newPlainText("Japanese Story", "${currentStory?.title ?: ""}\n\n${currentStory?.content ?: ""}") 
+                                            clipboard.setPrimaryClip(clip) 
+                                            Toast.makeText(context, "Story copied to clipboard!", Toast.LENGTH_SHORT).show() 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.ContentCopy, 
+                                            contentDescription = "Copy Story", 
+                                            tint = BlossomColors.TextSecondary, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { showWallhavenPicker = true }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.Wallpaper, 
+                                            contentDescription = "Change Wallpaper", 
+                                            tint = if (coverBitmap != null) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                } 
                             } 
                         } 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { skipToNextSentence() }, 
-                        enabled = !isSynthesizingAudio && activeSentenceIndex < storySentences.size - 1, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.SkipNext, 
-                            contentDescription = "Next sentence", 
-                            tint = if (!isSynthesizingAudio && activeSentenceIndex < storySentences.size - 1) BlossomColors.TextPrimary else BlossomColors.TextMuted, 
-                            modifier = Modifier 
-                                .size(19.dp) 
-                                .graphicsLayer { rotationZ = 90f } 
-                        ) 
-                    } 
-                    
-                    Surface( 
-                        shape = RoundedCornerShape(8.dp), 
-                        color = BlossomColors.SakuraRoseContainer.copy(alpha = 0.65f), 
-                        modifier = Modifier 
-                            .clip(RoundedCornerShape(8.dp)) 
-                            .clickable { cycleNarrationSpeed() } 
-                            .padding(horizontal = 6.dp, vertical = 4.dp) 
-                    ) { 
-                        Text( 
-                            text = "${narrationSpeed}x", 
-                            fontSize = 11.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = BlossomColors.SakuraRose 
-                        ) 
-                    } 
-                    
-                    Box( 
-                        modifier = Modifier 
-                            .size(32.dp) 
-                            .padding(2.dp), 
-                        contentAlignment = Alignment.Center 
-                    ) { 
-                        if (isSynthesizingAudio) { 
-                            CircularProgressIndicator( 
-                                modifier = Modifier.size(16.dp), 
-                                strokeWidth = 2.dp, 
-                                color = BlossomColors.SakuraRose 
-                            ) 
-                        } else { 
-                            Icon( 
-                                imageVector = Icons.Filled.GraphicEq, 
-                                contentDescription = null, 
-                                tint = BlossomColors.SakuraRose, 
-                                modifier = Modifier.size(16.dp) 
-                            ) 
+                        
+                        androidx.compose.animation.AnimatedVisibility( 
+                            visible = showFloatingNarration, 
+                            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
+                                    androidx.compose.animation.expandVertically(animationSpec = tween(200)), 
+                            exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
+                                   androidx.compose.animation.shrinkVertically(animationSpec = tween(150)) 
+                        ) { 
+                            Surface( 
+                                shape = RoundedCornerShape(12.dp), 
+                                color = BlossomColors.SurfaceCard1.copy(alpha = 0.92f), 
+                                border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.35f)), 
+                                shadowElevation = 8.dp 
+                            ) { 
+                                Row( 
+                                    modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), 
+                                    verticalAlignment = Alignment.CenterVertically, 
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp) 
+                                ) { 
+                                    IconButton( 
+                                        onClick = { 
+                                            floatingDockedSide = if (-floatingOffsetX >= maxTravel * 0.5f) -1 else 1 
+                                            isFloatingMinimized = true 
+                                        }, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.DragIndicator, 
+                                            contentDescription = "Minimize or drag", 
+                                            tint = BlossomColors.SakuraRose.copy(alpha = 0.6f), 
+                                            modifier = Modifier.size(16.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { rewindToPreviousSentence() }, 
+                                        enabled = !isSynthesizingAudio && activeSentenceIndex > 0, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.SkipPrevious, 
+                                            contentDescription = "Previous sentence", 
+                                            tint = if (!isSynthesizingAudio && activeSentenceIndex > 0) BlossomColors.TextPrimary else BlossomColors.TextMuted, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { 
+                                            if (isNarrating) { 
+                                                pauseNarration() 
+                                            } else if (isAudioPaused) { 
+                                                resumeNarration() 
+                                            } 
+                                        }, 
+                                        enabled = !isSynthesizingAudio, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Surface( 
+                                            shape = CircleShape, 
+                                            color = BlossomColors.SakuraRose, 
+                                            modifier = Modifier.size(30.dp) 
+                                        ) { 
+                                            Box(contentAlignment = Alignment.Center) { 
+                                                Icon( 
+                                                    imageVector = if (isNarrating) Icons.Filled.Pause else Icons.Filled.PlayArrow, 
+                                                    contentDescription = if (isNarrating) "Pause" else "Play", 
+                                                    tint = BlossomColors.BlossomWhite, 
+                                                    modifier = Modifier.size(16.dp) 
+                                                ) 
+                                            } 
+                                        } 
+                                    } 
+                                    
+                                    IconButton( 
+                                        onClick = { skipToNextSentence() }, 
+                                        enabled = !isSynthesizingAudio && activeSentenceIndex < storySentences.size - 1, 
+                                        modifier = Modifier.size(36.dp) 
+                                    ) { 
+                                        Icon( 
+                                            imageVector = Icons.Filled.SkipNext, 
+                                            contentDescription = "Next sentence", 
+                                            tint = if (!isSynthesizingAudio && activeSentenceIndex < storySentences.size - 1) BlossomColors.TextPrimary else BlossomColors.TextMuted, 
+                                            modifier = Modifier.size(19.dp) 
+                                        ) 
+                                    } 
+                                    
+                                    Surface( 
+                                        shape = RoundedCornerShape(8.dp), 
+                                        color = BlossomColors.SakuraRoseContainer.copy(alpha = 0.65f), 
+                                        modifier = Modifier 
+                                            .clip(RoundedCornerShape(8.dp)) 
+                                            .clickable { cycleNarrationSpeed() } 
+                                            .padding(horizontal = 6.dp, vertical = 4.dp) 
+                                    ) { 
+                                        Text( 
+                                            text = "${narrationSpeed}x", 
+                                            fontSize = 11.sp, 
+                                            fontWeight = FontWeight.Bold, 
+                                            color = BlossomColors.SakuraRose 
+                                        ) 
+                                    } 
+                                    
+                                    Box( 
+                                        modifier = Modifier 
+                                            .size(32.dp) 
+                                            .padding(2.dp), 
+                                        contentAlignment = Alignment.Center 
+                                    ) { 
+                                        if (isSynthesizingAudio) { 
+                                            CircularProgressIndicator( 
+                                                modifier = Modifier.size(16.dp), 
+                                                strokeWidth = 2.dp, 
+                                                color = BlossomColors.SakuraRose 
+                                            ) 
+                                        } else { 
+                                            Icon( 
+                                                imageVector = Icons.Filled.GraphicEq, 
+                                                contentDescription = null, 
+                                                tint = BlossomColors.SakuraRose, 
+                                                modifier = Modifier.size(16.dp) 
+                                            ) 
+                                        } 
+                                    } 
+                                } 
+                            } 
                         } 
                     } 
                 } 
             } 
-        } 
-        
-        androidx.compose.animation.AnimatedVisibility( 
-            visible = showFloatingActions, 
-            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
-                    androidx.compose.animation.slideInHorizontally( 
-                        initialOffsetX = { it }, 
-                        animationSpec = tween(200) 
-                    ), 
-            exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
-                   androidx.compose.animation.slideOutHorizontally( 
-                       targetOffsetX = { it }, 
-                       animationSpec = tween(150) 
-                   ), 
-            modifier = Modifier 
-                .align(Alignment.TopEnd) 
-                .padding(end = 12.dp, top = padding.calculateTopPadding() + 12.dp) 
-        ) { 
-            Surface( 
-                shape = RoundedCornerShape(12.dp), 
-                color = BlossomColors.SurfaceCard1.copy(alpha = 0.92f), 
-                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                shadowElevation = 8.dp 
+            
+            androidx.compose.animation.AnimatedVisibility( 
+                visible = isFloatingMinimized, 
+                enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) + 
+                        (if (floatingDockedSide == -1) 
+                            slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(200)) 
+                        else 
+                            slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200))), 
+                exit = androidx.compose.animation.fadeOut(animationSpec = tween(150)) + 
+                       (if (floatingDockedSide == -1) 
+                           slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(150)) 
+                       else 
+                           slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(150))), 
+                modifier = Modifier 
+                    .align(if (floatingDockedSide == -1) Alignment.TopStart else Alignment.TopEnd) 
+                    .offset { IntOffset(0, floatingOffsetY.roundToInt()) } 
+                    .padding(top = padding.calculateTopPadding() + 8.dp) 
             ) { 
-                Column( 
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp), 
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    verticalArrangement = Arrangement.spacedBy(4.dp) 
-                ) { 
-                    IconButton( 
-                        onClick = { showWallhavenPicker = true }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.Wallpaper, 
-                            contentDescription = "Change Wallpaper", 
-                            tint = if (coverBitmap != null) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                            modifier = Modifier.size(19.dp) 
-                        ) 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { 
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager 
-                            val clip = ClipData.newPlainText("Japanese Story", "${currentStory?.title ?: ""}\n\n${currentStory?.content ?: ""}") 
-                            clipboard.setPrimaryClip(clip) 
-                            Toast.makeText(context, "Story copied to clipboard!", Toast.LENGTH_SHORT).show() 
-                        }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.ContentCopy, 
-                            contentDescription = "Copy Story", 
-                            tint = BlossomColors.TextSecondary, 
-                            modifier = Modifier.size(19.dp) 
-                        ) 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { 
-                            highlightWords = !highlightWords 
-                            prefs.highlightVocabularyWords = highlightWords 
-                        }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.AutoAwesome, 
-                            contentDescription = "Toggle Vocabulary Highlight", 
-                            tint = if (highlightWords) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                            modifier = Modifier.size(19.dp) 
-                        ) 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { 
-                            showFurigana = !showFurigana 
-                            prefs.showFuriganaInReader = showFurigana 
-                        }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Text( 
-                            text = "ふ", 
-                            fontSize = 16.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = if (showFurigana) BlossomColors.SakuraRose else BlossomColors.TextSecondary 
-                        ) 
-                    } 
-                    
-                    IconButton( 
-                        onClick = { 
-                            currentStory?.let { 
-                                translateTargetText = it.content 
-                                showTranslationSheet = true 
-                            } 
-                        }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.Translate, 
-                            contentDescription = "Translate Story", 
-                            tint = BlossomColors.TextSecondary, 
-                            modifier = Modifier.size(19.dp) 
-                        ) 
-                    } 
-                    
-                    val isStoryPlaying = isNarrating && currentlyPlayingStoryId == currentStory?.id 
-                    val isStoryPaused = isAudioPaused && currentlyPlayingStoryId == currentStory?.id 
-                    val isStorySynthesizing = isSynthesizingAudio && currentlyPlayingStoryId == currentStory?.id 
-                    
-                    IconButton( 
-                        onClick = { 
-                            if (isStoryPlaying || isStoryPaused || isStorySynthesizing) { 
-                                stopNarration() 
-                            } else { 
-                                startNarration() 
-                            } 
-                        }, 
-                        modifier = Modifier.size(36.dp) 
-                    ) { 
-                        if (isStorySynthesizing) { 
-                            CircularProgressIndicator( 
-                                modifier = Modifier.size(18.dp), 
-                                strokeWidth = 2.dp, 
-                                color = BlossomColors.SakuraRose 
+                val tabShape = if (floatingDockedSide == -1) { 
+                    RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp) 
+                } else { 
+                    RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp) 
+                } 
+                Surface( 
+                    shape = tabShape, 
+                    color = BlossomColors.SurfaceCard1.copy(alpha = 0.94f), 
+                    border = BorderStroke(1.dp, BlossomColors.SakuraRose.copy(alpha = 0.45f)), 
+                    shadowElevation = 8.dp, 
+                    modifier = Modifier 
+                        .pointerInput(floatingDockedSide, maxMinimizedOffsetY, maxExpandedOffsetY) { 
+                            detectDragGestures( 
+                                onDrag = { change: PointerInputChange, dragAmount: Offset -> 
+                                    change.consume() 
+                                    floatingOffsetY = (floatingOffsetY + dragAmount.y).coerceIn(0f, maxMinimizedOffsetY) 
+                                    if (floatingDockedSide == 1 && dragAmount.x < -10f) { 
+                                        floatingOffsetX = 0f 
+                                        floatingOffsetY = floatingOffsetY.coerceIn(0f, maxExpandedOffsetY) 
+                                        isFloatingMinimized = false 
+                                    } else if (floatingDockedSide == -1 && dragAmount.x > 10f) { 
+                                        floatingOffsetX = -maxTravel 
+                                        floatingOffsetY = floatingOffsetY.coerceIn(0f, maxExpandedOffsetY) 
+                                        isFloatingMinimized = false 
+                                    } 
+                                } 
                             ) 
-                        } else if (isStoryPlaying || isStoryPaused) { 
+                        } 
+                        .clickable { 
+                            floatingOffsetX = if (floatingDockedSide == -1) -maxTravel else 0f 
+                            floatingOffsetY = floatingOffsetY.coerceIn(0f, maxExpandedOffsetY) 
+                            isFloatingMinimized = false 
+                        } 
+                ) { 
+                    Column( 
+                        horizontalAlignment = Alignment.CenterHorizontally, 
+                        verticalArrangement = Arrangement.Center, 
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 10.dp) 
+                    ) { 
+                        Icon( 
+                            imageVector = if (floatingDockedSide == -1) Icons.AutoMirrored.Filled.ArrowForward else Icons.AutoMirrored.Filled.ArrowBack, 
+                            contentDescription = "Expand controls", 
+                            tint = BlossomColors.SakuraRose, 
+                            modifier = Modifier.size(16.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.height(4.dp)) 
+                        if (isNarrating && currentlyPlayingStoryId == currentStory?.id) { 
                             Icon( 
-                                imageVector = Icons.Filled.Stop, 
-                                contentDescription = "Stop Narration", 
-                                tint = BlossomColors.BlossomRed, 
-                                modifier = Modifier.size(19.dp) 
+                                imageVector = Icons.Filled.GraphicEq, 
+                                contentDescription = "Audio playing", 
+                                tint = BlossomColors.SakuraRose, 
+                                modifier = Modifier.size(13.dp) 
                             ) 
                         } else { 
-                            Icon( 
-                                imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
-                                contentDescription = "Narrate Story", 
-                                tint = BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(19.dp) 
+                            Box( 
+                                modifier = Modifier 
+                                    .size(width = 3.dp, height = 14.dp) 
+                                    .background( 
+                                        color = BlossomColors.TextMuted.copy(alpha = 0.45f), 
+                                        shape = RoundedCornerShape(2.dp) 
+                                    ) 
                             ) 
                         } 
                     } 
