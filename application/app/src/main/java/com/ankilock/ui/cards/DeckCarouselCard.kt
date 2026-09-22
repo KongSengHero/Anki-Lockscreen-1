@@ -86,7 +86,8 @@ fun DeckCarouselCard(
     onGood: (DeckInfo, CardInfo) -> Unit, 
     onOpenAnki: () -> Unit, 
     classicAction: String = "open_anki", 
-    onClassicAction: ((DeckInfo, CardInfo) -> Unit)? = null, 
+    onClassicAction: ((DeckInfo, CardInfo?) -> Unit)? = null, 
+    onSuspend: ((DeckInfo, CardInfo) -> Unit)? = null, 
     onDeckChanged: (Long) -> Unit, 
     onPlayWord: (CardInfo) -> Unit = {}, 
     onPlaySentence: (CardInfo) -> Unit = {}, 
@@ -142,7 +143,14 @@ fun DeckCarouselCard(
         } 
     } 
     
-    LaunchedEffect(centerCard?.noteId) { 
+    LaunchedEffect(isProcessing) { 
+        if (isProcessing) { 
+            kotlinx.coroutines.delay(350) 
+            isProcessing = false 
+        } 
+    } 
+    
+    LaunchedEffect(centerCard?.noteId, centerCard?.cardOrd) { 
         isProcessing = false 
         revealedNoteId = null 
     } 
@@ -582,13 +590,17 @@ fun DeckCarouselCard(
                 
                 Button( 
                     onClick = { 
-                        if (currentCenterDeck != null && centerCard != null && onClassicAction != null) { 
-                            onClassicAction(currentCenterDeck, centerCard) 
+                        if (currentCenterDeck != null && onClassicAction != null) { 
+                            if (!isProcessing) { 
+                                isProcessing = true 
+                                revealedNoteId = null 
+                                onClassicAction(currentCenterDeck, centerCard) 
+                            } 
                         } else { 
                             onOpenAnki() 
                         } 
                     }, 
-                    enabled = if (classicAction == "suspend") (centerCard != null && !isProcessing) else true, 
+                    enabled = if (classicAction == "suspend") (centerCard != null && !isProcessing) else !isProcessing, 
                     shape = RoundedCornerShape(8.dp), 
                     colors = ButtonDefaults.buttonColors( 
                         containerColor = BlossomColors.BtnAnkiBg, 
@@ -602,6 +614,41 @@ fun DeckCarouselCard(
                 ) { 
                     Text( 
                         text = classicActionLabel, 
+                        fontSize = 12.5.sp, 
+                        fontWeight = FontWeight.SemiBold, 
+                        color = BlossomColors.BtnAnkiText, 
+                        maxLines = 1, 
+                        softWrap = false 
+                    ) 
+                } 
+            } 
+            
+            val isCardRevealed = (revealedNoteId != null && revealedNoteId == centerCard?.noteId) 
+            if (isCardRevealed && centerCard != null && currentCenterDeck != null && onSuspend != null) { 
+                Spacer(modifier = Modifier.height(8.dp)) 
+                Button( 
+                    onClick = { 
+                        if (!isProcessing) { 
+                            isProcessing = true 
+                            revealedNoteId = null 
+                            onSuspend(currentCenterDeck, centerCard) 
+                        } 
+                    }, 
+                    enabled = !isProcessing, 
+                    shape = RoundedCornerShape(8.dp), 
+                    colors = ButtonDefaults.buttonColors( 
+                        containerColor = BlossomColors.BtnAnkiBg, 
+                        disabledContainerColor = BlossomColors.BtnAnkiBg.copy(alpha = 0.5f) 
+                    ), 
+                    border = BorderStroke(1.dp, BlossomColors.BtnAnkiBorder), 
+                    modifier = Modifier 
+                        .fillMaxWidth() 
+                        .padding(horizontal = 16.dp) 
+                        .height(38.dp), 
+                    contentPadding = PaddingValues(horizontal = 4.dp) 
+                ) { 
+                    Text( 
+                        text = "Suspend", 
                         fontSize = 12.5.sp, 
                         fontWeight = FontWeight.SemiBold, 
                         color = BlossomColors.BtnAnkiText, 

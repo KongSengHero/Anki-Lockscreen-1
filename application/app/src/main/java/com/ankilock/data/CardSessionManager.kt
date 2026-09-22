@@ -12,64 +12,64 @@ object CardSessionManager {
     
     var currentCard: CardInfo? = null
         private set
-    var previousCard: CardInfo? = null
-        private set
-    private var previousStats: Triple<Int, Int, Int>? = null
-    var isRevealed: Boolean = false
-        private set
-    var currentStats: Triple<Int, Int, Int> = Triple(0, 0, 0)
-        private set
+    private val reviewHistory = mutableListOf<Pair<CardInfo, Triple<Int, Int, Int>>>() 
+    val canUndo: Boolean get() = reviewHistory.isNotEmpty() 
+    val previousCard: CardInfo? get() = reviewHistory.lastOrNull()?.first 
+    var isRevealed: Boolean = false 
+        private set 
+    var currentStats: Triple<Int, Int, Int> = Triple(0, 0, 0) 
+        private set 
     
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+    private val mainHandler = Handler(Looper.getMainLooper()) 
+    private val listeners = CopyOnWriteArrayList<() -> Unit>() 
     
     fun addListener(listener: () -> Unit) { 
         if (!listeners.contains(listener)) { 
-            listeners.add(listener)
-        }
-    }
+            listeners.add(listener) 
+        } 
+    } 
     
     fun removeListener(listener: () -> Unit) { 
-        listeners.remove(listener)
-    }
+        listeners.remove(listener) 
+    } 
     
     fun getOrFetchCard(context: Context, forceRefresh: Boolean = false): CardInfo? { 
         if (currentCard == null || forceRefresh) { 
-            val ankiHelper = AnkiDroidHelper(context)
-            val prefs = PreferencesManager(context)
-            val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
-            currentCard = ankiHelper.getNextDueCard(selectedDecks)
-            currentStats = ankiHelper.getSelectedDeckStats(selectedDecks)
-            if (forceRefresh) isRevealed = false
-            notifyUi()
-        }
-        return currentCard
-    }
+            val ankiHelper = AnkiDroidHelper(context) 
+            val prefs = PreferencesManager(context) 
+            val selectedDecks = prefs.getSelectedDeckIdsAsLongs() 
+            currentCard = ankiHelper.getNextDueCard(selectedDecks) 
+            currentStats = ankiHelper.getSelectedDeckStats(selectedDecks) 
+            if (forceRefresh) isRevealed = false 
+            notifyUi() 
+        } 
+        return currentCard 
+    } 
     
     fun toggleReveal(context: Context) { 
-        isRevealed = !isRevealed
-        notifyAllSurfaces(context)
-    }
+        isRevealed = !isRevealed 
+        notifyAllSurfaces(context) 
+    } 
     
     fun reveal(context: Context) { 
         if (!isRevealed) { 
-            isRevealed = true
-            notifyAllSurfaces(context)
-        }
-    }
+            isRevealed = true 
+            notifyAllSurfaces(context) 
+        } 
+    } 
     
     fun hide(context: Context) { 
         if (isRevealed) { 
-            isRevealed = false
-            notifyAllSurfaces(context)
-        }
-    }
+            isRevealed = false 
+            notifyAllSurfaces(context) 
+        } 
+    } 
     
     fun gradeCard( 
         context: Context, 
         ease: Int, 
         timeTaken: Long = 5000L, 
-        onComplete: ((CardInfo?) -> Unit)? = null
+        onComplete: ((CardInfo?) -> Unit)? = null 
     ) { 
         val card = currentCard ?: getOrFetchCard(context) 
         val ankiHelper = AnkiDroidHelper(context) 
@@ -81,8 +81,7 @@ object CardSessionManager {
                 prefs.recordNewCardLearned() 
             } 
             val oldStats = currentStats 
-            previousCard = card 
-            previousStats = oldStats 
+            reviewHistory.add(Pair(card, oldStats)) 
             isRevealed = false 
             currentStats = when (ease) { 
                 1 -> Triple( 
@@ -100,72 +99,66 @@ object CardSessionManager {
             
             Thread { 
                 ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken, card.deckId) 
-                val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId)
-                val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks)
+                val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId) 
+                val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks) 
                 
                 mainHandler.post { 
-                    currentCard = nextCard
-                    currentStats = freshStats
-                    isRevealed = false
-                    notifyAllSurfaces(context)
-                    onComplete?.invoke(nextCard)
-                }
-            }.start()
+                    currentCard = nextCard 
+                    currentStats = freshStats 
+                    isRevealed = false 
+                    notifyAllSurfaces(context) 
+                    onComplete?.invoke(nextCard) 
+                } 
+            }.start() 
         } else { 
-            currentCard = null
-            isRevealed = false
-            notifyAllSurfaces(context)
-            onComplete?.invoke(null)
-        }
-    }
+            currentCard = null 
+            isRevealed = false 
+            notifyAllSurfaces(context) 
+            onComplete?.invoke(null) 
+        } 
+    } 
     
     fun suspendCurrentCard( 
         context: Context, 
-        onComplete: ((CardInfo?) -> Unit)? = null
+        onComplete: ((CardInfo?) -> Unit)? = null 
     ) { 
-        val card = currentCard ?: getOrFetchCard(context)
-        val ankiHelper = AnkiDroidHelper(context)
-        val prefs = PreferencesManager(context)
-        val selectedDecks = prefs.getSelectedDeckIdsAsLongs()
+        val card = currentCard ?: getOrFetchCard(context) 
+        val ankiHelper = AnkiDroidHelper(context) 
+        val prefs = PreferencesManager(context) 
+        val selectedDecks = prefs.getSelectedDeckIdsAsLongs() 
         
         if (card != null) { 
-            previousCard = card
-            previousStats = currentStats
+            reviewHistory.add(Pair(card, currentStats)) 
             Thread { 
-                ankiHelper.suspendCard(card.noteId, card.cardOrd)
-                val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId)
-                val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks)
+                ankiHelper.suspendCard(card.noteId, card.cardOrd) 
+                val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId) 
+                val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks) 
                 
                 mainHandler.post { 
-                    currentCard = nextCard
-                    currentStats = freshStats
-                    isRevealed = false
-                    notifyAllSurfaces(context)
-                    onComplete?.invoke(nextCard)
-                }
-            }.start()
+                    currentCard = nextCard 
+                    currentStats = freshStats 
+                    isRevealed = false 
+                    notifyAllSurfaces(context) 
+                    onComplete?.invoke(nextCard) 
+                } 
+            }.start() 
         } else { 
-            onComplete?.invoke(null)
-        }
-    }
+            onComplete?.invoke(null) 
+        } 
+    } 
     
     fun recordAnswered(card: CardInfo, oldStats: Triple<Int, Int, Int>) { 
-        previousCard = card 
-        previousStats = oldStats 
+        reviewHistory.add(Pair(card, oldStats)) 
     } 
     
     fun undoLastReview(context: Context) { 
-        val prev = previousCard
-        if (prev != null) { 
-            currentCard = prev
-            if (previousStats != null) { 
-                currentStats = previousStats!!
-            }
-            isRevealed = false
-            previousCard = null
-            previousStats = null
-            notifyAllSurfaces(context)
-        }
+        if (reviewHistory.isNotEmpty()) { 
+            val (prevCard, prevStats) = reviewHistory.removeAt(reviewHistory.size - 1) 
+            currentCard = prevCard 
+            currentStats = prevStats 
+            isRevealed = false 
+            notifyAllSurfaces(context) 
+        } 
     }
     
     fun refresh(context: Context) { 

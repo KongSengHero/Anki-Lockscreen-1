@@ -337,9 +337,10 @@ class AnkiDroidHelper(private val context: Context) {
                         if (seenNoteIds.contains(noteId)) continue
                         seenNoteIds.add(noteId)
                         
-                        val cardOrd = cur.getInt(cur.getColumnIndexOrThrow(COL_CARD_ORD))
-                        val parsed = getCardContent(noteId)
-                        val actualDeckName = decks.find { it.id == deckId }?.name ?: decks.firstOrNull()?.name ?: ""
+                        val cardOrd = cur.getInt(cur.getColumnIndexOrThrow(COL_CARD_ORD)) 
+                        val parsed = getCardContent(noteId) 
+                        val actualDeckName = decks.find { it.id == deckId }?.name ?: decks.firstOrNull()?.name ?: "" 
+                        val actualDeckId = deckId ?: decks.find { it.name == actualDeckName }?.id ?: -1L 
                         val cardType = when { 
                             getNotesDueCount("nid:$noteId is:learn") > 0 -> 1 
                             getNotesDueCount("nid:$noteId is:new") > 0 -> 0 
@@ -349,7 +350,8 @@ class AnkiDroidHelper(private val context: Context) {
                             noteId = noteId, 
                             cardOrd = cardOrd, 
                             deckName = actualDeckName, 
-                            cardType = cardType 
+                            cardType = cardType, 
+                            deckId = actualDeckId 
                         ) 
                         if (card.kanji.isNotBlank() || card.question.isNotBlank()) { 
                             result.add(card)
@@ -433,6 +435,7 @@ class AnkiDroidHelper(private val context: Context) {
                     } 
                     
                     val parsed = getCardContent(noteId) 
+                    val targetDeckId = deckId ?: decks.find { it.name == deckName }?.id ?: -1L 
                     
                     return parsed.copy( 
                         noteId = noteId, 
@@ -440,7 +443,8 @@ class AnkiDroidHelper(private val context: Context) {
                         deckName = deckName.ifEmpty { decks.firstOrNull()?.name ?: "" }, 
                         buttonCount = buttonCount, 
                         nextReviewTimes = nextTimes, 
-                        cardType = cardType
+                        cardType = cardType, 
+                        deckId = targetDeckId 
                     ) 
                 } 
             }

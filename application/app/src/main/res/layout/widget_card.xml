@@ -33,7 +33,7 @@
             android:gravity="center"
             android:text="Again"
             android:textColor="#EF5350"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
@@ -46,7 +46,7 @@
             android:gravity="center"
             android:text="Reveal"
             android:textColor="#90CAF9"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
@@ -59,7 +59,7 @@
             android:gravity="center"
             android:text="Good"
             android:textColor="#66BB6A"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
@@ -71,7 +71,7 @@
             android:gravity="center"
             android:text="Anki"
             android:textColor="#E2E8F0"
-            android:textSize="13sp" />
+            android:textSize="15sp" />
     </LinearLayout>
 
 </LinearLayout>

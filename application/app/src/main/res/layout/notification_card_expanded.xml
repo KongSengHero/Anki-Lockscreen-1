@@ -210,7 +210,7 @@
             android:layout_weight="1"
             android:background="@drawable/btn_action_bg"
             android:gravity="center"
-            android:text="Open Anki"
+            android:text="Blossom"
             android:textColor="#E0E0E0"
             android:textSize="13sp" />
     </LinearLayout>

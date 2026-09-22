@@ -99,10 +99,10 @@ class AnkiAppWidgetProvider : AppWidgetProvider() {
             val heightDp = if (minHeightDp > 0) minHeightDp else 320
             
             val scaleTier = when { 
-                widthDp >= 320 -> 0.70f 
-                widthDp >= 250 -> 0.60f 
-                widthDp >= 180 -> 0.50f 
-                else -> 0.45f 
+                widthDp >= 320 -> 1.15f 
+                widthDp >= 250 -> 1.00f 
+                widthDp >= 180 -> 0.85f 
+                else -> 0.75f 
             } 
             
             val targetW = (widthDp * density).toInt().coerceAtLeast(300)

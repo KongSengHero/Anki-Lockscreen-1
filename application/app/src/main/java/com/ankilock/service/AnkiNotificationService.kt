@@ -584,8 +584,8 @@ class AnkiNotificationService : Service() {
                 rv.setViewVisibility(R.id.btn_reveal, View.VISIBLE)
                 rv.setViewVisibility(R.id.btn_snooze, View.VISIBLE)
                 rv.setViewVisibility(R.id.btn_open_anki, View.VISIBLE)
-                rv.setTextViewText(R.id.btn_open_anki, "Anki")
-                rv.setOnClickPendingIntent(R.id.btn_open_anki, openAnkiPending)
+                rv.setTextViewText(R.id.btn_open_anki, "Blossom")
+                rv.setOnClickPendingIntent(R.id.btn_open_anki, openAppPending)
                 rv.setViewVisibility(R.id.btn_again, View.GONE)
                 rv.setViewVisibility(R.id.btn_good, View.GONE)
                 
