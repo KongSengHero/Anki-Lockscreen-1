@@ -477,11 +477,11 @@ fun ListeningDictationScreen(
                                             if (eval.isOverallPass) { 
                                                 streakCount++
                                                 reviewedCount++
-                                                ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L)
+                                                ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L, card.deckId, card.buttonCount) 
                                             } else { 
                                                 streakCount = 0
                                                 reviewedCount++
-                                                ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L)
+                                                ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L, card.deckId, card.buttonCount) 
                                             }
                                         } else { 
                                             errorMessage = res.exceptionOrNull()?.message ?: "AI Evaluation failed"

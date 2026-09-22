@@ -766,18 +766,31 @@ class AnkiDroidHelper(private val context: Context) {
         } 
     } 
     
-    fun answerCard(noteId: Long, cardOrd: Int, ease: Int, timeTaken: Long, deckId: Long? = null): Boolean { 
+    fun answerCard( 
+        noteId: Long, 
+        cardOrd: Int, 
+        ease: Int, 
+        timeTaken: Long, 
+        deckId: Long? = null, 
+        buttonCount: Int = 4 
+    ): Boolean { 
         return try { 
             if (deckId != null && deckId > 0L) { 
                 selectDeck(deckId) 
             } 
+            val effectiveEase = if (ease == 3 && (buttonCount == 2 || buttonCount == 3)) { 
+                2 
+            } else { 
+                ease 
+            } 
             val values = ContentValues().apply { 
                 put(COL_NOTE_ID, noteId) 
                 put(COL_CARD_ORD, cardOrd) 
-                put(COL_EASE, ease) 
+                put(COL_EASE, effectiveEase) 
                 put(COL_TIME_TAKEN, timeTaken) 
             } 
-            resolver.update(SCHEDULE_URI, values, null, null) > 0 
+            val rows = resolver.update(SCHEDULE_URI, values, null, null) 
+            rows > 0 
         } catch (e: Exception) { 
             e.printStackTrace() 
             false 

@@ -98,7 +98,7 @@ object CardSessionManager {
             notifyAllSurfaces(context) 
             
             Thread { 
-                ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken, card.deckId) 
+                ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken, card.deckId, card.buttonCount) 
                 val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId) 
                 val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks) 
                 

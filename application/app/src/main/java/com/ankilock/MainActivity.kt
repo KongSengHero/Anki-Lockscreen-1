@@ -1254,7 +1254,7 @@ class MainActivity : ComponentActivity() {
                     deckStatsCache[deck.id] = newStats 
                     CardSessionManager.syncFromExternal(nextCard, false, newStats) 
                     coroutineScope.launch(Dispatchers.IO) { 
-                        ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L, deck.id) 
+                        ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L, deck.id, card.buttonCount) 
                         val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
                         if (remainingCount < 3) { 
                             val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
@@ -1290,7 +1290,7 @@ class MainActivity : ComponentActivity() {
                     deckStatsCache[deck.id] = newStats 
                     CardSessionManager.syncFromExternal(nextCard, false, newStats) 
                     coroutineScope.launch(Dispatchers.IO) { 
-                        ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L, deck.id) 
+                        ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L, deck.id, card.buttonCount) 
                         val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
                         if (remainingCount < 3) { 
                             val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
