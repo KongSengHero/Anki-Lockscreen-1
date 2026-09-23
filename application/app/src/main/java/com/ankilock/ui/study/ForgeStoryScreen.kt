@@ -92,6 +92,7 @@ import com.ankilock.data.CardInfo
 import com.ankilock.data.ForgedStory
 import com.ankilock.data.PreferencesManager
 import com.ankilock.data.StorySentenceItem
+import com.ankilock.data.BookmarkManager
 import com.ankilock.data.StorySessionManager
 import com.ankilock.data.StoryWordItem
 import com.ankilock.data.calculatedEstimatedMinutes
@@ -781,15 +782,19 @@ fun ForgeStoryScreen(
         } 
         
         selectedWordForDetail?.let { word -> 
-            val isBookmarked = StorySessionManager.savedStoriesList.any { s -> 
-                s.targetWords.any { it.kanji == word.kanji } 
-            } 
+            val isBookmarked = BookmarkManager.isBookmarked(word.kanji) 
             BlossomWordBottomSheet( 
                 wordItem = word, 
                 isBookmarked = isBookmarked, 
                 showFurigana = showFurigana, 
                 onToggleFurigana = { showFurigana = !showFurigana }, 
-                onToggleBookmark = {}, 
+                onToggleBookmark = { 
+                    BookmarkManager.toggleBookmark( 
+                        kanji = word.kanji, 
+                        reading = word.reading, 
+                        meaning = word.meaning 
+                    ) 
+                }, 
                 onPlayAudio = { 
                     val card = CardInfo( 
                         noteId = 0L, 

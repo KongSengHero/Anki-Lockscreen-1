@@ -91,7 +91,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import com.ankilock.data.BookmarkManager
 import com.ankilock.data.StoryWordItem
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import com.ankilock.ui.blossom.BlossomStoryTokenView
 import com.ankilock.ui.blossom.BlossomWordBottomSheet
 import com.ankilock.ui.blossom.story.StoryTokenizer
@@ -450,10 +452,12 @@ fun ReadingScreen(
             val count = prefs.storyConnectingWordsCount 
             val allWords = vocabSummary?.words ?: emptyList() 
             val filter = prefs.storyVocabularyFilter 
-            val eligibleVocab = if (filter == "all" || filter.isBlank()) { 
-                allWords 
-            } else { 
-                allWords.filter { it.state.equals(filter, ignoreCase = true) } 
+            val eligibleVocab = when { 
+                filter == "all" || filter.isBlank() -> allWords 
+                filter.equals("suspense", ignoreCase = true) || filter.equals("suspended", ignoreCase = true) -> 
+                    allWords.filter { it.isSuspended || it.state.equals("suspended", ignoreCase = true) || it.state.equals("suspense", ignoreCase = true) } 
+                else -> 
+                    allWords.filter { !it.isSuspended && it.state.equals(filter, ignoreCase = true) } 
             } 
             val words = when { 
                 count == -1 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled() 
@@ -1609,6 +1613,79 @@ fun ReadingScreen(
                                                                             contentDescription = "Used in story", 
                                                                             tint = BlossomColors.BlossomGreen, 
                                                                             modifier = Modifier.size(12.dp) 
+                                                                        ) 
+                                                                    } 
+                                                                } 
+                                                            } 
+                                                        } 
+                                                    } 
+                                                } 
+                                            } 
+                                        } 
+                                        
+                                        if (story.storyWords.isNotEmpty()) { 
+                                            Spacer(modifier = Modifier.height(14.dp)) 
+                                            Surface( 
+                                                shape = RoundedCornerShape(14.dp), 
+                                                color = BlossomColors.SurfaceElevated, 
+                                                border = BorderStroke(1.dp, BlossomColors.CardBorder), 
+                                                modifier = Modifier.fillMaxWidth() 
+                                            ) { 
+                                                Column(modifier = Modifier.padding(14.dp)) { 
+                                                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                                                        Icon( 
+                                                            Icons.AutoMirrored.Filled.MenuBook, 
+                                                            contentDescription = null, 
+                                                            tint = BlossomColors.SkyCyan, 
+                                                            modifier = Modifier.size(16.dp) 
+                                                        ) 
+                                                        Spacer(modifier = Modifier.width(8.dp)) 
+                                                        Text( 
+                                                            text = "WORDS FROM STORY (${story.storyWords.size})", 
+                                                            fontSize = 11.sp, 
+                                                            fontWeight = FontWeight.Bold, 
+                                                            color = BlossomColors.TextSecondary, 
+                                                            letterSpacing = 0.5.sp 
+                                                        ) 
+                                                    } 
+                                                    Spacer(modifier = Modifier.height(10.dp)) 
+                                                    FlowRow( 
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp), 
+                                                        verticalArrangement = Arrangement.spacedBy(6.dp), 
+                                                        modifier = Modifier.fillMaxWidth() 
+                                                    ) { 
+                                                        story.storyWords.forEach { wordItem -> 
+                                                            Surface( 
+                                                                shape = RoundedCornerShape(8.dp), 
+                                                                color = BlossomColors.SkyCyanContainer, 
+                                                                border = BorderStroke( 
+                                                                    1.dp, 
+                                                                    BlossomColors.SkyCyan.copy(alpha = 0.4f) 
+                                                                ), 
+                                                                onClick = { 
+                                                                    quickJishoWord = wordItem.kanji.ifBlank { wordItem.surface } 
+                                                                } 
+                                                            ) { 
+                                                                Row( 
+                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
+                                                                    verticalAlignment = Alignment.CenterVertically 
+                                                                ) { 
+                                                                    Text( 
+                                                                        text = wordItem.kanji, 
+                                                                        fontSize = 12.sp, 
+                                                                        fontWeight = FontWeight.Medium, 
+                                                                        color = BlossomColors.SkyCyan, 
+                                                                        maxLines = 1, 
+                                                                        softWrap = false 
+                                                                    ) 
+                                                                    if (wordItem.reading.isNotBlank()) { 
+                                                                        Spacer(modifier = Modifier.width(4.dp)) 
+                                                                        Text( 
+                                                                            text = "(${wordItem.reading})", 
+                                                                            fontSize = 10.sp, 
+                                                                            color = BlossomColors.TextMuted, 
+                                                                            maxLines = 1, 
+                                                                            softWrap = false 
                                                                         ) 
                                                                     } 
                                                                 } 
@@ -2815,20 +2892,33 @@ fun ReadingScreen(
     if (quickJishoWord != null) { 
         val wordText = quickJishoWord!! 
         val existingItem = currentStory?.targetWordsData?.find { it.kanji == wordText || it.surface == wordText } 
+            ?: currentStory?.storyWords?.find { it.kanji == wordText || it.surface == wordText } 
         val itemToDisplay = existingItem ?: StoryWordItem( 
             kanji = wordText, 
             reading = "", 
             meaning = "" 
         ) 
+        val isBookmarked = BookmarkManager.isBookmarked(wordText) 
         BlossomWordBottomSheet( 
             wordItem = itemToDisplay, 
-            isBookmarked = false, 
+            isBookmarked = isBookmarked, 
             showFurigana = showFurigana, 
             onToggleFurigana = { 
                 showFurigana = !showFurigana 
                 prefs.showFuriganaInReader = showFurigana 
             }, 
-            onToggleBookmark = {}, 
+            onToggleBookmark = { 
+                val storySentence = currentStory?.content?.lines()?.flatMap { l -> 
+                    l.split("。", "？", "！").filter { it.contains(wordText) } 
+                }?.firstOrNull()?.trim() ?: "" 
+                BookmarkManager.toggleBookmark( 
+                    kanji = wordText, 
+                    reading = itemToDisplay.reading, 
+                    meaning = itemToDisplay.meaning, 
+                    sentence = storySentence, 
+                    sourceStoryTitle = currentStory?.title 
+                ) 
+            }, 
             onPlayAudio = { 
                 quickJishoWord?.let { ttsHelper.speak(it) } 
             }, 
