@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AutoAwesome 
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Style
@@ -59,12 +60,14 @@ enum class BlossomTab(
 ) { 
     CARDS("Cards", Icons.Default.Style), 
     STORIES("Stories", Icons.AutoMirrored.Filled.MenuBook), 
+    LIBRARY("Library", Icons.Default.Bookmark), 
     JISHO("Jisho", Icons.Default.Search); 
     
     val activeColor: Color 
         get() = when (this) { 
             CARDS -> BlossomColors.SlateBlue 
             STORIES -> BlossomColors.SkyCyan 
+            LIBRARY -> BlossomColors.WarmAmber 
             JISHO -> BlossomColors.MatchaSage 
         } 
         
@@ -72,12 +75,13 @@ enum class BlossomTab(
         get() = when (this) { 
             CARDS -> BlossomColors.SlateBlueContainer 
             STORIES -> BlossomColors.SkyCyanContainer 
+            LIBRARY -> BlossomColors.WarmAmberContainer 
             JISHO -> BlossomColors.MatchaSageContainer 
         } 
     
     companion object { 
         val STUDY get() = CARDS 
-        val VOCAB get() = JISHO 
+        val VOCAB get() = LIBRARY 
     } 
 } 
     

@@ -181,6 +181,7 @@ object BlossomColors {
         private set 
     var WarmAmberSurface by mutableStateOf(Color(0xFF332717)) 
         private set 
+    val WarmAmberContainer: Color get() = WarmAmberSurface 
     
     var VioletPurple by mutableStateOf(Color(0xFF9678B6)) 
         private set 
