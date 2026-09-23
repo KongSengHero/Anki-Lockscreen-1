@@ -811,6 +811,150 @@ class AnkiDroidHelper(private val context: Context) {
         }
     }
     
+    fun getCardsCount(searchQuery: String): Int { 
+        if (!hasApiPermission()) { 
+            return 0 
+        } 
+        for (pkg in AnkiDroidContract.KNOWN_PACKAGES) { 
+            val authority = AnkiDroidContract.getAuthorityForPackage(pkg) 
+            val uri = AnkiDroidContract.Cards.getContentUri(authority) 
+            try { 
+                val cursor = resolver.query( 
+                    uri, 
+                    arrayOf(AnkiDroidContract.Cards._ID), 
+                    searchQuery, 
+                    null, 
+                    null 
+                ) 
+                cursor?.use { 
+                    return it.count 
+                } 
+            } catch (e: Exception) { 
+            } 
+        } 
+        return 0 
+    } 
+    
+    fun addNotesToDeck(deckName: String, words: List<com.ankilock.data.BookmarkedWord>): Int { 
+        if (!hasApiPermission() || words.isEmpty()) return 0 
+        var addedCount = 0 
+        for (pkg in AnkiDroidContract.KNOWN_PACKAGES) { 
+            val authority = AnkiDroidContract.getAuthorityForPackage(pkg) 
+            val modelsUri = AnkiDroidContract.Models.getContentUri(authority) 
+            val notesUri = AnkiDroidContract.Notes.getContentUri(authority) 
+            val decksUri = AnkiDroidContract.Decks.getContentUri(authority) 
+            
+            var targetDeckId: Long? = null 
+            try { 
+                val deckCur = resolver.query( 
+                    decksUri, 
+                    arrayOf(COL_DECK_ID, COL_DECK_NAME), 
+                    null, 
+                    null, 
+                    null 
+                ) 
+                deckCur?.use { cur -> 
+                    val idCol = cur.getColumnIndex(COL_DECK_ID) 
+                    val nameCol = cur.getColumnIndex(COL_DECK_NAME) 
+                    while (cur.moveToNext()) { 
+                        val name = cur.getString(nameCol) 
+                        if (name == deckName) { 
+                            targetDeckId = cur.getLong(idCol) 
+                            break 
+                        } 
+                    } 
+                } 
+            } catch (e: Exception) { 
+            } 
+            
+            if (targetDeckId == null) { 
+                try { 
+                    val deckValues = ContentValues().apply { 
+                        put(COL_DECK_NAME, deckName) 
+                    } 
+                    val newDeckUri = resolver.insert(decksUri, deckValues) 
+                    if (newDeckUri != null) { 
+                        targetDeckId = newDeckUri.lastPathSegment?.toLongOrNull() 
+                    } 
+                } catch (e: Exception) { 
+                } 
+            } 
+            
+            var targetModelId: Long? = null 
+            var fieldCount = 2 
+            try { 
+                val modelCur = resolver.query( 
+                    modelsUri, 
+                    arrayOf(AnkiDroidContract.Models._ID, AnkiDroidContract.Models.NAME, AnkiDroidContract.Models.FIELD_NAMES), 
+                    null, 
+                    null, 
+                    null 
+                ) 
+                modelCur?.use { cur -> 
+                    val idCol = cur.getColumnIndex(AnkiDroidContract.Models._ID) 
+                    val nameCol = cur.getColumnIndex(AnkiDroidContract.Models.NAME) 
+                    val fieldsCol = cur.getColumnIndex(AnkiDroidContract.Models.FIELD_NAMES) 
+                    while (cur.moveToNext()) { 
+                        val mId = cur.getLong(idCol) 
+                        val mName = cur.getString(nameCol) ?: "" 
+                        val fNames = cur.getString(fieldsCol) ?: "" 
+                        val count = if (fNames.startsWith("[")) { 
+                            try { org.json.JSONArray(fNames).length() } catch (e: Exception) { 2 } 
+                        } else 2 
+                        if (mName.contains("Kaishi", ignoreCase = true) || count >= 14) { 
+                            targetModelId = mId 
+                            fieldCount = count 
+                            break 
+                        } 
+                        if (targetModelId == null) { 
+                            targetModelId = mId 
+                            fieldCount = count 
+                        } 
+                    } 
+                } 
+            } catch (e: Exception) { 
+            } 
+            
+            if (targetModelId == null) continue 
+            
+            for (word in words) { 
+                try { 
+                    val flds = if (fieldCount >= 14) { 
+                        val list = listOf( 
+                            word.kanji, 
+                            word.reading, 
+                            word.meaning, 
+                            if (word.furigana.isNotBlank()) word.furigana else "${word.kanji}[${word.reading}]", 
+                            "", 
+                            word.sentence, 
+                            word.sentenceMeaning, 
+                            if (word.sentenceFurigana.isNotBlank()) word.sentenceFurigana else word.sentence, 
+                            "", "", "", "", "", "" 
+                        ) 
+                        list.joinToString("\u001f") 
+                    } else { 
+                        val front = if (word.reading.isNotBlank()) "${word.kanji} [${word.reading}]<br><br>${word.sentence}" else "${word.kanji}<br><br>${word.sentence}" 
+                        val back = if (word.sentenceMeaning.isNotBlank()) "${word.meaning}<br><br>${word.sentenceMeaning}" else word.meaning 
+                        "$front\u001f$back" 
+                    } 
+                    
+                    val values = ContentValues().apply { 
+                        put(AnkiDroidContract.Notes.MID, targetModelId) 
+                        put(AnkiDroidContract.Notes.FLDS, flds) 
+                        put(AnkiDroidContract.Notes.TAGS, "Blossom") 
+                    } 
+                    val inserted = resolver.insert(notesUri, values) 
+                    if (inserted != null) { 
+                        addedCount++ 
+                    } 
+                } catch (e: Exception) { 
+                } 
+            } 
+            if (addedCount > 0) return addedCount 
+        } 
+        return addedCount 
+    } 
+    
     companion object { 
         const val ANKI_PACKAGE = "com.ichi2.anki"
         const val PERMISSION_READ_WRITE_DATABASE = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
