@@ -77,7 +77,7 @@ object CardSessionManager {
         val selectedDecks = prefs.getSelectedDeckIdsAsLongs() 
         
         if (card != null) { 
-            if (card.cardType == 0 && ease >= 2) { 
+            if (ease >= 2) { 
                 prefs.recordNewCardLearned() 
             } 
             val oldStats = currentStats 

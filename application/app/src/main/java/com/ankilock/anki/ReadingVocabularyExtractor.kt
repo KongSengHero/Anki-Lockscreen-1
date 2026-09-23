@@ -108,7 +108,7 @@ class ReadingVocabularyExtractor(private val context: Context) {
             notesUri = notesUri, 
             searchQuery = suspendedSearchQuery, 
             isSuspended = true, 
-            state = "review", 
+            state = "suspended", 
             outMap = suspendedMap 
         ) 
 
@@ -257,6 +257,7 @@ class ReadingVocabularyExtractor(private val context: Context) {
                     if (noteId > 0 && !processedNoteIds.contains(noteId)) { 
                         processedNoteIds.add(noteId) 
                         val cardState = when { 
+                            isSuspended -> "suspended" 
                             interval >= 21 -> "learned" 
                             queue == 2 -> "review" 
                             else -> "learn" 

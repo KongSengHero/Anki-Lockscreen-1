@@ -37,6 +37,9 @@ data class JishoWord(
     val primaryReading: String 
         get() = japanese.firstOrNull()?.reading ?: "" 
     
+    val primaryEnglish: String 
+        get() = senses.firstOrNull()?.englishDefinitions?.joinToString(", ") ?: "" 
+    
     val romaji: String 
         get() = if (primaryReading.isNotBlank()) { 
             RomajiHelper.kanaToRomaji(primaryReading) 

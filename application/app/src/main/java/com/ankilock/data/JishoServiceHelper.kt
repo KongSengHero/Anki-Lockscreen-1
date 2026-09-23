@@ -20,12 +20,83 @@ data class JishoWordResult(
     val jlpt: String?, 
     val partsOfSpeech: List<String>, 
     val definitions: List<String> 
+) { 
+    val primaryEnglish: String 
+        get() = definitions.joinToString(", ") 
+} 
+
+data class JishoSentence( 
+    val sentence: String, 
+    val meaning: String 
 ) 
     
 object JishoServiceHelper { 
     
     private val legacyCache = ConcurrentHashMap<String, JishoWordResult>() 
     private val wordsCache = ConcurrentHashMap<String, List<JishoWord>>() 
+    private val sentencesCache = ConcurrentHashMap<String, JishoSentence>() 
+
+    suspend fun fetchSentence(keyword: String): JishoSentence? { 
+        val clean = keyword.trim() 
+        if (clean.isBlank()) return null 
+        
+        sentencesCache[clean]?.let { return it } 
+
+        return withContext(Dispatchers.IO) { 
+            var connection: HttpURLConnection? = null 
+            try { 
+                val encoded = URLEncoder.encode(clean, "UTF-8") 
+                val url = URL("https://tatoeba.org/en/api_v0/search?from=jpn&to=eng&query=$encoded&orphans=no&unapproved=no") 
+                connection = url.openConnection() as HttpURLConnection 
+                connection.requestMethod = "GET" 
+                connection.connectTimeout = 8000 
+                connection.readTimeout = 8000 
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0") 
+                connection.setRequestProperty("Accept", "application/json") 
+
+                val responseCode = connection.responseCode 
+                if (responseCode == HttpURLConnection.HTTP_OK) { 
+                    val reader = BufferedReader(InputStreamReader(connection.inputStream)) 
+                    val response = reader.readText() 
+                    reader.close() 
+
+                    val root = JSONObject(response) 
+                    val results = root.optJSONArray("results") 
+                    if (results != null) { 
+                        for (i in 0 until results.length()) { 
+                            val item = results.optJSONObject(i) ?: continue 
+                            val text = item.optString("text", "") 
+                            if (text.contains(clean)) { 
+                                var enText = "" 
+                                val transArr = item.optJSONArray("translations") 
+                                if (transArr != null && transArr.length() > 0) { 
+                                    for (g in 0 until transArr.length()) { 
+                                        val group = transArr.optJSONArray(g) ?: continue 
+                                        for (j in 0 until group.length()) { 
+                                            val tObj = group.optJSONObject(j) ?: continue 
+                                            if (tObj.optString("lang") == "eng") { 
+                                                enText = tObj.optString("text", "") 
+                                                break 
+                                            } 
+                                        } 
+                                        if (enText.isNotBlank()) break 
+                                    } 
+                                } 
+                                val res = JishoSentence(sentence = text, meaning = enText) 
+                                sentencesCache[clean] = res 
+                                return@withContext res 
+                            } 
+                        } 
+                    } 
+                } 
+                null 
+            } catch (e: Exception) { 
+                null 
+            } finally { 
+                connection?.disconnect() 
+            } 
+        } 
+    } 
     
     suspend fun searchWords(keyword: String): Result<List<JishoWord>> { 
         val trimmed = keyword.trim() 

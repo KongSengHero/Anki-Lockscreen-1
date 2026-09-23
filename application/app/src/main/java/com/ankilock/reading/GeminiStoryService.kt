@@ -180,11 +180,12 @@ class GeminiStoryService {
             
             val storyWordsArray = json.optJSONArray("storyWords") 
             val storyWordsList = mutableListOf<StoryWordItem>() 
+            val targetSet = targetWords.map { it.trim() }.filter { it.isNotBlank() }.toSet() 
             if (storyWordsArray != null) { 
                 for (i in 0 until storyWordsArray.length()) { 
                     val swObj = storyWordsArray.optJSONObject(i) ?: continue 
                     val k = swObj.optString("kanji", "").ifBlank { swObj.optString("surface", "") } 
-                    if (k.isNotBlank()) { 
+                    if (k.isNotBlank() && !targetSet.contains(k.trim())) { 
                         storyWordsList.add( 
                             StoryWordItem( 
                                 kanji = k, 
@@ -401,7 +402,7 @@ class GeminiStoryService {
                    Correct: 疲[つか]れる / 疲[つか]れ (NEVER write 疲[つ]れ), 忙[いそが]しい (NEVER 忙[い]しい), 楽[たの]しい (NEVER 楽[た]しい), 暖[あたた]かい (NEVER 暖[あ]かい), 驚[おどろ]く (NEVER 驚[お]く), 届[とど]く (NEVER 届[と]く), 静[しず]か (NEVER 静[し]か), 幸[しあわ]せ (NEVER 幸[し]せ).
                - ZERO English in story text: The story in both "storyJapanese" and "storyFurigana" must be 100% Japanese. Never insert English definitions, English annotations, or English brackets into the story.
             $req4
-            5. "storyWords": Extract 6 to 10 notable, authentic Japanese vocabulary words that actively appear in the story text (excluding basic grammatical particles and common pronouns). Return them with their kanji/kana, hiragana reading, and English meaning.
+            5. "storyWords": Extract 16 to 24 notable, authentic Japanese vocabulary words that actively appear in the story text (excluding basic grammatical particles and common pronouns). CRITICAL: "storyWords" MUST NOT INCLUDE any of the Target Words listed above (or words already in targetWords); every word in "storyWords" must be a NEW, distinct vocabulary word from the story. Return them with their kanji/kana, hiragana reading, and English meaning.
             6. Return ONLY valid JSON with this exact schema (no markdown formatting, no code blocks):
             {
               "title": "Story Title in Japanese",

@@ -373,10 +373,13 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putStringSet(KEY_PASSED_STORIES, value).apply() 
     
     fun markStoryPassed(storyId: String) { 
+        val alreadyPassed = passedStoryIds.contains(storyId) 
         val set = passedStoryIds.toMutableSet() 
         set.add(storyId) 
         passedStoryIds = set 
-        recordStoryTestPassed() 
+        if (!alreadyPassed) { 
+            recordStoryTestPassed() 
+        } 
     } 
     
     var storyDailyEnergyRemaining: Int 
@@ -576,7 +579,38 @@ class PreferencesManager(context: Context) {
     var dailyStreakCount: Int 
         get() { 
             checkAndResetDailyProgress() 
-            return prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
+            val today = getTodayDateString() 
+            val yesterday = getYesterdayDateString() 
+            val dates = streakCompletedDates.toMutableSet() 
+            val storedCount = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
+            val lastDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
+            if (storedCount > 0 && lastDate.isNotEmpty()) { 
+                try { 
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US) 
+                    val cal = java.util.Calendar.getInstance() 
+                    val parsed = sdf.parse(lastDate) 
+                    if (parsed != null) { 
+                        cal.time = parsed 
+                        var backfilled = false 
+                        for (i in 0 until storedCount) { 
+                            val dStr = sdf.format(cal.time) 
+                            if (dates.add(dStr)) { 
+                                backfilled = true 
+                            } 
+                            cal.add(java.util.Calendar.DAY_OF_YEAR, -1) 
+                        } 
+                        if (backfilled) { 
+                            streakCompletedDates = dates 
+                        } 
+                    } 
+                } catch (e: Exception) { 
+                } 
+            } 
+            val calculated = calculateStreakFromDates(dates, today, yesterday) 
+            if (calculated != storedCount) { 
+                prefs.edit().putInt(KEY_DAILY_STREAK_COUNT, calculated).apply() 
+            } 
+            return calculated 
         } 
         set(value) = prefs.edit().putInt(KEY_DAILY_STREAK_COUNT, value).apply() 
     
@@ -612,19 +646,54 @@ class PreferencesManager(context: Context) {
         return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(cal.time) 
     } 
     
+    fun calculateStreakFromDates(dates: Set<String>, today: String, yesterday: String): Int { 
+        if (dates.isEmpty()) { 
+            return 0 
+        } 
+        val startCal = java.util.Calendar.getInstance() 
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US) 
+        if (dates.contains(today)) { 
+            try { 
+                val parsed = sdf.parse(today) ?: return 0 
+                startCal.time = parsed 
+            } catch (e: Exception) { 
+                return 0 
+            } 
+        } else if (dates.contains(yesterday)) { 
+            try { 
+                val parsed = sdf.parse(yesterday) ?: return 0 
+                startCal.time = parsed 
+            } catch (e: Exception) { 
+                return 0 
+            } 
+        } else { 
+            return 0 
+        } 
+        
+        var count = 0 
+        while (true) { 
+            val checkDate = sdf.format(startCal.time) 
+            if (dates.contains(checkDate)) { 
+                count++ 
+                startCal.add(java.util.Calendar.DAY_OF_YEAR, -1) 
+            } else { 
+                break 
+            } 
+        } 
+        return count 
+    } 
+    
     fun checkAndResetDailyProgress() { 
         val today = getTodayDateString() 
         val recordedDate = prefs.getString(KEY_TODAY_PROGRESS_DATE, "") ?: "" 
         if (recordedDate != today) { 
             val yesterday = getYesterdayDateString() 
-            val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
-            if (lastStreakDate.isNotEmpty() && lastStreakDate != yesterday && lastStreakDate != today) { 
-                prefs.edit().putInt(KEY_DAILY_STREAK_COUNT, 0).apply() 
-            } 
+            val calculated = calculateStreakFromDates(streakCompletedDates, today, yesterday) 
             prefs.edit() 
                 .putString(KEY_TODAY_PROGRESS_DATE, today) 
                 .putInt(KEY_TODAY_LEARNED_CARDS_COUNT, 0) 
                 .putBoolean(KEY_TODAY_STORY_COMPLETED, false) 
+                .putInt(KEY_DAILY_STREAK_COUNT, calculated) 
                 .apply() 
         } 
     } 
@@ -678,43 +747,43 @@ class PreferencesManager(context: Context) {
         checkAndResetDailyProgress() 
         val today = getTodayDateString() 
         addStreakCompletedDate(today) 
-        val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
-        if (lastStreakDate != today) { 
-            val yesterday = getYesterdayDateString() 
-            val currentStreak = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
-            val newStreak = if (lastStreakDate == yesterday) currentStreak + 1 else 1 
-            prefs.edit() 
-                .putInt(KEY_DAILY_STREAK_COUNT, newStreak) 
-                .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
-                .putBoolean(KEY_TODAY_STORY_COMPLETED, true) 
-                .apply() 
-        } 
+        prefs.edit() 
+            .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
+            .putBoolean(KEY_TODAY_STORY_COMPLETED, true) 
+            .apply() 
+        val yesterday = getYesterdayDateString() 
+        val calculated = calculateStreakFromDates(streakCompletedDates, today, yesterday) 
+        prefs.edit().putInt(KEY_DAILY_STREAK_COUNT, calculated).apply() 
     } 
     
-    fun evaluateDailyStreak() { 
+    fun evaluateDailyStreak(ankiDroidHelper: com.ankilock.anki.AnkiDroidHelper? = null) { 
+        checkAndResetDailyProgress() 
         val today = getTodayDateString() 
-        val lastStreakDate = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
-        val learnedCards = prefs.getInt(KEY_TODAY_LEARNED_CARDS_COUNT, 0) 
+        var learnedCards = prefs.getInt(KEY_TODAY_LEARNED_CARDS_COUNT, 0) 
+        if (ankiDroidHelper != null && ankiDroidHelper.hasApiPermission()) { 
+            val introduced = ankiDroidHelper.getCardsCount("introduced:1") 
+            val rated = ankiDroidHelper.getCardsCount("rated:1") 
+            val ankiMax = maxOf(introduced, rated) 
+            if (ankiMax > learnedCards) { 
+                learnedCards = ankiMax 
+                prefs.edit().putInt(KEY_TODAY_LEARNED_CARDS_COUNT, learnedCards).apply() 
+            } 
+        } 
         val storyDone = prefs.getBoolean(KEY_TODAY_STORY_COMPLETED, false) 
         val qualifies = learnedCards >= 10 || storyDone 
         if (qualifies) { 
             addStreakCompletedDate(today) 
-            if (lastStreakDate != today) { 
-                val yesterday = getYesterdayDateString() 
-                val currentStreak = prefs.getInt(KEY_DAILY_STREAK_COUNT, 0) 
-                val newStreak = if (lastStreakDate == yesterday) currentStreak + 1 else 1 
-                prefs.edit() 
-                    .putInt(KEY_DAILY_STREAK_COUNT, newStreak) 
-                    .putString(KEY_LAST_COMPLETED_STREAK_DATE, today) 
-                    .apply() 
-            } 
+            prefs.edit().putString(KEY_LAST_COMPLETED_STREAK_DATE, today).apply() 
         } 
+        val yesterday = getYesterdayDateString() 
+        val calculated = calculateStreakFromDates(streakCompletedDates, today, yesterday) 
+        prefs.edit().putInt(KEY_DAILY_STREAK_COUNT, calculated).apply() 
     } 
     
     val isStreakCompletedToday: Boolean 
         get() { 
             checkAndResetDailyProgress() 
-            return lastCompletedStreakDate == getTodayDateString() 
+            return streakCompletedDates.contains(getTodayDateString()) 
         } 
     
     fun incrementThemeUsage(theme: String) { 

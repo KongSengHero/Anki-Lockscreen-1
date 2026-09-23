@@ -64,6 +64,8 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown 
+import androidx.compose.material.icons.filled.KeyboardArrowUp 
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Public
@@ -248,6 +250,8 @@ fun ReadingScreen(
     var currentlyPlayingStoryId by remember { mutableStateOf<String?>(null) } 
     var activeSentenceIndex by remember { mutableIntStateOf(-1) } 
     var showQuizOverlay by remember { mutableStateOf(false) } 
+    var isTargetWordsCollapsed by remember { mutableStateOf(true) } 
+    var isStoryWordsCollapsed by remember { mutableStateOf(true) } 
     var showFurigana by remember { mutableStateOf(prefs.showFuriganaInReader) } 
     var highlightWords by remember { mutableStateOf(prefs.highlightVocabularyWords) } 
     var narrationSpeed by remember { mutableStateOf(1.0f) } 
@@ -1553,67 +1557,88 @@ fun ReadingScreen(
                                         modifier = Modifier.fillMaxWidth() 
                                     ) { 
                                                 Column(modifier = Modifier.padding(14.dp)) { 
-                                                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                                                        Icon( 
-                                                            Icons.Filled.School, 
-                                                            contentDescription = null, 
-                                                            tint = BlossomColors.SakuraRose, 
-                                                            modifier = Modifier.size(16.dp) 
-                                                        ) 
-                                                        Spacer(modifier = Modifier.width(8.dp)) 
-                                                        Text( 
-                                                            text = "TARGET WORDS FROM YOUR CARDS (${story.targetWords.size})", 
-                                                            fontSize = 11.sp, 
-                                                            fontWeight = FontWeight.Bold, 
-                                                            color = BlossomColors.TextSecondary, 
-                                                            letterSpacing = 0.5.sp 
-                                                        ) 
-                                                    } 
-                                                    Spacer(modifier = Modifier.height(10.dp)) 
-                                                    FlowRow( 
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp), 
-                                                        verticalArrangement = Arrangement.spacedBy(6.dp), 
-                                                        modifier = Modifier.fillMaxWidth() 
+                                                    Row( 
+                                                        modifier = Modifier.fillMaxWidth(), 
+                                                        verticalAlignment = Alignment.CenterVertically, 
+                                                        horizontalArrangement = Arrangement.SpaceBetween 
                                                     ) { 
-                                                        story.targetWords.forEach { word -> 
-                                                            val isPresent = story.content.contains(word) 
-                                                            val matchedItem = story.targetWordsData.find { it.kanji == word || it.surface == word }?.let { 
-                                                                AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
-                                                            } ?: vocabSummary?.words?.find { it.displayWord == word || it.kanji == word } 
-                                                            Surface( 
-                                                                shape = RoundedCornerShape(8.dp), 
-                                                                color = if (isPresent) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard1, 
-                                                                border = BorderStroke( 
-                                                                    1.dp, 
-                                                                    if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
-                                                                ), 
-                                                                onClick = { 
-                                                                    matchedItem?.let {
-                                                                        translateTargetText = it.displayWord
-                                                                        showTranslationSheet = true
-                                                                    } 
-                                                                } 
+                                                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                                                            Icon( 
+                                                                Icons.Filled.School, 
+                                                                contentDescription = null, 
+                                                                tint = BlossomColors.SakuraRose, 
+                                                                modifier = Modifier.size(16.dp) 
+                                                            ) 
+                                                            Spacer(modifier = Modifier.width(8.dp)) 
+                                                            Text( 
+                                                                text = "TARGET WORDS FROM YOUR CARDS (${story.targetWords.size})", 
+                                                                fontSize = 11.sp, 
+                                                                fontWeight = FontWeight.Bold, 
+                                                                color = BlossomColors.TextSecondary, 
+                                                                letterSpacing = 0.5.sp 
+                                                            ) 
+                                                        } 
+                                                        IconButton( 
+                                                            onClick = { isTargetWordsCollapsed = !isTargetWordsCollapsed }, 
+                                                            modifier = Modifier.size(24.dp) 
+                                                        ) { 
+                                                            Icon( 
+                                                                imageVector = if (isTargetWordsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp, 
+                                                                contentDescription = if (isTargetWordsCollapsed) "Expand Target Words" else "Collapse Target Words", 
+                                                                tint = BlossomColors.TextSecondary, 
+                                                                modifier = Modifier.size(18.dp) 
+                                                            ) 
+                                                        } 
+                                                    } 
+                                                    AnimatedVisibility(visible = !isTargetWordsCollapsed) { 
+                                                        Column { 
+                                                            Spacer(modifier = Modifier.height(10.dp)) 
+                                                            FlowRow( 
+                                                                horizontalArrangement = Arrangement.spacedBy(6.dp), 
+                                                                verticalArrangement = Arrangement.spacedBy(6.dp), 
+                                                                modifier = Modifier.fillMaxWidth() 
                                                             ) { 
-                                                                Row( 
-                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                                                    verticalAlignment = Alignment.CenterVertically 
-                                                                ) { 
-                                                                    Text( 
-                                                                        text = word, 
-                                                                        fontSize = 12.sp, 
-                                                                        fontWeight = if (isPresent) FontWeight.Bold else FontWeight.Normal, 
-                                                                        color = if (isPresent) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
-                                                                        maxLines = 1, 
-                                                                        softWrap = false 
-                                                                    ) 
-                                                                    if (isPresent) { 
-                                                                        Spacer(modifier = Modifier.width(4.dp)) 
-                                                                        Icon( 
-                                                                            Icons.Filled.Check, 
-                                                                            contentDescription = "Used in story", 
-                                                                            tint = BlossomColors.BlossomGreen, 
-                                                                            modifier = Modifier.size(12.dp) 
-                                                                        ) 
+                                                                story.targetWords.forEach { word -> 
+                                                                    val isPresent = story.content.contains(word) 
+                                                                    val matchedItem = story.targetWordsData.find { it.kanji == word || it.surface == word }?.let { 
+                                                                        AnkiVocabularyItem(kanji = it.kanji, reading = it.reading, meaning = it.meaning) 
+                                                                    } ?: vocabSummary?.words?.find { it.displayWord == word || it.kanji == word } 
+                                                                    Surface( 
+                                                                        shape = RoundedCornerShape(8.dp), 
+                                                                        color = if (isPresent) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard1, 
+                                                                        border = BorderStroke( 
+                                                                            1.dp, 
+                                                                            if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
+                                                                        ), 
+                                                                        onClick = { 
+                                                                            matchedItem?.let { 
+                                                                                translateTargetText = it.displayWord 
+                                                                                showTranslationSheet = true 
+                                                                            } 
+                                                                        } 
+                                                                    ) { 
+                                                                        Row( 
+                                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
+                                                                            verticalAlignment = Alignment.CenterVertically 
+                                                                        ) { 
+                                                                            Text( 
+                                                                                text = word, 
+                                                                                fontSize = 12.sp, 
+                                                                                fontWeight = if (isPresent) FontWeight.Bold else FontWeight.Normal, 
+                                                                                color = if (isPresent) BlossomColors.SakuraRose else BlossomColors.TextSecondary, 
+                                                                                maxLines = 1, 
+                                                                                softWrap = false 
+                                                                            ) 
+                                                                            if (isPresent) { 
+                                                                                Spacer(modifier = Modifier.width(4.dp)) 
+                                                                                Icon( 
+                                                                                    Icons.Filled.Check, 
+                                                                                    contentDescription = "Used in story", 
+                                                                                    tint = BlossomColors.BlossomGreen, 
+                                                                                    modifier = Modifier.size(12.dp) 
+                                                                                ) 
+                                                                            } 
+                                                                        } 
                                                                     } 
                                                                 } 
                                                             } 
@@ -1623,7 +1648,15 @@ fun ReadingScreen(
                                             } 
                                         } 
                                         
-                                        if (story.storyWords.isNotEmpty()) { 
+                                        val distinctStoryWords = remember(story) { 
+                                            val targetSet = story.targetWords.map { it.trim() }.toSet() 
+                                            story.storyWords.filter { sw -> 
+                                                val k = sw.kanji.ifBlank { sw.surface }.trim() 
+                                                k.isNotBlank() && !targetSet.contains(k) 
+                                            } 
+                                        } 
+                                        
+                                        if (distinctStoryWords.isNotEmpty()) { 
                                             Spacer(modifier = Modifier.height(14.dp)) 
                                             Surface( 
                                                 shape = RoundedCornerShape(14.dp), 
@@ -1632,61 +1665,82 @@ fun ReadingScreen(
                                                 modifier = Modifier.fillMaxWidth() 
                                             ) { 
                                                 Column(modifier = Modifier.padding(14.dp)) { 
-                                                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                                                        Icon( 
-                                                            Icons.AutoMirrored.Filled.MenuBook, 
-                                                            contentDescription = null, 
-                                                            tint = BlossomColors.SkyCyan, 
-                                                            modifier = Modifier.size(16.dp) 
-                                                        ) 
-                                                        Spacer(modifier = Modifier.width(8.dp)) 
-                                                        Text( 
-                                                            text = "WORDS FROM STORY (${story.storyWords.size})", 
-                                                            fontSize = 11.sp, 
-                                                            fontWeight = FontWeight.Bold, 
-                                                            color = BlossomColors.TextSecondary, 
-                                                            letterSpacing = 0.5.sp 
-                                                        ) 
-                                                    } 
-                                                    Spacer(modifier = Modifier.height(10.dp)) 
-                                                    FlowRow( 
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp), 
-                                                        verticalArrangement = Arrangement.spacedBy(6.dp), 
-                                                        modifier = Modifier.fillMaxWidth() 
+                                                    Row( 
+                                                        modifier = Modifier.fillMaxWidth(), 
+                                                        verticalAlignment = Alignment.CenterVertically, 
+                                                        horizontalArrangement = Arrangement.SpaceBetween 
                                                     ) { 
-                                                        story.storyWords.forEach { wordItem -> 
-                                                            Surface( 
-                                                                shape = RoundedCornerShape(8.dp), 
-                                                                color = BlossomColors.SkyCyanContainer, 
-                                                                border = BorderStroke( 
-                                                                    1.dp, 
-                                                                    BlossomColors.SkyCyan.copy(alpha = 0.4f) 
-                                                                ), 
-                                                                onClick = { 
-                                                                    quickJishoWord = wordItem.kanji.ifBlank { wordItem.surface } 
-                                                                } 
+                                                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                                                            Icon( 
+                                                                Icons.AutoMirrored.Filled.MenuBook, 
+                                                                contentDescription = null, 
+                                                                tint = BlossomColors.SkyCyan, 
+                                                                modifier = Modifier.size(16.dp) 
+                                                            ) 
+                                                            Spacer(modifier = Modifier.width(8.dp)) 
+                                                            Text( 
+                                                                text = "WORDS FROM STORY (${distinctStoryWords.size})", 
+                                                                fontSize = 11.sp, 
+                                                                fontWeight = FontWeight.Bold, 
+                                                                color = BlossomColors.TextSecondary, 
+                                                                letterSpacing = 0.5.sp 
+                                                            ) 
+                                                        } 
+                                                        IconButton( 
+                                                            onClick = { isStoryWordsCollapsed = !isStoryWordsCollapsed }, 
+                                                            modifier = Modifier.size(24.dp) 
+                                                        ) { 
+                                                            Icon( 
+                                                                imageVector = if (isStoryWordsCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp, 
+                                                                contentDescription = if (isStoryWordsCollapsed) "Expand Words From Story" else "Collapse Words From Story", 
+                                                                tint = BlossomColors.TextSecondary, 
+                                                                modifier = Modifier.size(18.dp) 
+                                                            ) 
+                                                        } 
+                                                    } 
+                                                    AnimatedVisibility(visible = !isStoryWordsCollapsed) { 
+                                                        Column { 
+                                                            Spacer(modifier = Modifier.height(10.dp)) 
+                                                            FlowRow( 
+                                                                horizontalArrangement = Arrangement.spacedBy(6.dp), 
+                                                                verticalArrangement = Arrangement.spacedBy(6.dp), 
+                                                                modifier = Modifier.fillMaxWidth() 
                                                             ) { 
-                                                                Row( 
-                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                                                    verticalAlignment = Alignment.CenterVertically 
-                                                                ) { 
-                                                                    Text( 
-                                                                        text = wordItem.kanji, 
-                                                                        fontSize = 12.sp, 
-                                                                        fontWeight = FontWeight.Medium, 
-                                                                        color = BlossomColors.SkyCyan, 
-                                                                        maxLines = 1, 
-                                                                        softWrap = false 
-                                                                    ) 
-                                                                    if (wordItem.reading.isNotBlank()) { 
-                                                                        Spacer(modifier = Modifier.width(4.dp)) 
-                                                                        Text( 
-                                                                            text = "(${wordItem.reading})", 
-                                                                            fontSize = 10.sp, 
-                                                                            color = BlossomColors.TextMuted, 
-                                                                            maxLines = 1, 
-                                                                            softWrap = false 
-                                                                        ) 
+                                                                distinctStoryWords.forEach { wordItem -> 
+                                                                    Surface( 
+                                                                        shape = RoundedCornerShape(8.dp), 
+                                                                        color = BlossomColors.SkyCyanContainer, 
+                                                                        border = BorderStroke( 
+                                                                            1.dp, 
+                                                                            BlossomColors.SkyCyan.copy(alpha = 0.4f) 
+                                                                        ), 
+                                                                        onClick = { 
+                                                                            quickJishoWord = wordItem.kanji.ifBlank { wordItem.surface } 
+                                                                        } 
+                                                                    ) { 
+                                                                        Row( 
+                                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
+                                                                            verticalAlignment = Alignment.CenterVertically 
+                                                                        ) { 
+                                                                            Text( 
+                                                                                text = wordItem.kanji, 
+                                                                                fontSize = 12.sp, 
+                                                                                fontWeight = FontWeight.Medium, 
+                                                                                color = BlossomColors.SkyCyan, 
+                                                                                maxLines = 1, 
+                                                                                softWrap = false 
+                                                                            ) 
+                                                                            if (wordItem.reading.isNotBlank()) { 
+                                                                                Spacer(modifier = Modifier.width(4.dp)) 
+                                                                                Text( 
+                                                                                    text = "(${wordItem.reading})", 
+                                                                                    fontSize = 10.sp, 
+                                                                                    color = BlossomColors.TextMuted, 
+                                                                                    maxLines = 1, 
+                                                                                    softWrap = false 
+                                                                                ) 
+                                                                            } 
+                                                                        } 
                                                                     } 
                                                                 } 
                                                             } 
@@ -2908,14 +2962,11 @@ fun ReadingScreen(
                 prefs.showFuriganaInReader = showFurigana 
             }, 
             onToggleBookmark = { 
-                val storySentence = currentStory?.content?.lines()?.flatMap { l -> 
-                    l.split("。", "？", "！").filter { it.contains(wordText) } 
-                }?.firstOrNull()?.trim() ?: "" 
                 BookmarkManager.toggleBookmark( 
                     kanji = wordText, 
                     reading = itemToDisplay.reading, 
                     meaning = itemToDisplay.meaning, 
-                    sentence = storySentence, 
+                    sentence = "", 
                     sourceStoryTitle = currentStory?.title 
                 ) 
             }, 

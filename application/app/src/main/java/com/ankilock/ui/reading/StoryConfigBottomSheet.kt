@@ -107,8 +107,8 @@ fun StoryConfigBottomSheet(
     ) 
     
     val connectingWordsSteps = listOf(0, 5, 7, 9, 11, 22, -1) 
-    val vocabFilterOptions = listOf("all", "learn", "review", "learned") 
-    val vocabFilterLabels = mapOf("all" to "ALL", "learn" to "Learn", "review" to "Review", "learned" to "Learned") 
+    val vocabFilterOptions = listOf("all", "learn", "review", "learned", "suspense") 
+    val vocabFilterLabels = mapOf("all" to "ALL", "learn" to "Learn", "review" to "Review", "learned" to "Learned", "suspense" to "Suspense", "suspended" to "Suspense") 
     
     var selectedLevel by remember { 
         mutableStateOf(if (prefs.readingJlptLevel.isNotBlank()) prefs.readingJlptLevel else "N5") 
@@ -125,7 +125,9 @@ fun StoryConfigBottomSheet(
         mutableFloatStateOf(idx) 
     } 
     var selectedVocabFilter by remember { 
-        mutableStateOf(prefs.storyVocabularyFilter) 
+        val filter = prefs.storyVocabularyFilter 
+        val normalized = if (filter == "suspended") "suspense" else filter 
+        mutableStateOf(if (normalized in vocabFilterOptions) normalized else "all") 
     } 
     
     var selectedTab by remember { mutableIntStateOf(if (prefs.isCustomThemeModeActive) 1 else 0) } 

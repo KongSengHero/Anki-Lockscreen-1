@@ -917,40 +917,64 @@ class AnkiDroidHelper(private val context: Context) {
             
             if (targetModelId == null) continue 
             
+            val notesWithDeckUri = if (targetDeckId != null) { 
+                notesUri.buildUpon().appendQueryParameter("deckId", targetDeckId.toString()).build() 
+            } else { 
+                notesUri 
+            } 
+            
+            val valuesList = mutableListOf<ContentValues>() 
             for (word in words) { 
-                try { 
-                    val flds = if (fieldCount >= 14) { 
-                        val list = listOf( 
-                            word.kanji, 
-                            word.reading, 
-                            word.meaning, 
-                            if (word.furigana.isNotBlank()) word.furigana else "${word.kanji}[${word.reading}]", 
-                            "", 
-                            word.sentence, 
-                            word.sentenceMeaning, 
-                            if (word.sentenceFurigana.isNotBlank()) word.sentenceFurigana else word.sentence, 
-                            "", "", "", "", "", "" 
-                        ) 
-                        list.joinToString("\u001f") 
-                    } else { 
-                        val front = if (word.reading.isNotBlank()) "${word.kanji} [${word.reading}]<br><br>${word.sentence}" else "${word.kanji}<br><br>${word.sentence}" 
-                        val back = if (word.sentenceMeaning.isNotBlank()) "${word.meaning}<br><br>${word.sentenceMeaning}" else word.meaning 
-                        "$front\u001f$back" 
+                val flds = if (fieldCount > 2) { 
+                    val list = mutableListOf( 
+                        word.kanji, 
+                        word.reading, 
+                        word.meaning, 
+                        if (word.furigana.isNotBlank()) word.furigana else "${word.kanji}[${word.reading}]", 
+                        "", 
+                        word.sentence, 
+                        word.sentenceMeaning, 
+                        if (word.sentenceFurigana.isNotBlank()) word.sentenceFurigana else word.sentence 
+                    ) 
+                    while (list.size < fieldCount) { 
+                        list.add("") 
                     } 
-                    
-                    val values = ContentValues().apply { 
-                        put(AnkiDroidContract.Notes.MID, targetModelId) 
-                        put(AnkiDroidContract.Notes.FLDS, flds) 
-                        put(AnkiDroidContract.Notes.TAGS, "Blossom") 
+                    list.take(fieldCount).joinToString("\u001f") 
+                } else { 
+                    val front = if (word.reading.isNotBlank()) "${word.kanji} [${word.reading}]<br><br>${word.sentence}" else "${word.kanji}<br><br>${word.sentence}" 
+                    val back = if (word.sentenceMeaning.isNotBlank()) "${word.meaning}<br><br>${word.sentenceMeaning}" else word.meaning 
+                    "$front\u001f$back" 
+                } 
+                
+                val values = ContentValues().apply { 
+                    put(AnkiDroidContract.Notes.MID, targetModelId) 
+                    put(AnkiDroidContract.Notes.FLDS, flds) 
+                    put(AnkiDroidContract.Notes.TAGS, "Blossom") 
+                } 
+                valuesList.add(values) 
+            } 
+            
+            var inserted = 0 
+            try { 
+                inserted = resolver.bulkInsert(notesWithDeckUri, valuesList.toTypedArray()) 
+            } catch (e: Exception) { 
+            } 
+            
+            if (inserted <= 0) { 
+                for (v in valuesList) { 
+                    try { 
+                        if (resolver.insert(notesWithDeckUri, v) != null) { 
+                            inserted++ 
+                        } 
+                    } catch (e: Exception) { 
                     } 
-                    val inserted = resolver.insert(notesUri, values) 
-                    if (inserted != null) { 
-                        addedCount++ 
-                    } 
-                } catch (e: Exception) { 
                 } 
             } 
-            if (addedCount > 0) return addedCount 
+            
+            if (inserted > 0) { 
+                addedCount += inserted 
+                return addedCount 
+            } 
         } 
         return addedCount 
     } 

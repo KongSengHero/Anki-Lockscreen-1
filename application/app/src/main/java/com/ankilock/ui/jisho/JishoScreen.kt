@@ -117,6 +117,7 @@ fun JishoScreen(
     var recentSearches by remember { mutableStateOf(prefs.recentJishoSearches) } 
     var searchToDelete by remember { mutableStateOf<String?>(null) } 
     val expandedSlugs = remember { mutableStateListOf<String>() } 
+    var playingSlug by remember { mutableStateOf<String?>(null) } 
     val recentListState = rememberLazyListState() 
     val resultsListState = rememberLazyListState() 
     
@@ -569,10 +570,13 @@ fun JishoScreen(
                     } 
                     
                     items(results, key = { it.slug + it.primaryReading }) { word -> 
+                        val itemKey = word.slug + word.primaryReading 
                         val isExpanded = expandedSlugs.contains(word.slug) 
+                        val isPlaying = playingSlug == itemKey 
                         JishoWordCard( 
                             word = word, 
                             isExpanded = isExpanded, 
+                            isPlaying = isPlaying, 
                             onToggleExpand = { 
                                 if (isExpanded) { 
                                     expandedSlugs.remove(word.slug) 
@@ -581,7 +585,13 @@ fun JishoScreen(
                                 } 
                             }, 
                             onPronounce = { 
-                                ttsHelper.speak(word.primaryWord.ifBlank { word.primaryReading }) 
+                                playingSlug = itemKey 
+                                ttsHelper.speak( 
+                                    text = word.primaryWord.ifBlank { word.primaryReading }, 
+                                    onStart = { playingSlug = itemKey }, 
+                                    onDone = { if (playingSlug == itemKey) playingSlug = null }, 
+                                    onError = { if (playingSlug == itemKey) playingSlug = null } 
+                                ) 
                             }, 
                             onCopy = { 
                                 val copyContent = if (word.primaryReading.isNotBlank() && word.primaryReading != word.primaryWord) { 
@@ -673,10 +683,11 @@ fun JishoScreen(
 } 
     
 @OptIn(ExperimentalLayoutApi::class) 
-@Composable
+@Composable 
 private fun JishoWordCard( 
     word: JishoWord, 
     isExpanded: Boolean, 
+    isPlaying: Boolean = false, 
     onToggleExpand: () -> Unit, 
     onPronounce: () -> Unit, 
     onCopy: () -> Unit 
@@ -732,7 +743,7 @@ private fun JishoWordCard(
                         Icon( 
                             imageVector = Icons.AutoMirrored.Filled.VolumeUp, 
                             contentDescription = "Speak", 
-                            tint = BlossomColors.TextSecondary, 
+                            tint = if (isPlaying) BlossomColors.MatchaSage else BlossomColors.TextSecondary.copy(alpha = 0.45f), 
                             modifier = Modifier.size(18.dp) 
                         ) 
                     } 

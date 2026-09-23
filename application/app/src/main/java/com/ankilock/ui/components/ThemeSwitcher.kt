@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankilock.ui.blossom.AppTheme
@@ -175,7 +176,8 @@ fun <T> SlidingPillSwitcher(
     labelProvider: (T) -> String = { it.toString() }, 
     iconProvider: ((T) -> ImageVector?)? = null, 
     activeColor: Color = BlossomColors.SakuraRose, 
-    height: androidx.compose.ui.unit.Dp = 44.dp 
+    height: androidx.compose.ui.unit.Dp = 44.dp, 
+    fontSize: TextUnit = if (options.size >= 5) 11.sp else 12.sp 
 ) { 
     val selectedIndex = options.indexOf(selectedOption).coerceAtLeast(0) 
     
@@ -258,7 +260,7 @@ fun <T> SlidingPillSwitcher(
                             } 
                             Text( 
                                 text = labelProvider(option), 
-                                fontSize = 12.sp, 
+                                fontSize = fontSize, 
                                 fontFamily = BlossomNunito, 
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
                                 color = if (isSelected) activeColor else BlossomColors.TextSecondary, 
