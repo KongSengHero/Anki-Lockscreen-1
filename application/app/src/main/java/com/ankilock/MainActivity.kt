@@ -287,6 +287,7 @@ class MainActivity : ComponentActivity() {
         ankiHelper = AnkiDroidHelper(this) 
         prefs = PreferencesManager(this) 
         audioPlayer = AudioPlayerHelper(this) 
+        com.ankilock.data.BookmarkManager.init(this) 
         
         backgroundTypeState = prefs.backgroundType 
         appBackgroundTypeState = prefs.appBackgroundType 
@@ -345,7 +346,8 @@ class MainActivity : ComponentActivity() {
             decksState = ankiHelper.getDeckList()
             previewCardState = CardSessionManager.getOrFetchCard(this, forceRefresh = true)
         }
-        prefs.evaluateDailyStreak()
+        prefs.evaluateDailyStreak(ankiHelper)
+        CardSessionManager.notifyAllSurfaces(this)
         backgroundTypeState = prefs.backgroundType 
         appBackgroundTypeState = prefs.appBackgroundType 
         appCustomImageUriState = prefs.appCustomImageUri 
@@ -992,6 +994,20 @@ class MainActivity : ComponentActivity() {
                                 isStreakActive = prefs.isStreakCompletedToday 
                                 completedStoriesCount = prefs.passedStoryIds.size 
                                 storyEnergy = prefs.storyDailyEnergyRemaining 
+                            } 
+                        ) 
+                        BlossomTab.LIBRARY -> com.ankilock.ui.blossom.LibraryScreen( 
+                            padding = PaddingValues( 
+                                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 58.dp, 
+                                bottom = 96.dp 
+                            ), 
+                            prefs = prefs, 
+                            ankiHelper = ankiHelper, 
+                            onNavigateToJisho = { word -> 
+                                jishoTargetQuery = word 
+                                coroutineScope.launch { 
+                                    pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
+                                } 
                             } 
                         ) 
                         BlossomTab.JISHO -> com.ankilock.ui.jisho.JishoScreen( 
