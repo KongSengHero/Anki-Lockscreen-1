@@ -38,6 +38,7 @@ data class GeneratedStory(
     val createdAt: Long = System.currentTimeMillis(), 
     val targetWords: List<String> = emptyList(), 
     val targetWordsData: List<StoryWordItem> = emptyList(), 
+    val storyWords: List<StoryWordItem> = emptyList(), 
     val questions: List<StoryQuizQuestion> = emptyList(), 
     val theme: String? = null, 
     val topic: String? = null, 

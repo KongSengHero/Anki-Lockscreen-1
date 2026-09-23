@@ -163,7 +163,7 @@ class GeminiStoryService {
         return parseStoryResponse(rawText, jlptLevel, targetWords, targetWordsData, theme, topic) 
     } 
     
-    private fun parseStoryResponse( 
+    internal fun parseStoryResponse( 
         rawText: String, 
         jlptLevel: String, 
         targetWords: List<String>, 
@@ -177,6 +177,25 @@ class GeminiStoryService {
             val title = json.optString("title", "日本語の物語 ($jlptLevel)").ifBlank { "日本語の物語 ($jlptLevel)" } 
             val storyContent = json.optString("storyJapanese", "").ifBlank { json.optString("content", rawText) } 
             val furiganaContent = json.optString("storyFurigana", "").ifBlank { null } 
+            
+            val storyWordsArray = json.optJSONArray("storyWords") 
+            val storyWordsList = mutableListOf<StoryWordItem>() 
+            if (storyWordsArray != null) { 
+                for (i in 0 until storyWordsArray.length()) { 
+                    val swObj = storyWordsArray.optJSONObject(i) ?: continue 
+                    val k = swObj.optString("kanji", "").ifBlank { swObj.optString("surface", "") } 
+                    if (k.isNotBlank()) { 
+                        storyWordsList.add( 
+                            StoryWordItem( 
+                                kanji = k, 
+                                reading = swObj.optString("reading", "").ifBlank { swObj.optString("furigana", "") }, 
+                                meaning = swObj.optString("meaning", "").ifBlank { swObj.optString("english", "") }, 
+                                pos = swObj.optString("pos", "") 
+                            ) 
+                        ) 
+                    } 
+                } 
+            } 
             
             val qArray = json.optJSONArray("questions") 
             val questions = mutableListOf<StoryQuizQuestion>() 
@@ -213,6 +232,7 @@ class GeminiStoryService {
                 createdAt = System.currentTimeMillis(), 
                 targetWords = targetWords, 
                 targetWordsData = targetWordsData, 
+                storyWords = storyWordsList, 
                 questions = questions, 
                 theme = theme, 
                 topic = topic 
@@ -236,6 +256,7 @@ class GeminiStoryService {
                 createdAt = System.currentTimeMillis(), 
                 targetWords = targetWords, 
                 targetWordsData = targetWordsData, 
+                storyWords = emptyList(), 
                 questions = emptyList(), 
                 theme = theme, 
                 topic = topic 
@@ -380,11 +401,19 @@ class GeminiStoryService {
                    Correct: 疲[つか]れる / 疲[つか]れ (NEVER write 疲[つ]れ), 忙[いそが]しい (NEVER 忙[い]しい), 楽[たの]しい (NEVER 楽[た]しい), 暖[あたた]かい (NEVER 暖[あ]かい), 驚[おどろ]く (NEVER 驚[お]く), 届[とど]く (NEVER 届[と]く), 静[しず]か (NEVER 静[し]か), 幸[しあわ]せ (NEVER 幸[し]せ).
                - ZERO English in story text: The story in both "storyJapanese" and "storyFurigana" must be 100% Japanese. Never insert English definitions, English annotations, or English brackets into the story.
             $req4
-            5. Return ONLY valid JSON with this exact schema (no markdown formatting, no code blocks):
+            5. "storyWords": Extract 6 to 10 notable, authentic Japanese vocabulary words that actively appear in the story text (excluding basic grammatical particles and common pronouns). Return them with their kanji/kana, hiragana reading, and English meaning.
+            6. Return ONLY valid JSON with this exact schema (no markdown formatting, no code blocks):
             {
               "title": "Story Title in Japanese",
               "storyJapanese": "Full Japanese story text with natural paragraph breaks without ruby brackets.",
               "storyFurigana": "Exact same story with ruby brackets for every kanji, e.g. 友[とも]達[だち]と公[こう]園[えん]で会[あ]いました。",
+              "storyWords": [
+                {
+                  "kanji": "Word in kanji/kana as written in story",
+                  "reading": "Hiragana reading",
+                  "meaning": "English meaning"
+                }
+              ],
               "questions": [
                 {
                   "id": 1,
