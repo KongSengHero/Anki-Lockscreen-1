@@ -170,6 +170,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankilock.anki.ReadingVocabularyExtractor
@@ -1610,7 +1611,7 @@ fun ReadingScreen(
                                                                             1.dp, 
                                                                             if (isPresent) BlossomColors.SakuraRose.copy(alpha = 0.5f) else BlossomColors.CardBorderSubtle 
                                                                         ), 
-                                                                        onClick = { 
+                                                                        modifier = Modifier.clickable { 
                                                                             matchedItem?.let { 
                                                                                 translateTargetText = it.displayWord 
                                                                                 showTranslationSheet = true 
@@ -1714,7 +1715,7 @@ fun ReadingScreen(
                                                                             1.dp, 
                                                                             BlossomColors.SkyCyan.copy(alpha = 0.4f) 
                                                                         ), 
-                                                                        onClick = { 
+                                                                        modifier = Modifier.clickable { 
                                                                             quickJishoWord = wordItem.kanji.ifBlank { wordItem.surface } 
                                                                         } 
                                                                     ) { 

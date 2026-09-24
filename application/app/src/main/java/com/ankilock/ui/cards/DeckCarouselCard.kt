@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding 
 import androidx.compose.foundation.layout.size 
 import androidx.compose.foundation.layout.width 
+import androidx.compose.foundation.layout.widthIn 
 import androidx.compose.foundation.pager.HorizontalPager 
 import androidx.compose.foundation.pager.rememberPagerState 
 import androidx.compose.foundation.shape.RoundedCornerShape 
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AutoAwesome 
 import androidx.compose.material.icons.filled.CheckCircle 
 import androidx.compose.material.icons.filled.Refresh 
+import androidx.compose.material.icons.filled.Sync 
 import androidx.compose.material.icons.filled.Visibility 
 import androidx.compose.material3.Button 
 import androidx.compose.material3.ButtonDefaults 
@@ -36,8 +38,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults 
 import androidx.compose.material3.Icon 
 import androidx.compose.material3.IconButton 
+import androidx.compose.material3.Surface 
 import androidx.compose.material3.Text 
 import androidx.compose.ui.text.style.TextAlign 
+import androidx.compose.ui.text.style.TextOverflow 
 import com.ankilock.ui.components.squircleLiquidGlass 
 import androidx.compose.runtime.mutableStateMapOf 
 import androidx.compose.runtime.mutableStateOf 
@@ -81,7 +85,9 @@ fun DeckCarouselCard(
     deckCardsCache: SnapshotStateMap<Long, CardInfo?>, 
     deckStatsCache: SnapshotStateMap<Long, Triple<Int, Int, Int>> = remember { mutableStateMapOf() }, 
     onToggleReveal: (CardInfo?, Boolean) -> Unit = { _, _ -> }, 
-    onRefresh: () -> Unit, 
+    onRefresh: () -> Unit = {}, 
+    onOpenSync: (() -> Unit)? = null, 
+    pendingReviewsCount: Int = 0, 
     onAgain: (DeckInfo, CardInfo) -> Unit, 
     onGood: (DeckInfo, CardInfo) -> Unit, 
     onOpenAnki: () -> Unit, 
@@ -184,7 +190,9 @@ fun DeckCarouselCard(
                     fontSize = 14.sp, 
                     fontWeight = FontWeight.SemiBold, 
                     color = BlossomColors.TextPrimary, 
-                    maxLines = 1 
+                    maxLines = 1, 
+                    overflow = TextOverflow.Ellipsis, 
+                    modifier = Modifier.widthIn(max = 110.dp) 
                 ) 
                 Spacer(modifier = Modifier.width(10.dp)) 
                 Row(verticalAlignment = Alignment.CenterVertically) { 
@@ -252,16 +260,36 @@ fun DeckCarouselCard(
                     } 
                 } 
                 Spacer(modifier = Modifier.weight(1f)) 
-                IconButton( 
-                    onClick = onRefresh, 
-                    modifier = Modifier.size(28.dp) 
-                ) { 
-                    Icon( 
-                        imageVector = Icons.Filled.Refresh, 
-                        contentDescription = "Refresh", 
-                        tint = BlossomColors.TextSecondary, 
-                        modifier = Modifier.size(16.dp) 
+                Surface( 
+                    onClick = { onOpenSync?.invoke() ?: onRefresh() }, 
+                    shape = BlossomShapes.SquircleSmall, 
+                    color = if (pendingReviewsCount > 0) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard3, 
+                    border = BorderStroke( 
+                        1.dp, 
+                        if (pendingReviewsCount > 0) BlossomColors.SakuraRose.copy(alpha = 0.5f) 
+                        else BlossomColors.CardBorder 
                     ) 
+                ) { 
+                    Row( 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp) 
+                    ) { 
+                        Icon( 
+                            imageVector = Icons.Filled.Sync, 
+                            contentDescription = "Sync", 
+                            tint = if (pendingReviewsCount > 0) BlossomColors.SakuraRose else BlossomColors.SlateBlue, 
+                            modifier = Modifier.size(14.dp) 
+                        ) 
+                        Spacer(modifier = Modifier.width(6.dp)) 
+                        Text( 
+                            text = if (pendingReviewsCount > 0) "Sync ($pendingReviewsCount)" else "Sync", 
+                            fontSize = 12.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = if (pendingReviewsCount > 0) BlossomColors.SakuraRose else BlossomColors.TextPrimary, 
+                            maxLines = 1, 
+                            softWrap = false 
+                        ) 
+                    } 
                 } 
             } 
             

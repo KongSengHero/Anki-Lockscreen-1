@@ -29,7 +29,39 @@ data class CardInfo(
     val wordAudio: String = "", 
     val sentenceAudio: String = "", 
     val deckId: Long = -1L 
-)
+) { 
+    val isGoodGraduating: Boolean 
+        get() { 
+            if (nextReviewTimes.isNotBlank()) { 
+                try { 
+                    val array = org.json.JSONArray(nextReviewTimes) 
+                    val goodIndex = if (buttonCount == 4) 2 else 1 
+                    val interval = array.optString(goodIndex, "") 
+                    if (interval.isNotBlank()) { 
+                        val lower = interval.lowercase() 
+                        if (lower.contains("d") || lower.contains("mo") || lower.contains("y")) { 
+                            return true 
+                        } 
+                        if (lower.contains("m") || lower.contains("s") || lower.contains("h")) { 
+                            return false 
+                        } 
+                    } 
+                } catch (e: Exception) { 
+                } 
+            } 
+            return cardType == 2 
+        } 
+} 
+    
+data class PendingReview( 
+    val noteId: Long, 
+    val cardOrd: Int, 
+    val ease: Int, 
+    val timeTaken: Long = 5000L, 
+    val deckId: Long, 
+    val buttonCount: Int = 4, 
+    val timestamp: Long = System.currentTimeMillis() 
+) 
     
 data class ListeningEvaluationResult( 
     val isWordCorrect: Boolean, 

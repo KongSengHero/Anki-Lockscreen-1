@@ -71,7 +71,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.rememberScrollState 
 import androidx.compose.foundation.verticalScroll 
 import androidx.compose.foundation.layout.WindowInsets 
+import androidx.compose.foundation.layout.asPaddingValues 
 import androidx.compose.foundation.layout.imePadding 
+import androidx.compose.foundation.layout.navigationBars 
 import androidx.compose.foundation.layout.navigationBarsPadding 
 import androidx.compose.material.icons.filled.Translate 
 import androidx.compose.material3.CircularProgressIndicator 
@@ -143,10 +145,14 @@ fun LibraryScreen(
         } 
     } 
 
+    val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() 
+    val appBottomNavHeight = 78.dp 
+    val bottomNavTotal = navBarsBottom + appBottomNavHeight 
+    
     Box( 
         modifier = Modifier 
             .fillMaxSize() 
-            .padding(padding) 
+            .padding(top = padding.calculateTopPadding()) 
     ) { 
         Column( 
             modifier = Modifier.fillMaxSize() 
@@ -175,7 +181,7 @@ fun LibraryScreen(
                         start = 16.dp, 
                         end = 16.dp, 
                         top = 4.dp, 
-                        bottom = 72.dp 
+                        bottom = bottomNavTotal + 68.dp 
                     ), 
                     verticalArrangement = Arrangement.spacedBy(10.dp) 
                 ) { 
@@ -245,6 +251,7 @@ fun LibraryScreen(
                     } 
                 } 
             }, 
+            bottomSpacing = bottomNavTotal, 
             modifier = Modifier.align(Alignment.BottomCenter) 
         ) 
     } 
@@ -681,6 +688,7 @@ private fun EmptyLibraryView(
 private fun LibraryBottomActionBar( 
     isExporting: Boolean, 
     onBuildApkg: () -> Unit, 
+    bottomSpacing: androidx.compose.ui.unit.Dp, 
     modifier: Modifier = Modifier 
 ) { 
     Box( 
@@ -695,7 +703,7 @@ private fun LibraryBottomActionBar(
                     ) 
                 ) 
             ) 
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp) 
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomSpacing + 8.dp) 
     ) { 
         Squircle3DButton( 
             onClick = onBuildApkg, 

@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Palette 
 import androidx.compose.material.icons.filled.Opacity 
 import androidx.compose.material.icons.filled.Refresh 
+import androidx.compose.material.icons.filled.Sync 
 import androidx.compose.material.icons.filled.Style 
 import androidx.compose.material.icons.filled.Visibility 
 import androidx.compose.material.icons.filled.Headphones 
@@ -146,7 +147,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
 import com.ankilock.anki.AnkiDroidHelper
-import com.ankilock.ui.cards.DeckCarouselCard
+import com.ankilock.ui.cards.DeckCarouselCard 
+import com.ankilock.ui.cards.SyncModalSheet 
+import com.ankilock.data.PendingReview 
 import com.ankilock.ui.components.Squircle3DButton
 import com.ankilock.ui.blossom.BlossomBottomNav
 import com.ankilock.ui.blossom.BlossomColors
@@ -999,7 +1002,7 @@ class MainActivity : ComponentActivity() {
                         BlossomTab.LIBRARY -> com.ankilock.ui.blossom.LibraryScreen( 
                             padding = PaddingValues( 
                                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 58.dp, 
-                                bottom = 96.dp 
+                                bottom = 0.dp 
                             ), 
                             prefs = prefs, 
                             ankiHelper = ankiHelper, 
@@ -1111,6 +1114,9 @@ class MainActivity : ComponentActivity() {
         var showBackgroundsSheet by remember { mutableStateOf(false) } 
         var showDecksSheet by remember { mutableStateOf(false) } 
         var showStyleSheet by remember { mutableStateOf(false) } 
+        var showSyncSheet by remember { mutableStateOf(false) } 
+        var isSyncingState by remember { mutableStateOf(false) } 
+        var pendingReviewsCountState by remember { mutableIntStateOf(CardSessionManager.pendingReviewsCount) } 
         
         var activeCard by remember { mutableStateOf(CardSessionManager.currentCard) } 
         var isRevealed by remember { mutableStateOf(CardSessionManager.isRevealed) } 
@@ -1126,6 +1132,7 @@ class MainActivity : ComponentActivity() {
                 activeCard = CardSessionManager.currentCard 
                 isRevealed = CardSessionManager.isRevealed 
                 stats = CardSessionManager.currentStats 
+                pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
             } 
             CardSessionManager.addListener(listener) 
             onDispose { 
@@ -1167,8 +1174,9 @@ class MainActivity : ComponentActivity() {
                         } 
                     } 
                     if (!deckStatsCache.containsKey(deck.id)) { 
+                        val fresh = ankiHelper.getDeckStatsForDeckId(deck.id) ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                         withContext(Dispatchers.Main) { 
-                            deckStatsCache[deck.id] = Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
+                            deckStatsCache[deck.id] = fresh 
                         } 
                     } 
                 } 
@@ -1236,32 +1244,35 @@ class MainActivity : ComponentActivity() {
                     } 
                 }, 
                 onRefresh = { 
-                    audioPlayer.stop() 
-                    isRevealed = false 
-                    CardSessionManager.refresh(this@MainActivity) 
-                    coroutineScope.launch(Dispatchers.IO) { 
-                        val freshDecks = ankiHelper.getDeckList() 
-                        val decksToLoad = freshDecks.filter { it.id.toString() in selectedDeckIds } 
-                        for (deck in decksToLoad) { 
-                            val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
-                            val firstCard = batch.firstOrNull() 
-                            val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
-                            val deckStats = Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
-                            withContext(Dispatchers.Main) { 
-                                deckCardsCache[deck.id] = firstCard 
-                                deckCardQueues[deck.id] = remaining 
-                                deckStatsCache[deck.id] = deckStats 
-                            } 
-                        } 
-                    } 
+                    showSyncSheet = true 
                 }, 
+                onOpenSync = { 
+                    showSyncSheet = true 
+                }, 
+                pendingReviewsCount = pendingReviewsCountState, 
                 onAgain = { deck, card -> 
                     audioPlayer.stop() 
                     isRevealed = false 
                     val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                     historyStackByDeck.getOrPut(deck.id) { mutableListOf() }.add(Pair(card, currentStats)) 
-                    val queue = deckCardQueues[deck.id] 
-                    val nextCard = if (queue != null && queue.isNotEmpty()) queue.removeAt(0) else null 
+                    CardSessionManager.addPendingReview( 
+                        PendingReview( 
+                            noteId = card.noteId, 
+                            cardOrd = card.cardOrd, 
+                            ease = 1, 
+                            deckId = deck.id, 
+                            buttonCount = card.buttonCount 
+                        ) 
+                    ) 
+                    pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
+                    val queue = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
+                    val nextCard = if (queue.isNotEmpty()) { 
+                        val next = queue.removeAt(0) 
+                        queue.add(card) 
+                        next 
+                    } else { 
+                        card 
+                    } 
                     deckCardsCache[deck.id] = nextCard 
                     val optNew = if (card.cardType == 0) (currentStats.first - 1).coerceAtLeast(0) else currentStats.first 
                     val optLearn = currentStats.second + (if (card.cardType == 0 || card.cardType == 2) 1 else 0) 
@@ -1269,16 +1280,18 @@ class MainActivity : ComponentActivity() {
                     val newStats = Triple(optNew, optLearn, optReview) 
                     deckStatsCache[deck.id] = newStats 
                     CardSessionManager.syncFromExternal(nextCard, false, newStats) 
-                    coroutineScope.launch(Dispatchers.IO) { 
-                        ankiHelper.answerCard(card.noteId, card.cardOrd, 1, 5000L, deck.id, card.buttonCount) 
-                        val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
-                        if (remainingCount < 3) { 
-                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
+                    val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
+                    if (remainingCount < 3) { 
+                        coroutineScope.launch(Dispatchers.IO) { 
+                            val pendingNoteIds = CardSessionManager.pendingReviewsList.map { it.noteId }.toSet() 
+                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
                             withContext(Dispatchers.Main) { 
                                 val currentQ = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
                                 val currentVisible = deckCardsCache[deck.id] 
                                 for (freshCard in freshBatch) { 
-                                    if (freshCard.noteId != card.noteId && freshCard.noteId != currentVisible?.noteId && currentQ.none { it.noteId == freshCard.noteId }) { 
+                                    if (freshCard.noteId !in pendingNoteIds && 
+                                        freshCard.noteId != currentVisible?.noteId && 
+                                        currentQ.none { it.noteId == freshCard.noteId }) { 
                                         currentQ.add(freshCard) 
                                     } 
                                 } 
@@ -1296,25 +1309,52 @@ class MainActivity : ComponentActivity() {
                     isRevealed = false 
                     val currentStats = deckStatsCache[deck.id] ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
                     historyStackByDeck.getOrPut(deck.id) { mutableListOf() }.add(Pair(card, currentStats)) 
-                    val queue = deckCardQueues[deck.id] 
-                    val nextCard = if (queue != null && queue.isNotEmpty()) queue.removeAt(0) else null 
+                    CardSessionManager.addPendingReview( 
+                        PendingReview( 
+                            noteId = card.noteId, 
+                            cardOrd = card.cardOrd, 
+                            ease = 3, 
+                            deckId = deck.id, 
+                            buttonCount = card.buttonCount 
+                        ) 
+                    ) 
+                    pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
+                    val graduating = card.isGoodGraduating 
+                    val queue = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
+                    val nextCard = if (graduating) { 
+                        if (queue.isNotEmpty()) queue.removeAt(0) else null 
+                    } else { 
+                        if (queue.isNotEmpty()) { 
+                            val next = queue.removeAt(0) 
+                            queue.add(card) 
+                            next 
+                        } else { 
+                            card 
+                        } 
+                    } 
                     deckCardsCache[deck.id] = nextCard 
                     val optNew = if (card.cardType == 0) (currentStats.first - 1).coerceAtLeast(0) else currentStats.first 
-                    val optLearn = if (card.cardType == 1) (currentStats.second - 1).coerceAtLeast(0) else currentStats.second 
+                    val optLearn = when { 
+                        card.cardType == 0 && !graduating -> currentStats.second + 1 
+                        card.cardType == 1 && graduating -> (currentStats.second - 1).coerceAtLeast(0) 
+                        else -> currentStats.second 
+                    } 
                     val optReview = if (card.cardType == 2) (currentStats.third - 1).coerceAtLeast(0) else currentStats.third 
                     val newStats = Triple(optNew, optLearn, optReview) 
                     deckStatsCache[deck.id] = newStats 
                     CardSessionManager.syncFromExternal(nextCard, false, newStats) 
-                    coroutineScope.launch(Dispatchers.IO) { 
-                        ankiHelper.answerCard(card.noteId, card.cardOrd, 3, 5000L, deck.id, card.buttonCount) 
-                        val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
-                        if (remainingCount < 3) { 
-                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
+                    val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
+                    if (remainingCount < 3) { 
+                        coroutineScope.launch(Dispatchers.IO) { 
+                            val pendingNoteIds = CardSessionManager.pendingReviewsList.map { it.noteId }.toSet() 
+                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
                             withContext(Dispatchers.Main) { 
                                 val currentQ = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
                                 val currentVisible = deckCardsCache[deck.id] 
                                 for (freshCard in freshBatch) { 
-                                    if (freshCard.noteId != card.noteId && freshCard.noteId != currentVisible?.noteId && currentQ.none { it.noteId == freshCard.noteId }) { 
+                                    if (freshCard.noteId !in pendingNoteIds && 
+                                        freshCard.noteId != currentVisible?.noteId && 
+                                        currentQ.none { it.noteId == freshCard.noteId }) { 
                                         currentQ.add(freshCard) 
                                     } 
                                 } 
@@ -1349,12 +1389,16 @@ class MainActivity : ComponentActivity() {
                                     ankiHelper.suspendCard(card.noteId, card.cardOrd) 
                                     val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
                                     if (remainingCount < 3) { 
-                                        val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
+                                        val pendingNoteIds = CardSessionManager.pendingReviewsList.map { it.noteId }.toSet() 
+                                        val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
                                         withContext(Dispatchers.Main) { 
                                             val currentQ = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
                                             val currentVisible = deckCardsCache[deck.id] 
                                             for (freshCard in freshBatch) { 
-                                                if (freshCard.noteId != card.noteId && freshCard.noteId != currentVisible?.noteId && currentQ.none { it.noteId == freshCard.noteId }) { 
+                                                if (freshCard.noteId !in pendingNoteIds && 
+                                                    freshCard.noteId != card.noteId && 
+                                                    freshCard.noteId != currentVisible?.noteId && 
+                                                    currentQ.none { it.noteId == freshCard.noteId }) { 
                                                     currentQ.add(freshCard) 
                                                 } 
                                             } 
@@ -1381,6 +1425,8 @@ class MainActivity : ComponentActivity() {
                                 deckStatsCache[deck.id] = restoredStats 
                                 isRevealed = false 
                                 CardSessionManager.syncFromExternal(restoredCard, false, restoredStats) 
+                                CardSessionManager.popLastPendingReview() 
+                                pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
                             } 
                         } 
                         "open_app" -> { 
@@ -1413,12 +1459,16 @@ class MainActivity : ComponentActivity() {
                         ankiHelper.suspendCard(card.noteId, card.cardOrd) 
                         val remainingCount = deckCardQueues[deck.id]?.size ?: 0 
                         if (remainingCount < 3) { 
-                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, excludeNoteId = card.noteId, deckName = deck.name) 
+                            val pendingNoteIds = CardSessionManager.pendingReviewsList.map { it.noteId }.toSet() 
+                            val freshBatch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
                             withContext(Dispatchers.Main) { 
                                 val currentQ = deckCardQueues.getOrPut(deck.id) { mutableListOf() } 
                                 val currentVisible = deckCardsCache[deck.id] 
                                 for (freshCard in freshBatch) { 
-                                    if (freshCard.noteId != card.noteId && freshCard.noteId != currentVisible?.noteId && currentQ.none { it.noteId == freshCard.noteId }) { 
+                                    if (freshCard.noteId !in pendingNoteIds && 
+                                        freshCard.noteId != card.noteId && 
+                                        freshCard.noteId != currentVisible?.noteId && 
+                                        currentQ.none { it.noteId == freshCard.noteId }) { 
                                         currentQ.add(freshCard) 
                                     } 
                                 } 
@@ -1455,9 +1505,11 @@ class MainActivity : ComponentActivity() {
                                 deckCardQueues[deckId] = remaining 
                             } 
                         } 
-                        if (targetDeck != null && !deckStatsCache.containsKey(deckId)) { 
+                        val freshStats = ankiHelper.getDeckStatsForDeckId(deckId) 
+                            ?: targetDeck?.let { Triple(it.newCount, it.learnCount, it.reviewCount) } 
+                        if (freshStats != null) { 
                             withContext(Dispatchers.Main) { 
-                                deckStatsCache[deckId] = Triple(targetDeck.newCount, targetDeck.learnCount, targetDeck.reviewCount) 
+                                deckStatsCache[deckId] = freshStats 
                             } 
                         } 
                     } 
@@ -1728,6 +1780,53 @@ class MainActivity : ComponentActivity() {
                         } 
                     } 
                     
+                    Surface( 
+                        onClick = { 
+                            showDecksSheet = false 
+                            showSyncSheet = true 
+                        }, 
+                        shape = BlossomShapes.SquircleMedium, 
+                        color = if (pendingReviewsCountState > 0) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard2, 
+                        border = BorderStroke( 
+                            1.dp, 
+                            if (pendingReviewsCountState > 0) BlossomColors.SakuraRose.copy(alpha = 0.4f) 
+                            else BlossomColors.CardBorder 
+                        ), 
+                        modifier = Modifier.fillMaxWidth() 
+                    ) { 
+                        Row( 
+                            modifier = Modifier.padding(14.dp), 
+                            verticalAlignment = Alignment.CenterVertically 
+                        ) { 
+                            Icon( 
+                                imageVector = Icons.Filled.Sync, 
+                                contentDescription = null, 
+                                tint = if (pendingReviewsCountState > 0) BlossomColors.SakuraRose else BlossomColors.SlateBlue, 
+                                modifier = Modifier.size(24.dp) 
+                            ) 
+                            Spacer(modifier = Modifier.width(12.dp)) 
+                            Column(modifier = Modifier.weight(1f)) { 
+                                Text( 
+                                    text = if (pendingReviewsCountState > 0) "Synchronize Reviews ($pendingReviewsCountState Pending)" else "Synchronize with AnkiDroid", 
+                                    fontSize = 14.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = BlossomColors.TextPrimary 
+                                ) 
+                                Spacer(modifier = Modifier.height(2.dp)) 
+                                Text( 
+                                    text = "Push local reviews or pull fresh cards and counts", 
+                                    fontSize = 12.sp, 
+                                    color = BlossomColors.TextSecondary 
+                                ) 
+                            } 
+                            Icon( 
+                                imageVector = Icons.Default.ChevronRight, 
+                                contentDescription = null, 
+                                tint = BlossomColors.TextSecondary 
+                            ) 
+                        } 
+                    } 
+                    
                     if (decksState.isNotEmpty()) { 
                         ModernDeckSelectorCard(decksState, selectedDeckIds) { deckId, checked -> 
                             if (checked) 
@@ -1808,6 +1907,76 @@ class MainActivity : ComponentActivity() {
                     ) 
                 } 
             } 
+        } 
+        
+        if (showSyncSheet) { 
+            SyncModalSheet( 
+                pendingReviewsCount = pendingReviewsCountState, 
+                isSyncing = isSyncingState, 
+                deckName = if (selectedDecksList.size == 1) selectedDecksList.first().name else if (selectedDecksList.size > 1) "${selectedDecksList.size} Decks" else "", 
+                onDismissRequest = { 
+                    if (!isSyncingState) showSyncSheet = false 
+                }, 
+                onPushSync = { 
+                    isSyncingState = true 
+                    coroutineScope.launch(Dispatchers.IO) { 
+                        CardSessionManager.pushSyncBlocking(this@MainActivity, ankiHelper) 
+                        val freshDecks = ankiHelper.getDeckList() 
+                        val decksToLoad = freshDecks.filter { it.id.toString() in selectedDeckIds } 
+                        for (deck in decksToLoad) { 
+                            val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
+                            val firstCard = batch.firstOrNull() 
+                            val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
+                            val deckStats = ankiHelper.getDeckStatsForDeckId(deck.id) ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
+                            withContext(Dispatchers.Main) { 
+                                deckCardsCache[deck.id] = firstCard 
+                                deckCardQueues[deck.id] = remaining 
+                                deckStatsCache[deck.id] = deckStats 
+                            } 
+                        } 
+                        val activeDeckId = selectedDecksList.firstOrNull()?.id 
+                        val activeDeckCard = activeDeckId?.let { deckCardsCache[it] } 
+                        val activeDeckStats = activeDeckId?.let { deckStatsCache[it] } ?: Triple(0, 0, 0) 
+                        withContext(Dispatchers.Main) { 
+                            CardSessionManager.syncFromExternal(activeDeckCard, false, activeDeckStats) 
+                            pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
+                            isSyncingState = false 
+                            showSyncSheet = false 
+                        } 
+                    } 
+                }, 
+                onPullSync = { 
+                    isSyncingState = true 
+                    coroutineScope.launch(Dispatchers.IO) { 
+                        CardSessionManager.pullSyncBlocking(this@MainActivity, ankiHelper) 
+                        withContext(Dispatchers.Main) { 
+                            historyStackByDeck.clear() 
+                        } 
+                        val freshDecks = ankiHelper.getDeckList() 
+                        val decksToLoad = freshDecks.filter { it.id.toString() in selectedDeckIds } 
+                        for (deck in decksToLoad) { 
+                            val batch = ankiHelper.getDueCardsForDeck(deck.id, limit = 5, deckName = deck.name) 
+                            val firstCard = batch.firstOrNull() 
+                            val remaining = if (batch.size > 1) batch.drop(1).toMutableList() else mutableListOf() 
+                            val deckStats = ankiHelper.getDeckStatsForDeckId(deck.id) ?: Triple(deck.newCount, deck.learnCount, deck.reviewCount) 
+                            withContext(Dispatchers.Main) { 
+                                deckCardsCache[deck.id] = firstCard 
+                                deckCardQueues[deck.id] = remaining 
+                                deckStatsCache[deck.id] = deckStats 
+                            } 
+                        } 
+                        val activeDeckId = selectedDecksList.firstOrNull()?.id 
+                        val activeDeckCard = activeDeckId?.let { deckCardsCache[it] } 
+                        val activeDeckStats = activeDeckId?.let { deckStatsCache[it] } ?: Triple(0, 0, 0) 
+                        withContext(Dispatchers.Main) { 
+                            CardSessionManager.syncFromExternal(activeDeckCard, false, activeDeckStats) 
+                            pendingReviewsCountState = CardSessionManager.pendingReviewsCount 
+                            isSyncingState = false 
+                            showSyncSheet = false 
+                        } 
+                    } 
+                } 
+            ) 
         } 
     } 
     

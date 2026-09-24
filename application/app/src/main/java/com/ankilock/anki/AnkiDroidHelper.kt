@@ -66,6 +66,7 @@ class AnkiDroidHelper(private val context: Context) {
                         var learnC = 0 
                         var revC = 0 
                         
+                        var hasCounts = false 
                         if (countsIdx != null && countsIdx >= 0) { 
                             val countsStr = cur.getString(countsIdx) ?: "" 
                             if (countsStr.startsWith("[")) { 
@@ -74,20 +75,22 @@ class AnkiDroidHelper(private val context: Context) {
                                     learnC = jsonArray.optInt(0, 0) 
                                     revC = jsonArray.optInt(1, 0) 
                                     newC = jsonArray.optInt(2, 0) 
+                                    hasCounts = true 
                                 } catch (e: Exception) { 
                                     e.printStackTrace() 
                                 } 
-                            } else { 
+                            } else if (countsStr.isNotBlank()) { 
                                 val nums = Regex("\\d+").findAll(countsStr).map { it.value.toInt() }.toList() 
                                 if (nums.size >= 3) { 
                                     learnC = nums[0] 
                                     revC = nums[1] 
                                     newC = nums[2] 
+                                    hasCounts = true 
                                 } 
                             } 
                         } 
                         
-                        if (newC == 0 && learnC == 0 && revC == 0) { 
+                        if (!hasCounts) { 
                             val fallback = getDeckStatsForDeck(name) 
                             newC = fallback.first 
                             learnC = fallback.second 
@@ -192,11 +195,55 @@ class AnkiDroidHelper(private val context: Context) {
         return null 
     } 
 
+    fun getDeckStatsForDeckId(deckId: Long): Triple<Int, Int, Int>? { 
+        if (deckId <= 0L) return null 
+        val uris = listOf( 
+            Uri.withAppendedPath(DECKS_URI, deckId.toString()), 
+            Uri.parse("content://$AUTHORITY/decks/$deckId") 
+        ) 
+        for (uri in uris) { 
+            try { 
+                val cursor = resolver.query(uri, null, null, null, null) 
+                cursor?.use { cur -> 
+                    val countsIdx = cur.getColumnIndex(COL_DECK_COUNTS).takeIf { it != -1 } 
+                        ?: cur.getColumnIndex("deck_count") 
+                    if (cur.moveToFirst() && countsIdx != null && countsIdx >= 0) { 
+                        val countsStr = cur.getString(countsIdx) ?: "" 
+                        var newC = 0 
+                        var learnC = 0 
+                        var revC = 0 
+                        if (countsStr.startsWith("[")) { 
+                            try { 
+                                val jsonArray = org.json.JSONArray(countsStr) 
+                                learnC = jsonArray.optInt(0, 0) 
+                                revC = jsonArray.optInt(1, 0) 
+                                newC = jsonArray.optInt(2, 0) 
+                            } catch (e: Exception) { 
+                                e.printStackTrace() 
+                            } 
+                        } else { 
+                            val nums = Regex("\\d+").findAll(countsStr).map { it.value.toInt() }.toList() 
+                            if (nums.size >= 3) { 
+                                learnC = nums[0] 
+                                revC = nums[1] 
+                                newC = nums[2] 
+                            } 
+                        } 
+                        return Triple(newC, learnC, revC) 
+                    } 
+                } 
+            } catch (e: Exception) { 
+                e.printStackTrace() 
+            } 
+        } 
+        return null 
+    } 
+
     fun getDeckStatsForDeck(deckName: String): Triple<Int, Int, Int> { 
         val cleanDeck = deckName.trim() 
         if (cleanDeck.isEmpty()) return Triple(0, 0, 0) 
         val fromProvider = getDeckStatsFromProvider(cleanDeck) 
-        if (fromProvider != null && (fromProvider.first > 0 || fromProvider.second > 0 || fromProvider.third > 0)) { 
+        if (fromProvider != null) { 
             return fromProvider 
         } 
         val newNotes = getNotesDueCount("deck:\"$cleanDeck\" is:new is:due").takeIf { it > 0 } 
@@ -205,9 +252,6 @@ class AnkiDroidHelper(private val context: Context) {
         val dueNotes = getNotesDueCount("deck:\"$cleanDeck\" is:due -is:learn -is:new") 
         if (newNotes > 0 || learnNotes > 0 || dueNotes > 0) { 
             return Triple(newNotes, learnNotes, dueNotes) 
-        } 
-        if (fromProvider != null) { 
-            return fromProvider 
         } 
         return Triple(0, 0, 0) 
     }
