@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding 
 import androidx.compose.foundation.layout.size 
 import androidx.compose.foundation.layout.width 
-import androidx.compose.foundation.layout.widthIn 
 import androidx.compose.foundation.rememberScrollState 
 import androidx.compose.foundation.verticalScroll 
 import androidx.compose.material.icons.Icons 
@@ -31,7 +30,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text 
 import androidx.compose.material3.rememberModalBottomSheetState 
 import androidx.compose.runtime.Composable 
+import androidx.compose.runtime.LaunchedEffect 
 import androidx.compose.runtime.remember 
+import androidx.compose.runtime.rememberCoroutineScope 
 import androidx.compose.ui.Alignment 
 import androidx.compose.ui.Modifier 
 import androidx.compose.ui.geometry.Offset 
@@ -40,13 +41,13 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource 
 import androidx.compose.ui.input.nestedscroll.nestedScroll 
 import androidx.compose.ui.text.font.FontWeight 
-import androidx.compose.ui.text.style.TextOverflow 
 import androidx.compose.ui.unit.Velocity 
 import androidx.compose.ui.unit.dp 
 import androidx.compose.ui.unit.sp 
 import com.ankilock.ui.blossom.BlossomColors 
 import com.ankilock.ui.blossom.BlossomShapes 
 import com.ankilock.ui.components.Squircle3DButton 
+import kotlinx.coroutines.launch 
  
 @OptIn(ExperimentalMaterial3Api::class) 
 @Composable 
@@ -56,12 +57,28 @@ fun SyncModalSheet(
     onDismissRequest: () -> Unit, 
     onPushSync: () -> Unit, 
     onPullSync: () -> Unit, 
-    deckName: String = "", 
     isOpen: Boolean = true 
 ) { 
     if (!isOpen) return 
      
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+    val coroutineScope = rememberCoroutineScope() 
+     
+    val dismissWithAnimation: () -> Unit = { 
+        coroutineScope.launch { 
+            try { 
+                sheetState.hide() 
+            } finally { 
+                onDismissRequest() 
+            } 
+        } 
+    } 
+     
+    LaunchedEffect(Unit) { 
+        if (!sheetState.isVisible) { 
+            sheetState.show() 
+        } 
+    } 
      
     val noBounceNestedScroll = remember { 
         object : NestedScrollConnection { 
@@ -101,10 +118,7 @@ fun SyncModalSheet(
                 verticalAlignment = Alignment.CenterVertically, 
                 modifier = Modifier.fillMaxWidth() 
             ) { 
-                Row( 
-                    verticalAlignment = Alignment.CenterVertically, 
-                    modifier = Modifier.weight(1f, fill = false) 
-                ) { 
+                Row(verticalAlignment = Alignment.CenterVertically) { 
                     Icon( 
                         imageVector = Icons.Filled.Sync, 
                         contentDescription = null, 
@@ -116,36 +130,13 @@ fun SyncModalSheet(
                         text = "Deck Synchronization", 
                         fontSize = 18.sp, 
                         fontWeight = FontWeight.Bold, 
-                        color = BlossomColors.TextPrimary, 
-                        maxLines = 1, 
-                        overflow = TextOverflow.Ellipsis 
+                        color = BlossomColors.TextPrimary 
                     ) 
                 } 
                  
-                Spacer(modifier = Modifier.width(8.dp)) 
+                Spacer(modifier = Modifier.weight(1f)) 
                  
-                if (deckName.isNotBlank()) { 
-                    Surface( 
-                        shape = BlossomShapes.SquircleSmall, 
-                        color = BlossomColors.WisteriaVioletContainer, 
-                        border = BorderStroke(1.dp, BlossomColors.WisteriaViolet.copy(alpha = 0.5f)) 
-                    ) { 
-                        Text( 
-                            text = deckName, 
-                            fontSize = 12.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = BlossomColors.WisteriaViolet, 
-                            maxLines = 1, 
-                            overflow = TextOverflow.Ellipsis, 
-                            modifier = Modifier 
-                                .widthIn(max = 120.dp) 
-                                .padding(horizontal = 8.dp, vertical = 4.dp) 
-                        ) 
-                    } 
-                    Spacer(modifier = Modifier.width(8.dp)) 
-                } 
-                 
-                IconButton(onClick = onDismissRequest) { 
+                IconButton(onClick = dismissWithAnimation) { 
                     Icon( 
                         imageVector = Icons.Filled.Close, 
                         contentDescription = "Close", 

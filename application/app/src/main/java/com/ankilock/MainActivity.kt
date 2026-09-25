@@ -1913,7 +1913,6 @@ class MainActivity : ComponentActivity() {
             SyncModalSheet( 
                 pendingReviewsCount = pendingReviewsCountState, 
                 isSyncing = isSyncingState, 
-                deckName = if (selectedDecksList.size == 1) selectedDecksList.first().name else if (selectedDecksList.size > 1) "${selectedDecksList.size} Decks" else "", 
                 onDismissRequest = { 
                     if (!isSyncingState) showSyncSheet = false 
                 }, 

@@ -261,18 +261,20 @@ fun DeckCarouselCard(
                 } 
                 Spacer(modifier = Modifier.weight(1f)) 
                 Surface( 
-                    onClick = { onOpenSync?.invoke() ?: onRefresh() }, 
                     shape = BlossomShapes.SquircleSmall, 
                     color = if (pendingReviewsCount > 0) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard3, 
                     border = BorderStroke( 
                         1.dp, 
                         if (pendingReviewsCount > 0) BlossomColors.SakuraRose.copy(alpha = 0.5f) 
                         else BlossomColors.CardBorder 
-                    ) 
+                    ), 
+                    modifier = Modifier 
+                        .clip(BlossomShapes.SquircleSmall) 
+                        .clickable { onOpenSync?.invoke() ?: onRefresh() } 
                 ) { 
                     Row( 
                         verticalAlignment = Alignment.CenterVertically, 
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp) 
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp) 
                     ) { 
                         Icon( 
                             imageVector = Icons.Filled.Sync, 
