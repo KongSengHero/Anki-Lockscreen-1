@@ -254,7 +254,9 @@ fun TranslationBottomSheet(
                 ) { 
                     Column(modifier = Modifier.padding(16.dp)) { 
                         Row( 
-                            modifier = Modifier.fillMaxWidth(), 
+                            modifier = Modifier 
+                                .fillMaxWidth() 
+                                .clickable { isJapaneseMinimized = !isJapaneseMinimized }, 
                             verticalAlignment = Alignment.CenterVertically, 
                             horizontalArrangement = Arrangement.SpaceBetween 
                         ) { 
@@ -344,7 +346,10 @@ fun TranslationBottomSheet(
                                 fontSize = 12.sp, 
                                 color = BlossomColors.TextMuted, 
                                 maxLines = 1, 
-                                overflow = TextOverflow.Ellipsis 
+                                overflow = TextOverflow.Ellipsis, 
+                                modifier = Modifier 
+                                    .fillMaxWidth() 
+                                    .clickable { isJapaneseMinimized = false } 
                             ) 
                         } 
 
@@ -352,17 +357,9 @@ fun TranslationBottomSheet(
                             Column { 
                                 Spacer(modifier = Modifier.height(10.dp)) 
 
-                                JapaneseFuriganaDisplay(
-                                    segments = resolvedSegments,
-                                    showFurigana = showFurigana,
-                                    onSegmentClick = { word ->
-                                        ttsHelper.speak(
-                                            word,
-                                            onStart = { isTtsPlaying = true },
-                                            onDone = { isTtsPlaying = false },
-                                            onError = { isTtsPlaying = false }
-                                        )
-                                    }
+                                JapaneseFuriganaDisplay( 
+                                    segments = resolvedSegments, 
+                                    showFurigana = showFurigana 
                                 ) 
 
                                 if (!isLoading && !result?.romaji.isNullOrBlank()) { 
@@ -520,11 +517,10 @@ fun TranslationBottomSheet(
 
 @OptIn(ExperimentalLayoutApi::class) 
 @Composable 
-private fun JapaneseFuriganaDisplay(
-    segments: List<RubySegment>,
-    showFurigana: Boolean = true,
-    onSegmentClick: ((String) -> Unit)? = null
-) {
+private fun JapaneseFuriganaDisplay( 
+    segments: List<RubySegment>, 
+    showFurigana: Boolean = true 
+) { 
     val hasAnyRuby = showFurigana && segments.any { !it.ruby.isNullOrBlank() } 
     
     FlowRow( 
@@ -539,11 +535,7 @@ private fun JapaneseFuriganaDisplay(
             Column( 
                 horizontalAlignment = Alignment.CenterHorizontally, 
                 verticalArrangement = Arrangement.Bottom, 
-                modifier = Modifier 
-                    .padding(horizontal = 1.dp) 
-                    .clickable(enabled = onSegmentClick != null) { 
-                        onSegmentClick?.invoke(seg.text) 
-                    } 
+                modifier = Modifier.padding(horizontal = 1.dp) 
             ) { 
                 if (hasAnyRuby) { 
                     if (!ruby.isNullOrBlank()) { 

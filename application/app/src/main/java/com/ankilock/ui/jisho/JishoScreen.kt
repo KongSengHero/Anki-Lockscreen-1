@@ -1,8 +1,9 @@
 package com.ankilock.ui.jisho
     
 import android.widget.Toast
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateContentSize 
+import androidx.compose.foundation.background 
+import androidx.compose.foundation.BorderStroke 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -284,7 +285,7 @@ fun JishoScreen(
                             ) { 
                                 Surface( 
                                     shape = RoundedCornerShape(8.dp), 
-                                    color = BlossomColors.SurfaceElevated, 
+                                    color = BlossomColors.SurfaceElevated.copy(alpha = 0.5f), 
                                     border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle) 
                                 ) { 
                                     Text( 
@@ -319,7 +320,7 @@ fun JishoScreen(
                                 recentSearches.forEach { term -> 
                                     Surface( 
                                         shape = RoundedCornerShape(16.dp), 
-                                        color = BlossomColors.SurfaceElevated, 
+                                        color = BlossomColors.SurfaceElevated.copy(alpha = 0.5f), 
                                         border = BorderStroke(1.dp, BlossomColors.CardBorder), 
                                         modifier = Modifier 
                                             .clip(RoundedCornerShape(16.dp)) 
@@ -362,7 +363,7 @@ fun JishoScreen(
                     item { 
                         Surface( 
                             shape = RoundedCornerShape(8.dp), 
-                            color = BlossomColors.SurfaceElevated, 
+                            color = BlossomColors.SurfaceElevated.copy(alpha = 0.5f), 
                             border = BorderStroke(1.dp, BlossomColors.CardBorderSubtle), 
                             modifier = Modifier.padding(bottom = 12.dp) 
                         ) { 
@@ -565,7 +566,12 @@ fun JishoScreen(
                             fontWeight = FontWeight.Bold, 
                             color = BlossomColors.TextMuted, 
                             letterSpacing = 0.8.sp, 
-                            modifier = Modifier.padding(vertical = 4.dp) 
+                            modifier = Modifier 
+                                .background( 
+                                    color = BlossomColors.SurfaceElevated.copy(alpha = 0.5f), 
+                                    shape = RoundedCornerShape(8.dp) 
+                                ) 
+                                .padding(horizontal = 10.dp, vertical = 4.dp) 
                         ) 
                     } 
                     

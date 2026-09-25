@@ -17,8 +17,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable 
+import androidx.compose.foundation.horizontalScroll 
+import androidx.compose.foundation.layout.Arrangement 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -521,8 +522,10 @@ class MainActivity : ComponentActivity() {
         streakCount: Int, 
         isStreakActive: Boolean, 
         activeDates: Set<String>, 
+        prefs: PreferencesManager, 
         onDismiss: () -> Unit 
     ) { 
+        var viewMode by remember { mutableStateOf(prefs.streakViewMode) } 
         var monthOffset by remember { mutableIntStateOf(0) } 
         val calendar = remember(monthOffset) { 
             val c = java.util.Calendar.getInstance() 
@@ -546,6 +549,27 @@ class MainActivity : ComponentActivity() {
             (dayOfWeek + 5) % 7 
         } 
         
+        val heatmapWeeks = remember(activeDates) { 
+            val cal = java.util.Calendar.getInstance() 
+            val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK) 
+            val daysAfterMonday = (dayOfWeek + 5) % 7 
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -daysAfterMonday) 
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -((16 - 1) * 7)) 
+            
+            val weeksList = mutableListOf<List<Pair<String, Boolean>>>() 
+            for (w in 0 until 16) { 
+                val daysInWeek = mutableListOf<Pair<String, Boolean>>() 
+                for (d in 0 until 7) { 
+                    val dStr = todaySdf.format(cal.time) 
+                    val isDone = dStr in activeDates 
+                    daysInWeek.add(Pair(dStr, isDone)) 
+                    cal.add(java.util.Calendar.DAY_OF_YEAR, 1) 
+                } 
+                weeksList.add(daysInWeek) 
+            } 
+            weeksList 
+        } 
+
         Dialog(onDismissRequest = onDismiss) { 
             Card( 
                 shape = RoundedCornerShape(20.dp), 
@@ -566,7 +590,7 @@ class MainActivity : ComponentActivity() {
                             Icon( 
                                 Icons.Default.LocalFireDepartment, 
                                 contentDescription = null, 
-                                tint = Color(0xFFFF5722), 
+                                tint = if (viewMode == "heatmap") Color(0xFF39D353) else Color(0xFFFF5722), 
                                 modifier = Modifier.size(24.dp) 
                             ) 
                             Spacer(modifier = Modifier.width(10.dp)) 
@@ -580,16 +604,51 @@ class MainActivity : ComponentActivity() {
                         
                         Surface( 
                             shape = BlossomShapes.SquircleSmall, 
-                            color = Color(0xFF381E17), 
-                            border = BorderStroke(1.dp, Color(0xFFFF5722).copy(alpha = 0.5f)) 
+                            color = if (viewMode == "heatmap") Color(0xFF0E4429) else Color(0xFF381E17), 
+                            border = BorderStroke(1.dp, (if (viewMode == "heatmap") Color(0xFF39D353) else Color(0xFFFF5722)).copy(alpha = 0.5f)) 
                         ) { 
                             Text( 
                                 text = "$streakCount Days", 
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = Color(0xFFFF5722), 
+                                color = if (viewMode == "heatmap") Color(0xFF39D353) else Color(0xFFFF5722), 
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp) 
                             ) 
+                        } 
+                    } 
+                    
+                    Row( 
+                        modifier = Modifier 
+                            .fillMaxWidth() 
+                            .clip(RoundedCornerShape(10.dp)) 
+                            .background(BlossomColors.SurfaceElevated) 
+                            .padding(3.dp), 
+                        horizontalArrangement = Arrangement.spacedBy(4.dp) 
+                    ) { 
+                        listOf("calendar" to "Calendar", "heatmap" to "Heatmap").forEach { (mode, label) -> 
+                            val isSelected = viewMode == mode 
+                            Box( 
+                                modifier = Modifier 
+                                    .weight(1f) 
+                                    .clip(RoundedCornerShape(8.dp)) 
+                                    .background( 
+                                        if (isSelected) Color(0xFFFF5722) 
+                                        else Color.Transparent 
+                                    ) 
+                                    .clickable { 
+                                        viewMode = mode 
+                                        prefs.streakViewMode = mode 
+                                    } 
+                                    .padding(vertical = 6.dp), 
+                                contentAlignment = Alignment.Center 
+                            ) { 
+                                Text( 
+                                    text = label, 
+                                    fontSize = 12.sp, 
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+                                    color = if (isSelected) Color.White else BlossomColors.TextSecondary 
+                                ) 
+                            } 
                         } 
                     } 
                     
@@ -622,117 +681,216 @@ class MainActivity : ComponentActivity() {
                         } 
                     } 
                     
-                    Row( 
-                        modifier = Modifier.fillMaxWidth(), 
-                        verticalAlignment = Alignment.CenterVertically, 
-                        horizontalArrangement = Arrangement.SpaceBetween 
-                    ) { 
-                        IconButton( 
-                            onClick = { monthOffset -= 1 }, 
-                            modifier = Modifier.size(32.dp) 
+                    if (viewMode == "calendar") { 
+                        Row( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            verticalAlignment = Alignment.CenterVertically, 
+                            horizontalArrangement = Arrangement.SpaceBetween 
                         ) { 
-                            Icon( 
-                                Icons.AutoMirrored.Filled.ArrowBack, 
-                                contentDescription = "Previous Month", 
-                                tint = BlossomColors.TextSecondary, 
-                                modifier = Modifier.size(18.dp) 
-                            ) 
-                        } 
-                        
-                        Text( 
-                            text = monthTitle, 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = 14.sp, 
-                            color = BlossomColors.TextPrimary 
-                        ) 
-                        
-                        IconButton( 
-                            onClick = { if (monthOffset < 0) monthOffset += 1 }, 
-                            enabled = monthOffset < 0, 
-                            modifier = Modifier.size(32.dp) 
-                        ) { 
-                            Icon( 
-                                Icons.AutoMirrored.Filled.ArrowForward, 
-                                contentDescription = "Next Month", 
-                                tint = if (monthOffset < 0) BlossomColors.TextSecondary else BlossomColors.TextMuted.copy(alpha = 0.3f), 
-                                modifier = Modifier.size(18.dp) 
-                            ) 
-                        } 
-                    } 
-                    
-                    val dayNames = listOf("M", "T", "W", "T", "F", "S", "S") 
-                    Row( 
-                        modifier = Modifier.fillMaxWidth(), 
-                        horizontalArrangement = Arrangement.SpaceBetween 
-                    ) { 
-                        dayNames.forEach { dayName -> 
-                            Box( 
-                                modifier = Modifier.weight(1f), 
-                                contentAlignment = Alignment.Center 
+                            IconButton( 
+                                onClick = { monthOffset -= 1 }, 
+                                modifier = Modifier.size(32.dp) 
                             ) { 
-                                Text( 
-                                    text = dayName, 
-                                    fontSize = 11.sp, 
-                                    fontWeight = FontWeight.SemiBold, 
-                                    color = BlossomColors.TextMuted 
+                                Icon( 
+                                    Icons.AutoMirrored.Filled.ArrowBack, 
+                                    contentDescription = "Previous Month", 
+                                    tint = BlossomColors.TextSecondary, 
+                                    modifier = Modifier.size(18.dp) 
+                                ) 
+                            } 
+                            
+                            Text( 
+                                text = monthTitle, 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 14.sp, 
+                                color = BlossomColors.TextPrimary 
+                            ) 
+                            
+                            IconButton( 
+                                onClick = { if (monthOffset < 0) monthOffset += 1 }, 
+                                enabled = monthOffset < 0, 
+                                modifier = Modifier.size(32.dp) 
+                            ) { 
+                                Icon( 
+                                    Icons.AutoMirrored.Filled.ArrowForward, 
+                                    contentDescription = "Next Month", 
+                                    tint = if (monthOffset < 0) BlossomColors.TextSecondary else BlossomColors.TextMuted.copy(alpha = 0.3f), 
+                                    modifier = Modifier.size(18.dp) 
                                 ) 
                             } 
                         } 
-                    } 
-                    
-                    val totalCells = ((firstDayOfWeek + daysInMonth + 6) / 7) * 7 
-                    val weeks = totalCells / 7 
-                    Column( 
-                        modifier = Modifier.fillMaxWidth(), 
-                        verticalArrangement = Arrangement.spacedBy(4.dp) 
-                    ) { 
-                        for (week in 0 until weeks) { 
-                            Row( 
-                                modifier = Modifier.fillMaxWidth(), 
-                                horizontalArrangement = Arrangement.SpaceBetween 
-                            ) { 
-                                for (dayCol in 0 until 7) { 
-                                    val cellIndex = week * 7 + dayCol 
-                                    val dayNumber = cellIndex - firstDayOfWeek + 1 
-                                    if (dayNumber in 1..daysInMonth) { 
-                                        val dateStr = String.format(java.util.Locale.US, "%04d-%02d-%02d", year, month + 1, dayNumber) 
-                                        val isCompleted = dateStr in activeDates 
-                                        val isToday = dateStr == todayStr 
-                                        
-                                        Box( 
-                                            modifier = Modifier 
-                                                .weight(1f) 
-                                                .height(34.dp) 
-                                                .padding(2.dp) 
-                                                .clip(RoundedCornerShape(8.dp)) 
-                                                .background( 
-                                                    when { 
-                                                        isCompleted -> Color(0xFFFF5722) 
-                                                        isToday -> Color(0xFFFF5722).copy(alpha = 0.15f) 
-                                                        else -> Color.Transparent 
+                        
+                        val dayNames = listOf("M", "T", "W", "T", "F", "S", "S") 
+                        Row( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            horizontalArrangement = Arrangement.SpaceBetween 
+                        ) { 
+                            dayNames.forEach { dayName -> 
+                                Box( 
+                                    modifier = Modifier.weight(1f), 
+                                    contentAlignment = Alignment.Center 
+                                ) { 
+                                    Text( 
+                                        text = dayName, 
+                                        fontSize = 11.sp, 
+                                        fontWeight = FontWeight.SemiBold, 
+                                        color = BlossomColors.TextMuted 
+                                    ) 
+                                } 
+                            } 
+                        } 
+                        
+                        val totalCells = ((firstDayOfWeek + daysInMonth + 6) / 7) * 7 
+                        val weeks = totalCells / 7 
+                        Column( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            verticalArrangement = Arrangement.spacedBy(4.dp) 
+                        ) { 
+                            for (week in 0 until weeks) { 
+                                Row( 
+                                    modifier = Modifier.fillMaxWidth(), 
+                                    horizontalArrangement = Arrangement.SpaceBetween 
+                                ) { 
+                                    for (dayCol in 0 until 7) { 
+                                        val cellIndex = week * 7 + dayCol 
+                                        val dayNumber = cellIndex - firstDayOfWeek + 1 
+                                        if (dayNumber in 1..daysInMonth) { 
+                                            val dateStr = String.format(java.util.Locale.US, "%04d-%02d-%02d", year, month + 1, dayNumber) 
+                                            val isCompleted = dateStr in activeDates 
+                                            val isToday = dateStr == todayStr 
+                                            
+                                            Box( 
+                                                modifier = Modifier 
+                                                    .weight(1f) 
+                                                    .height(34.dp) 
+                                                    .padding(2.dp) 
+                                                    .clip(RoundedCornerShape(8.dp)) 
+                                                    .background( 
+                                                        when { 
+                                                            isCompleted -> Color(0xFFFF5722) 
+                                                            isToday -> Color(0xFFFF5722).copy(alpha = 0.15f) 
+                                                            else -> Color.Transparent 
+                                                        } 
+                                                    ) 
+                                                    .then( 
+                                                        if (isToday && !isCompleted) { 
+                                                            Modifier.border(1.dp, Color(0xFFFF5722).copy(alpha = 0.6f), RoundedCornerShape(8.dp)) 
+                                                        } else Modifier 
+                                                    ), 
+                                                contentAlignment = Alignment.Center 
+                                            ) { 
+                                                Text( 
+                                                    text = "$dayNumber", 
+                                                    fontSize = 12.sp, 
+                                                    fontWeight = if (isCompleted || isToday) FontWeight.Bold else FontWeight.Normal, 
+                                                    color = when { 
+                                                        isCompleted -> BlossomColors.BlossomWhite 
+                                                        isToday -> Color(0xFFFF5722) 
+                                                        else -> BlossomColors.TextPrimary 
                                                     } 
                                                 ) 
-                                                .then( 
-                                                    if (isToday && !isCompleted) { 
-                                                        Modifier.border(1.dp, Color(0xFFFF5722).copy(alpha = 0.6f), RoundedCornerShape(8.dp)) 
-                                                    } else Modifier 
-                                                ), 
+                                            } 
+                                        } else { 
+                                            Spacer(modifier = Modifier.weight(1f)) 
+                                        } 
+                                    } 
+                                } 
+                            } 
+                        } 
+                    } else { 
+                        Column( 
+                            modifier = Modifier.fillMaxWidth(), 
+                            verticalArrangement = Arrangement.spacedBy(10.dp) 
+                        ) { 
+                            val heatmapScrollState = rememberScrollState() 
+                            LaunchedEffect(Unit) { 
+                                heatmapScrollState.scrollTo(heatmapScrollState.maxValue) 
+                            } 
+                            
+                            Row( 
+                                modifier = Modifier 
+                                    .fillMaxWidth() 
+                                    .horizontalScroll(heatmapScrollState) 
+                                    .padding(vertical = 4.dp), 
+                                horizontalArrangement = Arrangement.spacedBy(3.dp) 
+                            ) { 
+                                Column( 
+                                    verticalArrangement = Arrangement.spacedBy(3.dp), 
+                                    modifier = Modifier.padding(end = 3.dp) 
+                                ) { 
+                                    val rowLabels = listOf("M", "", "W", "", "F", "", "S") 
+                                    rowLabels.forEach { label -> 
+                                        Box( 
+                                            modifier = Modifier.size(10.dp), 
                                             contentAlignment = Alignment.Center 
                                         ) { 
-                                            Text( 
-                                                text = "$dayNumber", 
-                                                fontSize = 12.sp, 
-                                                fontWeight = if (isCompleted || isToday) FontWeight.Bold else FontWeight.Normal, 
-                                                color = when { 
-                                                    isCompleted -> BlossomColors.BlossomWhite 
-                                                    isToday -> Color(0xFFFF5722) 
-                                                    else -> BlossomColors.TextPrimary 
-                                                } 
+                                            if (label.isNotEmpty()) { 
+                                                Text( 
+                                                    text = label, 
+                                                    fontSize = 8.sp, 
+                                                    color = BlossomColors.TextMuted, 
+                                                    fontWeight = FontWeight.Medium 
+                                                ) 
+                                            } 
+                                        } 
+                                    } 
+                                } 
+                                
+                                heatmapWeeks.forEach { weekDays -> 
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) { 
+                                        weekDays.forEach { (dateStr, isCompleted) -> 
+                                            val isToday = dateStr == todayStr 
+                                            Box( 
+                                                modifier = Modifier 
+                                                    .size(10.dp) 
+                                                    .clip(RoundedCornerShape(2.dp)) 
+                                                    .background( 
+                                                        when { 
+                                                            isCompleted -> Color(0xFFFF5722) 
+                                                            isToday -> Color(0xFFFF5722).copy(alpha = 0.25f) 
+                                                            else -> BlossomColors.SurfaceElevated 
+                                                        } 
+                                                    ) 
+                                                    .then( 
+                                                        if (isToday && !isCompleted) { 
+                                                            Modifier.border(1.dp, Color(0xFFFF5722).copy(alpha = 0.7f), RoundedCornerShape(2.dp)) 
+                                                        } else Modifier 
+                                                    ) 
                                             ) 
                                         } 
-                                    } else { 
-                                        Spacer(modifier = Modifier.weight(1f)) 
                                     } 
+                                } 
+                            } 
+                            
+                            Row( 
+                                modifier = Modifier.fillMaxWidth(), 
+                                horizontalArrangement = Arrangement.SpaceBetween, 
+                                verticalAlignment = Alignment.CenterVertically 
+                            ) { 
+                                Text( 
+                                    text = "Past 16 Weeks", 
+                                    fontSize = 11.sp, 
+                                    color = BlossomColors.TextMuted 
+                                ) 
+                                Row( 
+                                    verticalAlignment = Alignment.CenterVertically, 
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp) 
+                                ) { 
+                                    Text( 
+                                        text = "Less", 
+                                        fontSize = 10.sp, 
+                                        color = BlossomColors.TextMuted 
+                                    ) 
+                                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(BlossomColors.SurfaceElevated)) 
+                                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF5D2411))) 
+                                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF9E3613))) 
+                                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFD84315))) 
+                                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFFF5722))) 
+                                    Text( 
+                                        text = "More", 
+                                        fontSize = 10.sp, 
+                                        color = BlossomColors.TextMuted 
+                                    ) 
                                 } 
                             } 
                         } 
@@ -989,7 +1147,11 @@ class MainActivity : ComponentActivity() {
                             onNavigateToJisho = { word -> 
                                 jishoTargetQuery = word 
                                 coroutineScope.launch { 
-                                    pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
+                                    if (kotlin.math.abs(pagerState.currentPage - BlossomTab.JISHO.ordinal) > 1) { 
+                                        pagerState.scrollToPage(BlossomTab.JISHO.ordinal) 
+                                    } else { 
+                                        pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
+                                    } 
                                 } 
                             }, 
                             onTopBarStatsChanged = { 
@@ -1009,7 +1171,11 @@ class MainActivity : ComponentActivity() {
                             onNavigateToJisho = { word -> 
                                 jishoTargetQuery = word 
                                 coroutineScope.launch { 
-                                    pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
+                                    if (kotlin.math.abs(pagerState.currentPage - BlossomTab.JISHO.ordinal) > 1) { 
+                                        pagerState.scrollToPage(BlossomTab.JISHO.ordinal) 
+                                    } else { 
+                                        pagerState.animateScrollToPage(BlossomTab.JISHO.ordinal) 
+                                    } 
                                 } 
                             } 
                         ) 
@@ -1051,6 +1217,7 @@ class MainActivity : ComponentActivity() {
                         streakCount = streakCount, 
                         isStreakActive = isStreakActive, 
                         activeDates = prefs.getActiveStreakDates(), 
+                        prefs = prefs, 
                         onDismiss = { showStreakCalendarDialog = false } 
                     ) 
                 } 
@@ -1091,7 +1258,11 @@ class MainActivity : ComponentActivity() {
                                 audioPlayer.stop() 
                                 selectedBlossomTab = tab 
                                 coroutineScope.launch { 
-                                    pagerState.animateScrollToPage(tab.ordinal) 
+                                    if (kotlin.math.abs(pagerState.currentPage - tab.ordinal) > 1) { 
+                                        pagerState.scrollToPage(tab.ordinal) 
+                                    } else { 
+                                        pagerState.animateScrollToPage(tab.ordinal) 
+                                    } 
                                 } 
                             } 
                         ) 

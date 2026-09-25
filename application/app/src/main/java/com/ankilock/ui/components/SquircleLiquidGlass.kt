@@ -290,10 +290,20 @@ fun Squircle3DButton(
                         Modifier.background(faceColor) 
                     } 
                 ) 
-                .border( 
-                    width = 1.dp, 
-                    color = effectiveBorderColor, 
-                    shape = shape 
+                .then( 
+                    if (borderBrush != null) { 
+                        Modifier.border( 
+                            width = 2.dp, 
+                            brush = borderBrush, 
+                            shape = shape 
+                        ) 
+                    } else { 
+                        Modifier.border( 
+                            width = 1.dp, 
+                            color = effectiveBorderColor, 
+                            shape = shape 
+                        ) 
+                    } 
                 ) 
         ) { 
             if (progressFraction != null && progressFraction > 0f) { 

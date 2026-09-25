@@ -1,6 +1,7 @@
 package com.ankilock.ui.study
  
-import android.graphics.BitmapFactory
+import android.graphics.BitmapFactory 
+import android.util.LruCache 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -696,7 +697,10 @@ fun WallhavenImagePickerSheet(
     
     if (previewingItem != null) { 
         val item = previewingItem!! 
-        val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
+        val previewSheetState = rememberModalBottomSheetState( 
+            skipPartiallyExpanded = true, 
+            confirmValueChange = { false } 
+        ) 
         val configuration = LocalConfiguration.current 
         val density = LocalDensity.current 
         val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() } 
@@ -712,11 +716,16 @@ fun WallhavenImagePickerSheet(
                 offset = Offset.Zero 
             } else { 
                 val panMultiplier = 1f + (newScale - 1f) * 1.5f 
+                val rad = Math.toRadians(rotationAngle.toDouble()) 
+                val cos = Math.cos(rad).toFloat() 
+                val sin = Math.sin(rad).toFloat() 
+                val localPanX = (panChange.x * cos + panChange.y * sin) * panMultiplier 
+                val localPanY = (-panChange.x * sin + panChange.y * cos) * panMultiplier 
                 val maxOffsetX = (screenWidthPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
                 val maxOffsetY = (screenHeightPx * (newScale - 1f) * 0.75f).coerceAtLeast(0f) 
                 offset = Offset( 
-                    x = (offset.x + panChange.x * panMultiplier).coerceIn(-maxOffsetX, maxOffsetX), 
-                    y = (offset.y + panChange.y * panMultiplier).coerceIn(-maxOffsetY, maxOffsetY) 
+                    x = (offset.x + localPanX).coerceIn(-maxOffsetX, maxOffsetX), 
+                    y = (offset.y + localPanY).coerceIn(-maxOffsetY, maxOffsetY) 
                 ) 
             } 
         } 
@@ -726,20 +735,13 @@ fun WallhavenImagePickerSheet(
             sheetState = previewSheetState, 
             containerColor = BlossomColors.BackgroundDeep, 
             windowInsets = WindowInsets(0), 
-            dragHandle = { 
-                Box( 
-                    modifier = Modifier 
-                        .padding(vertical = 12.dp) 
-                        .size(width = 38.dp, height = 4.dp) 
-                        .clip(BlossomShapes.Pill) 
-                        .background(BlossomColors.CardBorder) 
-                ) 
-            } 
+            dragHandle = null 
         ) { 
             Column( 
                 modifier = Modifier 
                     .fillMaxWidth() 
                     .fillMaxHeight(0.92f) 
+                    .nestedScroll(noBounceNestedScroll) 
                     .padding(horizontal = 16.dp) 
                     .navigationBarsPadding() 
             ) { 
@@ -885,14 +887,21 @@ fun WallhavenImagePickerSheet(
     } 
 } 
  
+private val wallhavenBitmapCache = LruCache<String, ImageBitmap>(80) 
+
 @Composable
 fun WallhavenRemoteThumbnail( 
     url: String, 
     contentScale: ContentScale = ContentScale.Crop, 
     modifier: Modifier = Modifier 
 ) { 
-    val bitmapState = produceState<ImageBitmap?>(initialValue = null, key1 = url) { 
-        value = withContext(Dispatchers.IO) { 
+    val cachedBitmap = remember(url) { wallhavenBitmapCache.get(url) } 
+    val bitmapState = produceState<ImageBitmap?>(initialValue = cachedBitmap, key1 = url) { 
+        if (cachedBitmap != null) { 
+            value = cachedBitmap 
+            return@produceState 
+        } 
+        val bmp = withContext(Dispatchers.IO) { 
             try { 
                 val conn = URL(url).openConnection() as HttpURLConnection 
                 conn.setRequestProperty("User-Agent", "AnkiLock-Blossom/1.0") 
@@ -906,6 +915,10 @@ fun WallhavenRemoteThumbnail(
                 null 
             } 
         } 
+        if (bmp != null) { 
+            wallhavenBitmapCache.put(url, bmp) 
+        } 
+        value = bmp 
     } 
     
     val bmp = bitmapState.value 

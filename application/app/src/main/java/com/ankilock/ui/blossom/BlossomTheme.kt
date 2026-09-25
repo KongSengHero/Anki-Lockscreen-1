@@ -175,9 +175,9 @@ object BlossomColors {
     var CoralRedLip by mutableStateOf(Color(0xFFA8475B)) 
         private set 
     
-    var WarmAmber by mutableStateOf(Color(0xFFCFA055)) 
+    var WarmAmber by mutableStateOf(Color(0xFFFFD56B)) 
         private set 
-    var WarmAmberLip by mutableStateOf(Color(0xFF9A7233)) 
+    var WarmAmberLip by mutableStateOf(Color(0xFFD49E35)) 
         private set 
     var WarmAmberSurface by mutableStateOf(Color(0xFF332717)) 
         private set 
@@ -195,7 +195,7 @@ object BlossomColors {
     var TextMuted by mutableStateOf(Color(0xFF6E7482)) 
         private set 
     
-    var UnderlineOrange by mutableStateOf(Color(0xFFCFA055)) 
+    var UnderlineOrange by mutableStateOf(Color(0xFFFFD56B)) 
         private set 
     var UnderlineBlue by mutableStateOf(Color(0xFFE87A90)) 
         private set 
@@ -322,8 +322,8 @@ object BlossomColors {
                 CoralRed = Color(0xFFD84A65) 
                 CoralRedLip = Color(0xFFB52B44) 
     
-                WarmAmber = Color(0xFFC07A15) 
-                WarmAmberLip = Color(0xFF8F580B) 
+                WarmAmber = Color(0xFFE69A1C) 
+                WarmAmberLip = Color(0xFFB5740F) 
                 WarmAmberSurface = Color(0xFFFBF0DF) 
     
                 VioletPurple = Color(0xFF7C56A6) 
@@ -333,7 +333,7 @@ object BlossomColors {
                 TextSecondary = Color(0xFF4B5565) 
                 TextMuted = Color(0xFF687487) 
     
-                UnderlineOrange = Color(0xFFC07A15) 
+                UnderlineOrange = Color(0xFFE69A1C) 
                 UnderlineBlue = Color(0xFFD84A65) 
                 KanjiCardBg = Color(0xFFFDE8EC) 
     
@@ -439,8 +439,8 @@ object BlossomColors {
                 CoralRed = Color(0xFFE87A90) 
                 CoralRedLip = Color(0xFFB54B62) 
     
-                WarmAmber = Color(0xFFE5C07B) 
-                WarmAmberLip = Color(0xFFA68545) 
+                WarmAmber = Color(0xFFFFD97D) 
+                WarmAmberLip = Color(0xFFCFA055) 
                 WarmAmberSurface = Color(0xFF2B2213) 
     
                 VioletPurple = Color(0xFFC678DD) 
@@ -450,7 +450,7 @@ object BlossomColors {
                 TextSecondary = Color(0xFFA2AAB8) 
                 TextMuted = Color(0xFF656D7E) 
     
-                UnderlineOrange = Color(0xFFE5C07B) 
+                UnderlineOrange = Color(0xFFFFD97D) 
                 UnderlineBlue = Color(0xFFE87A90) 
                 KanjiCardBg = Color(0xFF231419) 
     
@@ -556,8 +556,8 @@ object BlossomColors {
                 CoralRed = Color(0xFFE87A90) 
                 CoralRedLip = Color(0xFFA8475B) 
     
-                WarmAmber = Color(0xFFCFA055) 
-                WarmAmberLip = Color(0xFF9A7233) 
+                WarmAmber = Color(0xFFFFD56B) 
+                WarmAmberLip = Color(0xFFD49E35) 
                 WarmAmberSurface = Color(0xFF332717) 
     
                 VioletPurple = Color(0xFF9678B6) 
@@ -567,7 +567,7 @@ object BlossomColors {
                 TextSecondary = Color(0xFF9AA1AD) 
                 TextMuted = Color(0xFF6E7482) 
     
-                UnderlineOrange = Color(0xFFCFA055) 
+                UnderlineOrange = Color(0xFFFFD56B) 
                 UnderlineBlue = Color(0xFFE87A90) 
                 KanjiCardBg = Color(0xFF2A1C1E) 
     

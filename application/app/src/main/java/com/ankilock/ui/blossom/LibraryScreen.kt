@@ -80,6 +80,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api 
 import androidx.compose.material3.ModalBottomSheet 
 import androidx.compose.material3.rememberModalBottomSheetState 
+import androidx.compose.ui.geometry.Offset 
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection 
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource 
+import androidx.compose.ui.input.nestedscroll.nestedScroll 
+import androidx.compose.ui.unit.Velocity 
 import androidx.compose.foundation.text.KeyboardOptions 
 import androidx.compose.ui.text.input.ImeAction 
 import androidx.compose.ui.text.font.FontWeight 
@@ -123,11 +128,11 @@ fun LibraryScreen(
     var wordToEdit by remember { mutableStateOf<BookmarkedWord?>(null) } 
     var wordToDelete by remember { mutableStateOf<BookmarkedWord?>(null) } 
     var isExporting by remember { mutableStateOf(false) } 
-    val ttsHelper = remember { JapaneseTtsHelper(context) } 
+    var ttsHelper by remember { mutableStateOf<JapaneseTtsHelper?>(null) } 
     var playingWordId by remember { mutableStateOf<String?>(null) } 
     DisposableEffect(Unit) { 
         onDispose { 
-            ttsHelper.shutdown() 
+            ttsHelper?.shutdown() 
         } 
     } 
 
@@ -187,16 +192,18 @@ fun LibraryScreen(
                 ) { 
                     items( 
                         items = filteredWords, 
-                        key = { it.id } 
+                        key = { it.id }, 
+                        contentType = { "word_card" } 
                     ) { word -> 
                         val isPlaying = playingWordId == word.id 
                         LibraryWordCard( 
                             word = word, 
                             isPlaying = isPlaying, 
                             onPlayAudio = { 
+                                val helper = ttsHelper ?: JapaneseTtsHelper(context).also { ttsHelper = it } 
                                 val toSpeak = word.reading.ifBlank { word.kanji } 
                                 playingWordId = word.id 
-                                ttsHelper.speak( 
+                                helper.speak( 
                                     text = toSpeak, 
                                     onStart = { playingWordId = word.id }, 
                                     onDone = { if (playingWordId == word.id) playingWordId = null }, 
@@ -389,7 +396,13 @@ private fun LibraryTopSection(
                 fontSize = 12.sp, 
                 fontFamily = BlossomNunito, 
                 fontWeight = FontWeight.Medium, 
-                color = BlossomColors.TextSecondary 
+                color = BlossomColors.TextSecondary, 
+                modifier = Modifier 
+                    .background( 
+                        color = BlossomColors.SurfaceElevated.copy(alpha = 0.5f), 
+                        shape = RoundedCornerShape(8.dp) 
+                    ) 
+                    .padding(horizontal = 10.dp, vertical = 4.dp) 
             ) 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { 
                 Squircle3DButton( 
@@ -490,9 +503,7 @@ private fun LibraryWordCard(
         shape = RoundedCornerShape(18.dp), 
         color = BlossomColors.SurfaceElevated, 
         border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-        modifier = Modifier 
-            .fillMaxWidth() 
-            .animateContentSize() 
+        modifier = Modifier.fillMaxWidth() 
     ) { 
         Column(modifier = Modifier.padding(16.dp)) { 
             Row( 
@@ -674,11 +685,11 @@ private fun EmptyLibraryView(
                 Icon( 
                     imageVector = Icons.Default.Add, 
                     contentDescription = null, 
-                    tint = Color.Black, 
+                    tint = Color.White, 
                     modifier = Modifier.size(16.dp) 
                 ) 
                 Spacer(modifier = Modifier.width(6.dp)) 
-                Text("Add First Word", color = Color.Black, fontWeight = FontWeight.Bold) 
+                Text("Add First Word", color = Color.White, fontWeight = FontWeight.Bold) 
             } 
         } 
     } 
@@ -752,6 +763,21 @@ private fun DeckSettingsBottomSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true) 
     var deckName by remember { mutableStateOf(initialDeckName) } 
     var tag by remember { mutableStateOf(initialTag) } 
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
 
     ModalBottomSheet( 
         onDismissRequest = onDismiss, 
@@ -771,6 +797,7 @@ private fun DeckSettingsBottomSheet(
         Column( 
             modifier = Modifier 
                 .fillMaxWidth() 
+                .nestedScroll(noBounceNestedScroll) 
                 .padding(horizontal = 20.dp, vertical = 6.dp) 
                 .navigationBarsPadding() 
                 .imePadding(), 
@@ -1035,6 +1062,22 @@ private fun AddOrEditWordBottomSheet(
         } 
     } 
 
+    val noBounceNestedScroll = remember { 
+        object : NestedScrollConnection { 
+            override fun onPostScroll( 
+                consumed: Offset, 
+                available: Offset, 
+                source: NestedScrollSource 
+            ): Offset { 
+                return if (available.y < 0f) Offset(0f, available.y) else Offset.Zero 
+            } 
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity { 
+                return Velocity(0f, available.y) 
+            } 
+        } 
+    } 
+
     ModalBottomSheet( 
         onDismissRequest = onDismiss, 
         sheetState = sheetState, 
@@ -1054,6 +1097,7 @@ private fun AddOrEditWordBottomSheet(
             modifier = Modifier 
                 .fillMaxWidth() 
                 .verticalScroll(rememberScrollState()) 
+                .nestedScroll(noBounceNestedScroll) 
                 .padding(horizontal = 20.dp, vertical = 6.dp) 
                 .imePadding() 
                 .navigationBarsPadding() 

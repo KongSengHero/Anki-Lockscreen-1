@@ -618,6 +618,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString(KEY_LAST_COMPLETED_STREAK_DATE, "") ?: "" 
         set(value) = prefs.edit().putString(KEY_LAST_COMPLETED_STREAK_DATE, value).apply() 
     
+    var streakViewMode: String 
+        get() = prefs.getString(KEY_STREAK_VIEW_MODE, "calendar") ?: "calendar" 
+        set(value) = prefs.edit().putString(KEY_STREAK_VIEW_MODE, value).apply() 
+    
     var todayLearnedCardsCount: Int 
         get() { 
             checkAndResetDailyProgress() 
@@ -953,6 +957,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_DAILY_STREAK_COUNT = "daily_streak_count" 
         private const val KEY_LAST_COMPLETED_STREAK_DATE = "last_completed_streak_date" 
         private const val KEY_STREAK_COMPLETED_DATES = "streak_completed_dates" 
+        private const val KEY_STREAK_VIEW_MODE = "streak_view_mode" 
         private const val KEY_TODAY_LEARNED_CARDS_COUNT = "today_learned_cards_count" 
         private const val KEY_TODAY_STORY_COMPLETED = "today_story_completed" 
         private const val KEY_TODAY_PROGRESS_DATE = "today_progress_date" 

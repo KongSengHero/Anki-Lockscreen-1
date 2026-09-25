@@ -58,6 +58,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import android.widget.Toast 
+import androidx.compose.material.icons.filled.Close 
+import androidx.compose.material.icons.filled.ContentCopy 
+import androidx.compose.ui.platform.LocalClipboardManager 
+import androidx.compose.ui.text.AnnotatedString 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -83,8 +88,9 @@ fun AiKeyConfigDialog(
     onDismiss: () -> Unit, 
     onSaved: () -> Unit
 ) { 
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current 
+    val clipboardManager = LocalClipboardManager.current 
+    val scope = rememberCoroutineScope() 
     
     val providers = listOf( 
         "gemini" to "Google Gemini (Free Tier)", 
@@ -146,34 +152,50 @@ fun AiKeyConfigDialog(
                 .padding(bottom = 16.dp) 
         ) { 
             Row( 
+                modifier = Modifier.fillMaxWidth(), 
                 verticalAlignment = Alignment.CenterVertically, 
-                horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                horizontalArrangement = Arrangement.SpaceBetween 
             ) { 
-                Surface( 
-                    shape = RoundedCornerShape(12.dp), 
-                    color = BlossomColors.SakuraRose.copy(alpha = 0.15f), 
-                    modifier = Modifier.size(38.dp) 
+                Row( 
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.spacedBy(10.dp) 
+                ) { 
+                    Surface( 
+                        shape = RoundedCornerShape(12.dp), 
+                        color = BlossomColors.SakuraRose.copy(alpha = 0.15f), 
+                        modifier = Modifier.size(38.dp) 
+                    ) { 
+                        Icon( 
+                            Icons.Default.Key, 
+                            contentDescription = null, 
+                            tint = BlossomColors.SakuraRose, 
+                            modifier = Modifier 
+                                .padding(8.dp) 
+                                .size(22.dp) 
+                        ) 
+                    } 
+                    Column { 
+                        Text( 
+                            "API Configuration", 
+                            fontSize = 18.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = BlossomColors.TextPrimary 
+                        ) 
+                        Text( 
+                            "Powers Listening evaluation & Stories", 
+                            fontSize = 12.sp, 
+                            color = BlossomColors.TextSecondary 
+                        ) 
+                    } 
+                } 
+                IconButton( 
+                    onClick = onDismiss, 
+                    modifier = Modifier.size(36.dp) 
                 ) { 
                     Icon( 
-                        Icons.Default.Key, 
-                        contentDescription = null, 
-                        tint = BlossomColors.SakuraRose, 
-                        modifier = Modifier 
-                            .padding(8.dp) 
-                            .size(22.dp) 
-                    ) 
-                } 
-                Column { 
-                    Text( 
-                        "API Configuration", 
-                        fontSize = 18.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = BlossomColors.TextPrimary 
-                    ) 
-                    Text( 
-                        "Powers Listening evaluation & Stories", 
-                        fontSize = 12.sp, 
-                        color = BlossomColors.TextSecondary 
+                        imageVector = Icons.Default.Close, 
+                        contentDescription = "Close", 
+                        tint = BlossomColors.TextSecondary 
                     ) 
                 } 
             } 
@@ -370,14 +392,32 @@ fun AiKeyConfigDialog(
                 value = apiKeyText, 
                 onValueChange = { apiKeyText = it }, 
                 placeholder = { Text("Paste your API key here", color = BlossomColors.TextMuted, fontSize = 13.sp) }, 
+                singleLine = true, 
                 visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
                 trailingIcon = { 
-                    IconButton(onClick = { isKeyVisible = !isKeyVisible }) { 
-                        Icon( 
-                            if (isKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
-                            contentDescription = "Toggle Visibility", 
-                            tint = BlossomColors.TextSecondary 
-                        ) 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        if (apiKeyText.isNotBlank()) { 
+                            IconButton( 
+                                onClick = { 
+                                    clipboardManager.setText(AnnotatedString(apiKeyText)) 
+                                    Toast.makeText(context, "API Key copied", Toast.LENGTH_SHORT).show() 
+                                } 
+                            ) { 
+                                Icon( 
+                                    imageVector = Icons.Default.ContentCopy, 
+                                    contentDescription = "Copy API Key", 
+                                    tint = BlossomColors.TextSecondary, 
+                                    modifier = Modifier.size(18.dp) 
+                                ) 
+                            } 
+                        } 
+                        IconButton(onClick = { isKeyVisible = !isKeyVisible }) { 
+                            Icon( 
+                                if (isKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                                contentDescription = "Toggle Visibility", 
+                                tint = BlossomColors.TextSecondary 
+                            ) 
+                        } 
                     } 
                 }, 
                 colors = OutlinedTextFieldDefaults.colors( 
@@ -413,10 +453,13 @@ fun AiKeyConfigDialog(
                         verticalAlignment = Alignment.CenterVertically 
                     ) { 
                         Text( 
-                            "Get Free Gemini Key (aistudio.google.com)", 
+                            "Get Gemini Key (aistudio.google.com)", 
                             fontSize = 11.sp, 
                             color = BlossomColors.SakuraRose, 
                             fontWeight = FontWeight.Medium, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis, 
+                            softWrap = false, 
                             modifier = Modifier.weight(1f) 
                         ) 
                         Icon( 
@@ -446,12 +489,29 @@ fun AiKeyConfigDialog(
                 singleLine = true, 
                 visualTransformation = if (isWallhavenKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
                 trailingIcon = { 
-                    IconButton(onClick = { isWallhavenKeyVisible = !isWallhavenKeyVisible }) { 
-                        Icon( 
-                            if (isWallhavenKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
-                            contentDescription = null, 
-                            tint = BlossomColors.TextSecondary 
-                        ) 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        if (wallhavenKeyText.isNotBlank()) { 
+                            IconButton( 
+                                onClick = { 
+                                    clipboardManager.setText(AnnotatedString(wallhavenKeyText)) 
+                                    Toast.makeText(context, "API Key copied", Toast.LENGTH_SHORT).show() 
+                                } 
+                            ) { 
+                                Icon( 
+                                    imageVector = Icons.Default.ContentCopy, 
+                                    contentDescription = "Copy API Key", 
+                                    tint = BlossomColors.TextSecondary, 
+                                    modifier = Modifier.size(18.dp) 
+                                ) 
+                            } 
+                        } 
+                        IconButton(onClick = { isWallhavenKeyVisible = !isWallhavenKeyVisible }) { 
+                            Icon( 
+                                if (isWallhavenKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                                contentDescription = null, 
+                                tint = BlossomColors.TextSecondary 
+                            ) 
+                        } 
                     } 
                 }, 
                 colors = OutlinedTextFieldDefaults.colors( 
@@ -518,12 +578,29 @@ fun AiKeyConfigDialog(
                 singleLine = true, 
                 visualTransformation = if (isFishAudioKeyVisible) VisualTransformation.None else PasswordVisualTransformation(), 
                 trailingIcon = { 
-                    IconButton(onClick = { isFishAudioKeyVisible = !isFishAudioKeyVisible }) { 
-                        Icon( 
-                            if (isFishAudioKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
-                            contentDescription = null, 
-                            tint = BlossomColors.TextSecondary 
-                        ) 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        if (fishAudioApiKey.isNotBlank()) { 
+                            IconButton( 
+                                onClick = { 
+                                    clipboardManager.setText(AnnotatedString(fishAudioApiKey)) 
+                                    Toast.makeText(context, "API Key copied", Toast.LENGTH_SHORT).show() 
+                                } 
+                            ) { 
+                                Icon( 
+                                    imageVector = Icons.Default.ContentCopy, 
+                                    contentDescription = "Copy API Key", 
+                                    tint = BlossomColors.TextSecondary, 
+                                    modifier = Modifier.size(18.dp) 
+                                ) 
+                            } 
+                        } 
+                        IconButton(onClick = { isFishAudioKeyVisible = !isFishAudioKeyVisible }) { 
+                            Icon( 
+                                if (isFishAudioKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                                contentDescription = null, 
+                                tint = BlossomColors.TextSecondary 
+                            ) 
+                        } 
                     } 
                 }, 
                 colors = OutlinedTextFieldDefaults.colors( 

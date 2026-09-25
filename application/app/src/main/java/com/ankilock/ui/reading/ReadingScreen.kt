@@ -190,18 +190,25 @@ import com.ankilock.ui.components.Squircle3DCard
 import com.ankilock.ui.components.squircleLiquidGlass 
 import com.ankilock.ui.blossom.story.StoryToken 
 import kotlinx.coroutines.delay 
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.isActive 
+import kotlinx.coroutines.launch 
+import kotlinx.coroutines.Job 
+import kotlinx.coroutines.withContext 
+import kotlinx.coroutines.Dispatchers 
+import androidx.compose.runtime.produceState 
+import android.util.LruCache 
+import androidx.compose.foundation.gestures.awaitEachGesture 
+import androidx.compose.foundation.gestures.awaitFirstDown 
+import androidx.compose.foundation.gestures.waitForUpOrCancellation 
+import androidx.compose.runtime.mutableFloatStateOf 
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType 
+import androidx.compose.ui.input.pointer.pointerInput 
+import androidx.compose.ui.platform.LocalHapticFeedback 
 import java.text.SimpleDateFormat 
 import java.util.Date 
 import java.util.Locale 
+
+private val storyThumbnailCache = LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(40) 
 
 private data class TokenizedSentence( 
     val globalIndex: Int, 
@@ -266,12 +273,20 @@ fun ReadingScreen(
         ttsHelper.setSpeechRate(newSpeed) 
     } 
     
+    var storyGenerationJob by remember { mutableStateOf<Job?>(null) } 
+    var audioSynthesisJob by remember { mutableStateOf<Job?>(null) } 
+    var isGeneratingStory by remember { mutableStateOf(false) } 
+    var generationError by remember { mutableStateOf<String?>(null) } 
+    var showInternetConsentDialog by remember { mutableStateOf(false) } 
+    
     DisposableEffect(Unit) { 
         onDispose { 
             audioService.stopAudio() 
             ttsHelper.stop() 
             ttsHelper.shutdown() 
             activeSentenceIndex = -1 
+            storyGenerationJob?.cancel() 
+            audioSynthesisJob?.cancel() 
         } 
     } 
     
@@ -296,9 +311,6 @@ fun ReadingScreen(
         isFloatingMinimized = false 
         floatingDockedSide = 1 
     } 
-    var isGeneratingStory by remember { mutableStateOf(false) } 
-    var generationError by remember { mutableStateOf<String?>(null) } 
-    var showInternetConsentDialog by remember { mutableStateOf(false) } 
     
     val userAnswers = remember { mutableStateMapOf<Int, Int>() } 
     var quizCurrentIndex by remember { mutableIntStateOf(0) } 
@@ -430,78 +442,89 @@ fun ReadingScreen(
     var customStoryTheme by remember { mutableStateOf(prefs.customStoryTheme) } 
     var customStoryTopic by remember { mutableStateOf(prefs.customStoryTopic) } 
     
+    fun cancelStoryGeneration() { 
+        storyGenerationJob?.cancel() 
+        storyGenerationJob = null 
+        isGeneratingStory = false 
+    } 
+
     fun executeGeneration() { 
-        coroutineScope.launch { 
-            if (prefs.storyDailyEnergyRemaining <= 0) { 
-                generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
-                return@launch 
-            } 
-            isGeneratingStory = true 
-            generationError = null 
-            
-            val (targetTheme, targetTopic) = if (isCustomThemeModeActive && !customStoryTheme.isNullOrBlank()) { 
-                val chosenTheme = customStoryTheme!! 
-                val chosenTopic = customStoryTopic ?: run { 
-                    val topics = StoryThemes.CATEGORIES[chosenTheme] ?: emptyList() 
-                    val eligible = topics.filter { it !in prefs.disabledStoryTopics }.ifEmpty { topics } 
-                    if (eligible.isNotEmpty()) eligible.random() else "A memorable event" 
+        storyGenerationJob?.cancel() 
+        storyGenerationJob = coroutineScope.launch { 
+            try { 
+                if (prefs.storyDailyEnergyRemaining <= 0) { 
+                    generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
+                    return@launch 
                 } 
-                Pair(chosenTheme, chosenTopic) 
-            } else { 
-                StoryThemes.getRandomThemeAndTopic( 
-                    disabledThemes = prefs.disabledStoryThemes, 
-                    disabledTopics = prefs.disabledStoryTopics 
-                ) 
-            } 
-            
-            val count = prefs.storyConnectingWordsCount 
-            val allWords = vocabSummary?.words ?: emptyList() 
-            val filter = prefs.storyVocabularyFilter 
-            val eligibleVocab = when { 
-                filter == "all" || filter.isBlank() -> allWords 
-                filter.equals("suspense", ignoreCase = true) || filter.equals("suspended", ignoreCase = true) -> 
-                    allWords.filter { it.isSuspended || it.state.equals("suspended", ignoreCase = true) || it.state.equals("suspense", ignoreCase = true) } 
-                else -> 
-                    allWords.filter { !it.isSuspended && it.state.equals(filter, ignoreCase = true) } 
-            } 
-            val words = when { 
-                count == -1 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled() 
-                count > 0 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled().take(count) 
-                else -> emptyList() 
-            } 
-            val result = storyService.generateStory( 
-                apiKey = apiKey, 
-                jlptLevel = selectedJlpt, 
-                vocabularyList = words, 
-                preferredModel = selectedModel, 
-                theme = targetTheme, 
-                topic = targetTopic, 
-                storyLength = prefs.storyLength, 
-                questionsCount = prefs.storyQuestionsCount 
-            ) 
-            result.onSuccess { story -> 
-                val enrichedStory = if (story.targetWordsData.isEmpty() && words.isNotEmpty()) { 
-                    story.copy( 
-                        targetWordsData = words.map { 
-                            StoryWordItem( 
-                                kanji = it.kanji.ifBlank { it.reading }, 
-                                reading = it.reading, 
-                                meaning = it.meaning 
-                            ) 
-                        } 
-                    ) 
+                isGeneratingStory = true 
+                generationError = null 
+                
+                val (targetTheme, targetTopic) = if (isCustomThemeModeActive && !customStoryTheme.isNullOrBlank()) { 
+                    val chosenTheme = customStoryTheme!! 
+                    val chosenTopic = customStoryTopic ?: run { 
+                        val topics = StoryThemes.CATEGORIES[chosenTheme] ?: emptyList() 
+                        val eligible = topics.filter { it !in prefs.disabledStoryTopics }.ifEmpty { topics } 
+                        if (eligible.isNotEmpty()) eligible.random() else "A memorable event" 
+                    } 
+                    Pair(chosenTheme, chosenTopic) 
                 } else { 
-                    story 
+                    StoryThemes.getRandomThemeAndTopic( 
+                        disabledThemes = prefs.disabledStoryThemes, 
+                        disabledTopics = prefs.disabledStoryTopics 
+                    ) 
                 } 
-                currentStory = enrichedStory 
-                historyManager.saveStory(enrichedStory) 
-                savedStories = historyManager.getStories() 
-                prefs.consumeDailyStoryEnergy() 
-                onTopBarStatsChanged() 
-            }.onFailure { err -> 
-                generationError = err.message ?: "Failed to generate story" 
+                
+                val count = prefs.storyConnectingWordsCount 
+                val allWords = vocabSummary?.words ?: emptyList() 
+                val filter = prefs.storyVocabularyFilter 
+                val eligibleVocab = when { 
+                    filter == "all" || filter.isBlank() -> allWords 
+                    filter.equals("suspense", ignoreCase = true) || filter.equals("suspended", ignoreCase = true) -> 
+                        allWords.filter { it.isSuspended || it.state.equals("suspended", ignoreCase = true) || it.state.equals("suspense", ignoreCase = true) } 
+                    else -> 
+                        allWords.filter { !it.isSuspended && it.state.equals(filter, ignoreCase = true) } 
+                } 
+                val words = when { 
+                    count == -1 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled() 
+                    count > 0 && eligibleVocab.isNotEmpty() -> eligibleVocab.shuffled().take(count) 
+                    else -> emptyList() 
+                } 
+                val result = storyService.generateStory( 
+                    apiKey = apiKey, 
+                    jlptLevel = selectedJlpt, 
+                    vocabularyList = words, 
+                    preferredModel = selectedModel, 
+                    theme = targetTheme, 
+                    topic = targetTopic, 
+                    storyLength = prefs.storyLength, 
+                    questionsCount = prefs.storyQuestionsCount 
+                ) 
+                result.onSuccess { story -> 
+                    val enrichedStory = if (story.targetWordsData.isEmpty() && words.isNotEmpty()) { 
+                        story.copy( 
+                            targetWordsData = words.map { 
+                                StoryWordItem( 
+                                    kanji = it.kanji.ifBlank { it.reading }, 
+                                    reading = it.reading, 
+                                    meaning = it.meaning 
+                                ) 
+                            } 
+                        ) 
+                    } else { 
+                        story 
+                    } 
+                    currentStory = enrichedStory 
+                    historyManager.saveStory(enrichedStory) 
+                    savedStories = historyManager.getStories() 
+                    prefs.consumeDailyStoryEnergy() 
+                    onTopBarStatsChanged() 
+                }.onFailure { err -> 
+                    generationError = err.message ?: "Failed to generate story" 
+                } 
+            } finally { 
+                isGeneratingStory = false 
+                storyGenerationJob = null 
             } 
-            isGeneratingStory = false 
         } 
     } 
     
@@ -527,6 +550,13 @@ fun ReadingScreen(
         return (frac * durMs).toInt() 
     } 
 
+    fun cancelAudioSynthesis() { 
+        audioSynthesisJob?.cancel() 
+        audioSynthesisJob = null 
+        isSynthesizingAudio = false 
+        currentlyPlayingStoryId = null 
+    } 
+
     fun startNarration(fromSentenceIdx: Int = -1) { 
         val s = story ?: return 
         audioService.stopAudio() 
@@ -541,56 +571,62 @@ fun ReadingScreen(
         val currentModel = prefs.fishAudioModel 
         if (currentApiKey.isNotBlank()) { 
             isSynthesizingAudio = true 
-            coroutineScope.launch { 
-                val narrationText = "${s.title}。\n\n${s.content}" 
-                val result = audioService.synthesizeStoryAudio( 
-                    apiKey = currentApiKey, 
-                    voiceId = currentVoiceId, 
-                    model = currentModel, 
-                    storyId = s.id, 
-                    text = narrationText 
-                ) 
-                isSynthesizingAudio = false 
-                result.onSuccess { audioFile -> 
-                    isNarrating = true 
-                    isAudioPaused = false 
-                    currentlyPlayingStoryId = s.id 
-                    audioService.playAudio( 
-                        file = audioFile, 
-                        speed = narrationSpeed, 
-                        onPlaybackStateChanged = { playing -> 
-                            if (!isAudioPaused) { 
-                                isNarrating = playing 
-                            } 
-                            if (playing) { 
-                                currentlyPlayingStoryId = s.id 
-                            } else if (currentlyPlayingStoryId == s.id && !isAudioPaused) { 
-                                currentlyPlayingStoryId = null 
-                                activeSentenceIndex = -1 
-                            } 
-                        }, 
-                        onCompletion = { 
-                            isNarrating = false 
-                            isAudioPaused = false 
-                            if (currentlyPlayingStoryId == s.id) { 
-                                currentlyPlayingStoryId = null 
-                                activeSentenceIndex = -1 
-                            } 
-                        } 
+            audioSynthesisJob?.cancel() 
+            audioSynthesisJob = coroutineScope.launch { 
+                try { 
+                    val narrationText = "${s.title}。\n\n${s.content}" 
+                    val result = audioService.synthesizeStoryAudio( 
+                        apiKey = currentApiKey, 
+                        voiceId = currentVoiceId, 
+                        model = currentModel, 
+                        storyId = s.id, 
+                        text = narrationText 
                     ) 
-                    if (fromSentenceIdx >= 0) { 
-                        delay(200) 
-                        val dur = audioService.getDurationMs() 
-                        val targetMs = getSentencePositionMs(fromSentenceIdx, dur) 
-                        audioService.seekTo(targetMs) 
-                        activeSentenceIndex = fromSentenceIdx 
+                    isSynthesizingAudio = false 
+                    result.onSuccess { audioFile -> 
+                        isNarrating = true 
+                        isAudioPaused = false 
+                        currentlyPlayingStoryId = s.id 
+                        audioService.playAudio( 
+                            file = audioFile, 
+                            speed = narrationSpeed, 
+                            onPlaybackStateChanged = { playing -> 
+                                if (!isAudioPaused) { 
+                                    isNarrating = playing 
+                                } 
+                                if (playing) { 
+                                    currentlyPlayingStoryId = s.id 
+                                } else if (currentlyPlayingStoryId == s.id && !isAudioPaused) { 
+                                    currentlyPlayingStoryId = null 
+                                    activeSentenceIndex = -1 
+                                } 
+                            }, 
+                            onCompletion = { 
+                                isNarrating = false 
+                                isAudioPaused = false 
+                                if (currentlyPlayingStoryId == s.id) { 
+                                    currentlyPlayingStoryId = null 
+                                    activeSentenceIndex = -1 
+                                } 
+                            } 
+                        ) 
+                        if (fromSentenceIdx >= 0) { 
+                            delay(200) 
+                            val dur = audioService.getDurationMs() 
+                            val targetMs = getSentencePositionMs(fromSentenceIdx, dur) 
+                            audioService.seekTo(targetMs) 
+                            activeSentenceIndex = fromSentenceIdx 
+                        } 
+                    }.onFailure { error -> 
+                        isNarrating = false 
+                        isAudioPaused = false 
+                        currentlyPlayingStoryId = null 
+                        activeSentenceIndex = -1 
+                        Toast.makeText(context, "Narration error: ${error.message ?: "Failed to generate audio"}", Toast.LENGTH_LONG).show() 
                     } 
-                }.onFailure { error -> 
-                    isNarrating = false 
-                    isAudioPaused = false 
-                    currentlyPlayingStoryId = null 
-                    activeSentenceIndex = -1 
-                    Toast.makeText(context, "Narration error: ${error.message ?: "Failed to generate audio"}", Toast.LENGTH_LONG).show() 
+                } finally { 
+                    isSynthesizingAudio = false 
+                    audioSynthesisJob = null 
                 } 
             } 
         } else { 
@@ -685,6 +721,8 @@ fun ReadingScreen(
     } 
 
     fun stopNarration() { 
+        audioSynthesisJob?.cancel() 
+        audioSynthesisJob = null 
         audioService.stopAudio() 
         ttsHelper.stop() 
         isNarrating = false 
@@ -817,7 +855,7 @@ fun ReadingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween 
                 ) { 
                     Text( 
-                        text = "Story Immersion", 
+                        text = "Tune Story", 
                         fontSize = 15.sp, 
                         fontWeight = FontWeight.Bold, 
                         color = BlossomColors.TextPrimary 
@@ -1049,7 +1087,9 @@ fun ReadingScreen(
 
                                 IconButton( 
                                     onClick = { 
-                                        if (isCurrentStoryPlaying || isCurrentStoryPaused || isCurrentStorySynthesizing) { 
+                                        if (isCurrentStorySynthesizing) { 
+                                            cancelAudioSynthesis() 
+                                        } else if (isCurrentStoryPlaying || isCurrentStoryPaused) { 
                                             stopNarration() 
                                         } else { 
                                             startNarration() 
@@ -1057,11 +1097,19 @@ fun ReadingScreen(
                                     } 
                                 ) { 
                                     if (isCurrentStorySynthesizing) { 
-                                        CircularProgressIndicator( 
-                                            modifier = Modifier.size(18.dp), 
-                                            strokeWidth = 2.dp, 
-                                            color = BlossomColors.SakuraRose 
-                                        ) 
+                                        Box(contentAlignment = Alignment.Center) { 
+                                            CircularProgressIndicator( 
+                                                modifier = Modifier.size(20.dp), 
+                                                strokeWidth = 2.dp, 
+                                                color = BlossomColors.SakuraRose 
+                                            ) 
+                                            Icon( 
+                                                Icons.Filled.Close, 
+                                                contentDescription = "Cancel Audio Generation", 
+                                                tint = BlossomColors.BlossomRed, 
+                                                modifier = Modifier.size(12.dp) 
+                                            ) 
+                                        } 
                                     } else if (isCurrentStoryPlaying || isCurrentStoryPaused) { 
                                         Icon( 
                                             Icons.Filled.Stop, 
@@ -1223,6 +1271,19 @@ fun ReadingScreen(
                                         } 
                                     } 
                                     
+                                    if (isSynthesizingAudio) { 
+                                        IconButton( 
+                                            onClick = { cancelAudioSynthesis() }, 
+                                            modifier = Modifier.size(30.dp) 
+                                        ) { 
+                                            Icon( 
+                                                Icons.Filled.Close, 
+                                                contentDescription = "Cancel Audio Generation", 
+                                                tint = BlossomColors.BlossomRed, 
+                                                modifier = Modifier.size(18.dp) 
+                                            ) 
+                                        } 
+                                    } 
                                     Row( 
                                         verticalAlignment = Alignment.CenterVertically, 
                                         horizontalArrangement = Arrangement.spacedBy(4.dp) 
@@ -1555,11 +1616,20 @@ fun ReadingScreen(
                                         shape = RoundedCornerShape(14.dp), 
                                         color = BlossomColors.SurfaceElevated, 
                                         border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                        modifier = Modifier.fillMaxWidth() 
+                                        modifier = Modifier 
+                                            .fillMaxWidth() 
+                                            .then( 
+                                                if (isTargetWordsCollapsed) { 
+                                                    Modifier.clickable { isTargetWordsCollapsed = false } 
+                                                } else Modifier 
+                                            ) 
                                     ) { 
                                                 Column(modifier = Modifier.padding(14.dp)) { 
                                                     Row( 
-                                                        modifier = Modifier.fillMaxWidth(), 
+                                                        modifier = Modifier 
+                                                            .fillMaxWidth() 
+                                                            .clip(RoundedCornerShape(8.dp)) 
+                                                            .clickable { isTargetWordsCollapsed = !isTargetWordsCollapsed }, 
                                                         verticalAlignment = Alignment.CenterVertically, 
                                                         horizontalArrangement = Arrangement.SpaceBetween 
                                                     ) { 
@@ -1663,11 +1733,20 @@ fun ReadingScreen(
                                                 shape = RoundedCornerShape(14.dp), 
                                                 color = BlossomColors.SurfaceElevated, 
                                                 border = BorderStroke(1.dp, BlossomColors.CardBorder), 
-                                                modifier = Modifier.fillMaxWidth() 
+                                                modifier = Modifier 
+                                                    .fillMaxWidth() 
+                                                    .then( 
+                                                        if (isStoryWordsCollapsed) { 
+                                                            Modifier.clickable { isStoryWordsCollapsed = false } 
+                                                        } else Modifier 
+                                                    ) 
                                             ) { 
                                                 Column(modifier = Modifier.padding(14.dp)) { 
                                                     Row( 
-                                                        modifier = Modifier.fillMaxWidth(), 
+                                                        modifier = Modifier 
+                                                            .fillMaxWidth() 
+                                                            .clip(RoundedCornerShape(8.dp)) 
+                                                            .clickable { isStoryWordsCollapsed = !isStoryWordsCollapsed }, 
                                                         verticalAlignment = Alignment.CenterVertically, 
                                                         horizontalArrangement = Arrangement.SpaceBetween 
                                                     ) { 
@@ -1731,16 +1810,6 @@ fun ReadingScreen(
                                                                                 maxLines = 1, 
                                                                                 softWrap = false 
                                                                             ) 
-                                                                            if (wordItem.reading.isNotBlank()) { 
-                                                                                Spacer(modifier = Modifier.width(4.dp)) 
-                                                                                Text( 
-                                                                                    text = "(${wordItem.reading})", 
-                                                                                    fontSize = 10.sp, 
-                                                                                    color = BlossomColors.TextMuted, 
-                                                                                    maxLines = 1, 
-                                                                                    softWrap = false 
-                                                                                ) 
-                                                                            } 
                                                                         } 
                                                                     } 
                                                                 } 
@@ -1821,100 +1890,123 @@ fun ReadingScreen(
             else -> BlossomColors.SakuraRoseLip 
         } 
         
-        Squircle3DButton( 
-            onClick = { 
-                if (apiKey.isBlank()) { 
-                    showApiKeyDialog = true 
-                } else if (!prefs.hasAcceptedInternetDisclosure) { 
-                    showInternetConsentDialog = true 
-                } else if (prefs.storyDailyEnergyRemaining <= 0) { 
-                    generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
-                } else { 
-                    executeGeneration() 
-                } 
-            }, 
-            enabled = !isGeneratingStory, 
-            modifier = Modifier 
-                .fillMaxWidth() 
-                .height(50.dp), 
-            containerColor = buttonBackground, 
-            bevelColor = buttonBevel, 
-            shape = BlossomShapes.SquircleMedium, 
-            depth = 3.dp, 
-            hasSweepingShine = !isLockedWithoutKey && !isGeneratingStory 
+        Row( 
+            modifier = Modifier.fillMaxWidth(), 
+            horizontalArrangement = Arrangement.spacedBy(8.dp), 
+            verticalAlignment = Alignment.CenterVertically 
         ) { 
-            AnimatedContent( 
-                targetState = when { 
-                    isGeneratingStory -> 0 
-                    isLockedWithoutKey -> 1 
-                    else -> 2 
+            Squircle3DButton( 
+                onClick = { 
+                    if (apiKey.isBlank()) { 
+                        showApiKeyDialog = true 
+                    } else if (!prefs.hasAcceptedInternetDisclosure) { 
+                        showInternetConsentDialog = true 
+                    } else if (prefs.storyDailyEnergyRemaining <= 0) { 
+                        generationError = "Daily story energy depleted (0/7). Resets tomorrow!" 
+                    } else { 
+                        executeGeneration() 
+                    } 
                 }, 
-                transitionSpec = { 
-                    fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(150)) 
-                }, 
-                label = "StoryButtonStateTransition" 
-            ) { state -> 
-                Row( 
-                    verticalAlignment = Alignment.CenterVertically, 
-                    horizontalArrangement = Arrangement.Center, 
-                    modifier = Modifier.padding(horizontal = 16.dp) 
-                ) { 
-                    when (state) { 
-                        0 -> { 
-                            CircularProgressIndicator( 
-                                modifier = Modifier.size(18.dp), 
-                                strokeWidth = 2.dp, 
-                                color = BlossomColors.BlossomWhite 
-                            ) 
-                            Spacer(modifier = Modifier.width(10.dp)) 
-                            RotatingStatusText( 
-                                phrases = listOf( 
-                                    "Crafting $selectedJlpt story...", 
-                                    "Weaving the plot...", 
-                                    "Polishing details...", 
-                                    "Adding some flair...", 
-                                    "Fine-tuning emotions...", 
-                                    "Almost there..." 
-                                ), 
-                                isGenerating = isGeneratingStory, 
-                                color = BlossomColors.BlossomWhite 
-                            ) 
-                        } 
-                        1 -> { 
-                            Icon( 
-                                Icons.Filled.Lock, 
-                                contentDescription = "API Key Required", 
-                                modifier = Modifier.size(18.dp), 
-                                tint = BlossomColors.BlossomRed 
-                            ) 
-                            Spacer(modifier = Modifier.width(8.dp)) 
-                            Text( 
-                                text = "Set up API Key to Generate", 
-                                fontWeight = FontWeight.SemiBold, 
-                                fontSize = 15.sp, 
-                                color = BlossomColors.BlossomRed, 
-                                maxLines = 1, 
-                                softWrap = false 
-                            ) 
-                        } 
-                        else -> { 
-                            Icon( 
-                                Icons.Filled.AutoAwesome, 
-                                contentDescription = null, 
-                                modifier = Modifier.size(18.dp), 
-                                tint = BlossomColors.BlossomWhite 
-                            ) 
-                            Spacer(modifier = Modifier.width(8.dp)) 
-                            Text( 
-                                text = if (currentStory == null) "Generate $selectedJlpt Story (${prefs.storyDailyEnergyRemaining}/7)" else "Generate Another Story (${prefs.storyDailyEnergyRemaining}/7)", 
-                                fontWeight = FontWeight.SemiBold, 
-                                fontSize = 15.sp, 
-                                color = BlossomColors.BlossomWhite, 
-                                maxLines = 1, 
-                                softWrap = false 
-                            ) 
+                enabled = !isGeneratingStory, 
+                modifier = Modifier 
+                    .weight(1f) 
+                    .height(50.dp), 
+                containerColor = buttonBackground, 
+                bevelColor = buttonBevel, 
+                shape = BlossomShapes.SquircleMedium, 
+                depth = 3.dp, 
+                hasSweepingShine = !isLockedWithoutKey && !isGeneratingStory 
+            ) { 
+                AnimatedContent( 
+                    targetState = when { 
+                        isGeneratingStory -> 0 
+                        isLockedWithoutKey -> 1 
+                        else -> 2 
+                    }, 
+                    transitionSpec = { 
+                        fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(150)) 
+                    }, 
+                    label = "StoryButtonStateTransition" 
+                ) { state -> 
+                    Row( 
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.Center, 
+                        modifier = Modifier.padding(horizontal = 16.dp) 
+                    ) { 
+                        when (state) { 
+                            0 -> { 
+                                CircularProgressIndicator( 
+                                    modifier = Modifier.size(18.dp), 
+                                    strokeWidth = 2.dp, 
+                                    color = BlossomColors.BlossomWhite 
+                                ) 
+                                Spacer(modifier = Modifier.width(10.dp)) 
+                                RotatingStatusText( 
+                                    phrases = listOf( 
+                                        "Crafting $selectedJlpt story...", 
+                                        "Weaving the plot...", 
+                                        "Polishing details...", 
+                                        "Adding some flair...", 
+                                        "Fine-tuning emotions...", 
+                                        "Almost there..." 
+                                    ), 
+                                    isGenerating = isGeneratingStory, 
+                                    color = BlossomColors.BlossomWhite 
+                                ) 
+                            } 
+                            1 -> { 
+                                Icon( 
+                                    Icons.Filled.Lock, 
+                                    contentDescription = "API Key Required", 
+                                    modifier = Modifier.size(18.dp), 
+                                    tint = BlossomColors.BlossomRed 
+                                ) 
+                                Spacer(modifier = Modifier.width(8.dp)) 
+                                Text( 
+                                    text = "Set up API Key to Generate", 
+                                    fontWeight = FontWeight.SemiBold, 
+                                    fontSize = 15.sp, 
+                                    color = BlossomColors.BlossomRed, 
+                                    maxLines = 1, 
+                                    softWrap = false 
+                                ) 
+                            } 
+                            else -> { 
+                                Icon( 
+                                    Icons.Filled.AutoAwesome, 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(18.dp), 
+                                    tint = BlossomColors.BlossomWhite 
+                                ) 
+                                Spacer(modifier = Modifier.width(8.dp)) 
+                                Text( 
+                                    text = if (currentStory == null) "Generate $selectedJlpt Story (${prefs.storyDailyEnergyRemaining}/7)" else "Forge New Story (${prefs.storyDailyEnergyRemaining}/7)", 
+                                    fontWeight = FontWeight.SemiBold, 
+                                    fontSize = 15.sp, 
+                                    color = BlossomColors.BlossomWhite, 
+                                    maxLines = 1, 
+                                    softWrap = false 
+                                ) 
+                            } 
                         } 
                     } 
+                } 
+            } 
+            if (isGeneratingStory) { 
+                Squircle3DButton( 
+                    onClick = { cancelStoryGeneration() }, 
+                    modifier = Modifier.size(50.dp), 
+                    containerColor = BlossomColors.BlossomRed, 
+                    bevelColor = BlossomColors.BlossomRedLip, 
+                    shape = BlossomShapes.SquircleMedium, 
+                    depth = 3.dp 
+                ) { 
+                    Icon( 
+                        imageVector = Icons.Filled.Close, 
+                        contentDescription = "Cancel", 
+                        tint = Color.White, 
+                        modifier = Modifier.size(22.dp) 
+                    ) 
                 } 
             } 
         } 
@@ -2207,6 +2299,19 @@ fun ReadingScreen(
                                     verticalAlignment = Alignment.CenterVertically, 
                                     horizontalArrangement = Arrangement.spacedBy(4.dp) 
                                 ) { 
+                                    if (isSynthesizingAudio) { 
+                                        IconButton( 
+                                            onClick = { cancelAudioSynthesis() }, 
+                                            modifier = Modifier.size(36.dp) 
+                                        ) { 
+                                            Icon( 
+                                                imageVector = Icons.Filled.Close, 
+                                                contentDescription = "Cancel Audio Generation", 
+                                                tint = BlossomColors.BlossomRed, 
+                                                modifier = Modifier.size(20.dp) 
+                                            ) 
+                                        } 
+                                    } 
                                     IconButton( 
                                         onClick = { 
                                             floatingDockedSide = if (-floatingOffsetX >= maxTravel * 0.5f) -1 else 1 
@@ -2470,22 +2575,39 @@ fun ReadingScreen(
                         contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp) 
                     ) { 
                         items(savedStories, key = { it.id }) { item -> 
-                            val itemCoverFile = remember(item.id, wallpaperUpdateTrigger) { 
-                                val f = File(context.filesDir, "stories/images/${item.id}/cover.png") 
-                                if (f.exists()) f else null 
-                            } 
-                            val itemBitmap = remember(itemCoverFile) { 
-                                itemCoverFile?.let { f -> 
-                                    try { 
-                                        BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() 
-                                    } catch (e: Exception) { 
-                                        null 
-                                    } 
+                            val isActiveStory = (currentStory?.id ?: prefs.lastReadStoryId) == item.id 
+                            val itemBitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = storyThumbnailCache.get(item.id), key1 = item.id, key2 = wallpaperUpdateTrigger) { 
+                                val cached = storyThumbnailCache.get(item.id) 
+                                if (cached != null) { 
+                                    value = cached 
+                                    return@produceState 
                                 } 
+                                val bmp = withContext(Dispatchers.IO) { 
+                                    val f = File(context.filesDir, "stories/images/${item.id}/cover.png") 
+                                    if (f.exists()) { 
+                                        try { 
+                                            val options = BitmapFactory.Options().apply { 
+                                                inSampleSize = 2 
+                                            } 
+                                            BitmapFactory.decodeFile(f.absolutePath, options)?.asImageBitmap() 
+                                        } catch (e: Exception) { 
+                                            null 
+                                        } 
+                                    } else null 
+                                } 
+                                if (bmp != null) { 
+                                    storyThumbnailCache.put(item.id, bmp) 
+                                } 
+                                value = bmp 
                             } 
 
-                            val itemStorage = remember(item.id) { historyManager.getStoryStorageBytes(item) } 
-                            val itemStorageFormatted = remember(itemStorage) { historyManager.formatStorageSize(itemStorage) } 
+                            val itemStorageFormatted by produceState(initialValue = "", key1 = item.id) { 
+                                val formatted = withContext(Dispatchers.IO) { 
+                                    val bytes = historyManager.getStoryStorageBytes(item) 
+                                    historyManager.formatStorageSize(bytes) 
+                                } 
+                                value = formatted 
+                            } 
 
                             Squircle3DCard( 
                                 onClick = { 
@@ -2501,14 +2623,15 @@ fun ReadingScreen(
                                 shape = RoundedCornerShape(16.dp), 
                                 containerColor = BlossomColors.SurfaceElevated, 
                                 borderBrush = androidx.compose.ui.graphics.SolidColor( 
-                                    if (item.isPassed) BlossomColors.BlossomGreen else BlossomColors.CardBorder 
+                                    if (isActiveStory) BlossomColors.BlossomGreen else BlossomColors.CardBorder 
                                 ), 
                                 depth = 3.dp 
                             ) { 
                                 Box(modifier = Modifier.fillMaxSize()) { 
-                                    if (itemBitmap != null) { 
+                                    val bmp = itemBitmap 
+                                    if (bmp != null) { 
                                         Image( 
-                                            bitmap = itemBitmap, 
+                                            bitmap = bmp, 
                                             contentDescription = null, 
                                             contentScale = ContentScale.Crop, 
                                             modifier = Modifier.fillMaxSize() 
@@ -2555,6 +2678,25 @@ fun ReadingScreen(
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
                                                     ) 
                                                 } 
+                                                if (!item.theme.isNullOrBlank()) { 
+                                                    Spacer(modifier = Modifier.width(6.dp)) 
+                                                    val themeBadge = StoryThemes.getThemeBadgeColors(item.theme) 
+                                                    Surface( 
+                                                        shape = RoundedCornerShape(6.dp), 
+                                                        color = themeBadge.backgroundColor, 
+                                                        border = BorderStroke(1.dp, themeBadge.borderColor) 
+                                                    ) { 
+                                                        Text( 
+                                                            text = StoryThemes.formatThemeName(item.theme), 
+                                                            fontSize = 10.sp, 
+                                                            fontWeight = FontWeight.Bold, 
+                                                            color = themeBadge.contentColor, 
+                                                            maxLines = 1, 
+                                                            softWrap = false, 
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
+                                                        ) 
+                                                    } 
+                                                } 
                                                 if (item.isPassed) { 
                                                     Spacer(modifier = Modifier.width(6.dp)) 
                                                     Surface( 
@@ -2573,19 +2715,18 @@ fun ReadingScreen(
                                                         ) 
                                                     } 
                                                 } 
-                                                if (!item.theme.isNullOrBlank()) { 
+                                                if (isActiveStory) { 
                                                     Spacer(modifier = Modifier.width(6.dp)) 
-                                                    val themeBadge = StoryThemes.getThemeBadgeColors(item.theme) 
                                                     Surface( 
                                                         shape = RoundedCornerShape(6.dp), 
-                                                        color = themeBadge.backgroundColor, 
-                                                        border = BorderStroke(1.dp, themeBadge.borderColor) 
+                                                        color = BlossomColors.BlossomGreenSurface, 
+                                                        border = BorderStroke(1.dp, BlossomColors.BlossomGreen) 
                                                     ) { 
                                                         Text( 
-                                                            text = StoryThemes.formatThemeName(item.theme), 
+                                                            text = "Active", 
                                                             fontSize = 10.sp, 
                                                             fontWeight = FontWeight.Bold, 
-                                                            color = themeBadge.contentColor, 
+                                                            color = BlossomColors.BlossomGreen, 
                                                             maxLines = 1, 
                                                             softWrap = false, 
                                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) 
