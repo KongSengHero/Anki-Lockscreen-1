@@ -95,41 +95,13 @@ object CardSessionManager {
             } 
             val oldStats = currentStats 
             reviewHistory.add(Pair(card, oldStats)) 
-            isRevealed = false 
-            val graduating = card.isGoodGraduating 
-            currentStats = when (ease) { 
-                1 -> Triple( 
-                    (oldStats.first - (if (card.cardType == 0) 1 else 0)).coerceAtLeast(0), 
-                    oldStats.second + (if (card.cardType == 0 || card.cardType == 2) 1 else 0), 
-                    (oldStats.third - (if (card.cardType == 2) 1 else 0)).coerceAtLeast(0) 
-                ) 
-                else -> { 
-                    val optNew = if (card.cardType == 0) (oldStats.first - 1).coerceAtLeast(0) else oldStats.first 
-                    val optLearn = when { 
-                        card.cardType == 0 && !graduating -> oldStats.second + 1 
-                        card.cardType == 1 && graduating -> (oldStats.second - 1).coerceAtLeast(0) 
-                        else -> oldStats.second 
-                    } 
-                    val optReview = if (card.cardType == 2) (oldStats.third - 1).coerceAtLeast(0) else oldStats.third 
-                    Triple(optNew, optLearn, optReview) 
-                } 
-            } 
-            addPendingReview( 
-                PendingReview( 
-                    noteId = card.noteId, 
-                    cardOrd = card.cardOrd, 
-                    ease = ease, 
-                    timeTaken = timeTaken, 
-                    deckId = card.deckId, 
-                    buttonCount = card.buttonCount 
-                ) 
-            ) 
-            notifyAllSurfaces(context) 
-            
             Thread { 
+                ankiHelper.answerCard(card.noteId, card.cardOrd, ease, timeTaken, card.deckId, card.buttonCount) 
                 val nextCard = ankiHelper.getNextDueCard(selectedDecks, excludeNoteId = card.noteId) 
+                val freshStats = ankiHelper.getSelectedDeckStats(selectedDecks) 
                 postToMain { 
                     currentCard = nextCard 
+                    currentStats = freshStats 
                     isRevealed = false 
                     notifyAllSurfaces(context) 
                     onComplete?.invoke(nextCard) 

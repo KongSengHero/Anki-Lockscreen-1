@@ -86,8 +86,6 @@ fun DeckCarouselCard(
     deckStatsCache: SnapshotStateMap<Long, Triple<Int, Int, Int>> = remember { mutableStateMapOf() }, 
     onToggleReveal: (CardInfo?, Boolean) -> Unit = { _, _ -> }, 
     onRefresh: () -> Unit = {}, 
-    onOpenSync: (() -> Unit)? = null, 
-    pendingReviewsCount: Int = 0, 
     onAgain: (DeckInfo, CardInfo) -> Unit, 
     onGood: (DeckInfo, CardInfo) -> Unit, 
     onOpenAnki: () -> Unit, 
@@ -260,38 +258,16 @@ fun DeckCarouselCard(
                     } 
                 } 
                 Spacer(modifier = Modifier.weight(1f)) 
-                Surface( 
-                    shape = BlossomShapes.SquircleSmall, 
-                    color = if (pendingReviewsCount > 0) BlossomColors.SakuraRoseContainer else BlossomColors.SurfaceCard3, 
-                    border = BorderStroke( 
-                        1.dp, 
-                        if (pendingReviewsCount > 0) BlossomColors.SakuraRose.copy(alpha = 0.5f) 
-                        else BlossomColors.CardBorder 
-                    ), 
-                    modifier = Modifier 
-                        .clip(BlossomShapes.SquircleSmall) 
-                        .clickable { onOpenSync?.invoke() ?: onRefresh() } 
+                IconButton( 
+                    onClick = onRefresh, 
+                    modifier = Modifier.size(28.dp) 
                 ) { 
-                    Row( 
-                        verticalAlignment = Alignment.CenterVertically, 
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp) 
-                    ) { 
-                        Icon( 
-                            imageVector = Icons.Filled.Sync, 
-                            contentDescription = "Sync", 
-                            tint = if (pendingReviewsCount > 0) BlossomColors.SakuraRose else BlossomColors.SlateBlue, 
-                            modifier = Modifier.size(14.dp) 
-                        ) 
-                        Spacer(modifier = Modifier.width(6.dp)) 
-                        Text( 
-                            text = if (pendingReviewsCount > 0) "Sync ($pendingReviewsCount)" else "Sync", 
-                            fontSize = 12.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = if (pendingReviewsCount > 0) BlossomColors.SakuraRose else BlossomColors.TextPrimary, 
-                            maxLines = 1, 
-                            softWrap = false 
-                        ) 
-                    } 
+                    Icon( 
+                        imageVector = Icons.Filled.Refresh, 
+                        contentDescription = "Refresh", 
+                        tint = BlossomColors.TextSecondary, 
+                        modifier = Modifier.size(16.dp) 
+                    ) 
                 } 
             } 
             
